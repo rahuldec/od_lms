@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/api";
 import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -32,15 +32,17 @@ export default function TraineeHome() {
   const [activeLesson, setActiveLesson] = useState(null);
   const tickRef = useRef(null);
   const tickStartRef = useRef(null);
+  const progressRef = useRef({});
+
+  // keep ref in sync so timer reads latest
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
 
   const reloadProgress = async () => {
-    if (!trainee) return;
-    const { data } = await supabase
-      .from("lesson_progress")
-      .select("*")
-      .eq("trainee_id", trainee.id);
+    const res = await api.myProgress();
     const map = {};
-    (data || []).forEach((p) => (map[p.lesson_id] = p));
+    (res.progress || []).forEach((p) => (map[p.lesson_id] = p));
     setProgress(map);
   };
 
@@ -48,8 +50,9 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const [mods] = await Promise.all([fetchSheetModules(), reloadProgress()]);
+        const mods = await fetchSheetModules();
         setModules(mods);
+        await reloadProgress();
       } catch (e) {
         toast.error("Could not load training content");
       } finally {
@@ -60,7 +63,9 @@ export default function TraineeHome() {
   }, [trainee?.id]);
 
   const stats = useMemo(() => {
-    const lessons = modules.flatMap((m) => m.lessons.filter((l) => l.kind === "video"));
+    const lessons = modules.flatMap((m) =>
+      m.lessons.filter((l) => l.kind === "video")
+    );
     const total = lessons.length;
     const watched = lessons.filter((l) => progress[l.id]?.watched).length;
     const seconds = Object.values(progress).reduce(
@@ -70,40 +75,8 @@ export default function TraineeHome() {
     return { total, watched, seconds, pct: total ? (watched / total) * 100 : 0 };
   }, [modules, progress]);
 
-  const upsertProgress = async (lesson, patch) => {
-    if (!trainee) return;
-    const existing = progress[lesson.id];
-    const payload = {
-      trainee_id: trainee.id,
-      lesson_id: lesson.id,
-      watched: existing?.watched || false,
-      watch_seconds: existing?.watch_seconds || 0,
-      ...patch,
-      updated_at: new Date().toISOString(),
-    };
-    let result;
-    if (existing?.id) {
-      result = await supabase
-        .from("lesson_progress")
-        .update(payload)
-        .eq("id", existing.id)
-        .select()
-        .single();
-    } else {
-      result = await supabase
-        .from("lesson_progress")
-        .insert(payload)
-        .select()
-        .single();
-    }
-    if (result.data) {
-      setProgress((prev) => ({ ...prev, [lesson.id]: result.data }));
-    }
-  };
-
-  // Auto-tracking timer while a video lesson is open
   const startTimer = (lesson) => {
-    stopTimer(); // ensure single
+    stopTimer();
     tickStartRef.current = { lessonId: lesson.id, startedAt: Date.now() };
     tickRef.current = setInterval(async () => {
       const ref = tickStartRef.current;
@@ -111,10 +84,15 @@ export default function TraineeHome() {
       const delta = Math.floor((Date.now() - ref.startedAt) / 1000);
       if (delta < 5) return;
       tickStartRef.current = { ...ref, startedAt: Date.now() };
-      const currentSeconds = progress[ref.lessonId]?.watch_seconds || 0;
-      await upsertProgress({ id: ref.lessonId }, {
-        watch_seconds: currentSeconds + delta,
-      });
+      try {
+        const updated = await api.upsertProgress({
+          lesson_id: ref.lessonId,
+          watch_seconds_delta: delta,
+        });
+        setProgress((prev) => ({ ...prev, [ref.lessonId]: updated }));
+      } catch (e) {
+        // silent
+      }
     }, 5000);
   };
 
@@ -127,16 +105,21 @@ export default function TraineeHome() {
     if (ref) {
       const delta = Math.floor((Date.now() - ref.startedAt) / 1000);
       if (delta > 0) {
-        const currentSeconds = progress[ref.lessonId]?.watch_seconds || 0;
-        await upsertProgress({ id: ref.lessonId }, {
-          watch_seconds: currentSeconds + delta,
-        });
+        try {
+          const updated = await api.upsertProgress({
+            lesson_id: ref.lessonId,
+            watch_seconds_delta: delta,
+          });
+          setProgress((prev) => ({ ...prev, [ref.lessonId]: updated }));
+        } catch (e) {
+          // silent
+        }
       }
       tickStartRef.current = null;
     }
   };
 
-  useEffect(() => () => stopTimer(), []); // cleanup on unmount
+  useEffect(() => () => stopTimer(), []);
 
   const openLesson = (lesson) => {
     if (lesson.kind === "assignment" && lesson.assignmentUrl) {
@@ -144,7 +127,11 @@ export default function TraineeHome() {
       return;
     }
     if (lesson.kind === "video" && !lesson.videoEmbedUrl) {
-      toast.info("No video link for this lesson");
+      toast.info("No video link for this lesson yet");
+      return;
+    }
+    if (lesson.kind === "review") {
+      toast.info("Review session - no video");
       return;
     }
     setActiveLesson(lesson);
@@ -158,8 +145,16 @@ export default function TraineeHome() {
 
   const toggleWatched = async (lesson) => {
     const existing = progress[lesson.id];
-    await upsertProgress(lesson, { watched: !existing?.watched });
-    toast.success(existing?.watched ? "Marked as unwatched" : "Marked as watched");
+    try {
+      const updated = await api.upsertProgress({
+        lesson_id: lesson.id,
+        watched: !existing?.watched,
+      });
+      setProgress((prev) => ({ ...prev, [lesson.id]: updated }));
+      toast.success(existing?.watched ? "Marked as unwatched" : "Marked as watched");
+    } catch (e) {
+      toast.error("Could not update");
+    }
   };
 
   if (loading) {
@@ -233,7 +228,9 @@ export default function TraineeHome() {
       <div className="space-y-8">
         {modules.map((mod) => {
           const modLessons = mod.lessons.filter((l) => l.kind === "video");
-          const modWatched = modLessons.filter((l) => progress[l.id]?.watched).length;
+          const modWatched = modLessons.filter(
+            (l) => progress[l.id]?.watched
+          ).length;
           return (
             <section key={mod.id} data-testid={`module-${mod.order}`}>
               <div className="flex items-baseline justify-between mb-3">

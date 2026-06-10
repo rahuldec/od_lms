@@ -5,9 +5,11 @@ import React, {
   useState,
   useCallback,
 } from "react";
+import axios from "axios";
 import { supabase, usernameToEmail } from "@/lib/supabaseClient";
 
 const AuthContext = createContext(null);
+const BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
@@ -15,47 +17,43 @@ export const AuthProvider = ({ children }) => {
   const [trainee, setTrainee] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadRole = useCallback(async (userId) => {
-    if (!userId) {
+  const refreshMe = useCallback(async (token) => {
+    if (!token) {
       setRole(null);
       setTrainee(null);
       return;
     }
-    const { data: rolesRows } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    const r = rolesRows?.[0]?.role || null;
-    setRole(r);
-    if (r === "trainee") {
-      const { data: tRows } = await supabase
-        .from("trainees")
-        .select("*")
-        .eq("auth_user_id", userId)
-        .limit(1);
-      setTrainee(tRows?.[0] || null);
-    } else {
+    try {
+      const { data } = await axios.get(`${BASE}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setRole(data.role);
+      setTrainee(data.trainee);
+    } catch (e) {
+      setRole(null);
       setTrainee(null);
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
+    // ensure admin user is set up server-side on initial load (idempotent)
+    axios.post(`${BASE}/setup/init`).catch(() => {});
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
       setSession(data.session);
-      await loadRole(data.session?.user?.id);
+      await refreshMe(data.session?.access_token);
       setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange(async (_e, s) => {
       setSession(s);
-      await loadRole(s?.user?.id);
+      await refreshMe(s?.access_token);
     });
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [loadRole]);
+  }, [refreshMe]);
 
   const signInAs = async ({ username, password, roleHint }) => {
     const email = usernameToEmail(username, roleHint);
@@ -76,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ session, role, trainee, loading, signInAs, signOut, loadRole }}
+      value={{ session, role, trainee, loading, signInAs, signOut, refreshMe }}
     >
       {children}
     </AuthContext.Provider>

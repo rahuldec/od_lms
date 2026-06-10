@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/api";
 import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, CheckCircle2, Circle, Clock } from "lucide-react";
+import { toast } from "sonner";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -27,15 +28,19 @@ export default function TraineeDetail() {
 
   useEffect(() => {
     (async () => {
-      const [{ data: t }, { data: p }, mods] = await Promise.all([
-        supabase.from("trainees").select("*").eq("id", id).single(),
-        supabase.from("lesson_progress").select("*").eq("trainee_id", id),
-        fetchSheetModules().catch(() => []),
-      ]);
-      setTrainee(t || null);
-      setProgress(p || []);
-      setModules(mods || []);
-      setLoading(false);
+      try {
+        const [tRes, mods] = await Promise.all([
+          api.getTrainee(id),
+          fetchSheetModules().catch(() => []),
+        ]);
+        setTrainee(tRes.trainee || null);
+        setProgress(tRes.progress || []);
+        setModules(mods || []);
+      } catch (e) {
+        toast.error("Failed to load trainee");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [id]);
 
@@ -46,7 +51,11 @@ export default function TraineeDetail() {
   }, [progress]);
 
   const totalLessons = useMemo(
-    () => modules.reduce((acc, m) => acc + m.lessons.filter((l) => l.kind === "video").length, 0),
+    () =>
+      modules.reduce(
+        (acc, m) => acc + m.lessons.filter((l) => l.kind === "video").length,
+        0
+      ),
     [modules]
   );
   const watchedCount = useMemo(
@@ -160,7 +169,8 @@ export default function TraineeDetail() {
           </div>
           <div className="mt-6 flex items-center gap-2 text-sm text-neutral-600">
             <Clock className="h-4 w-4 text-neutral-400" />
-            Total watch time: <span className="font-medium">{fmtMinutes(totalSeconds)}</span>
+            Total watch time:{" "}
+            <span className="font-medium">{fmtMinutes(totalSeconds)}</span>
           </div>
         </Card>
       </div>

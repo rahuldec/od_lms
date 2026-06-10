@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase, usernameToEmail } from "@/lib/supabaseClient";
+import { api } from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,9 @@ const navItems = [
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
 ];
 
+const errMsg = (e) =>
+  e?.response?.data?.detail || e?.message || "Operation failed";
+
 export default function Trainees() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,12 +85,14 @@ export default function Trainees() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("trainees")
-      .select("*")
-      .order("created_at", { ascending: false });
-    setList(data || []);
-    setLoading(false);
+    try {
+      const data = await api.listTrainees();
+      setList(Array.isArray(data) ? data : []);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -136,20 +141,14 @@ export default function Trainees() {
     setSaving(true);
     try {
       if (editing) {
-        const patch = {
+        await api.updateTrainee(editing.id, {
           name: form.name,
           phone: form.phone,
           join_date: form.join_date || null,
           manager: form.manager,
           status: form.status,
           notes: form.notes,
-          username: form.username.trim().toLowerCase(),
-        };
-        const { error } = await supabase
-          .from("trainees")
-          .update(patch)
-          .eq("id", editing.id);
-        if (error) throw error;
+        });
         toast.success("Trainee updated");
       } else {
         if (!form.password || form.password.length < 6) {
@@ -157,50 +156,22 @@ export default function Trainees() {
           setSaving(false);
           return;
         }
-        const username = form.username.trim().toLowerCase();
-        const email = usernameToEmail(username, "trainee");
-        const { data: signed, error: e1 } = await supabase.auth.signUp({
-          email,
-          password: form.password,
-        });
-        if (e1) throw e1;
-        const authUserId = signed?.user?.id;
-        if (!authUserId) {
-          toast.error(
-            "Could not create auth user. Email confirmation may be enabled."
-          );
-          setSaving(false);
-          return;
-        }
-        const insert = {
+        await api.createTrainee({
           name: form.name,
           phone: form.phone,
           join_date: form.join_date || null,
           manager: form.manager,
           status: form.status,
           notes: form.notes,
-          username,
-          auth_user_id: authUserId,
-          current_level: 0,
-          history: [
-            {
-              type: "joined",
-              level: 0,
-              at: new Date().toISOString(),
-            },
-          ],
-        };
-        const { error: e2 } = await supabase.from("trainees").insert(insert);
-        if (e2) throw e2;
-        await supabase
-          .from("user_roles")
-          .insert({ user_id: authUserId, role: "trainee" });
+          username: form.username.trim().toLowerCase(),
+          password: form.password,
+        });
         toast.success("Trainee added");
       }
       setModalOpen(false);
       await load();
     } catch (err) {
-      toast.error(err.message || "Save failed");
+      toast.error(errMsg(err));
     } finally {
       setSaving(false);
     }
@@ -209,16 +180,12 @@ export default function Trainees() {
   const doDelete = async () => {
     if (!confirmDelete) return;
     try {
-      const { error } = await supabase
-        .from("trainees")
-        .delete()
-        .eq("id", confirmDelete.id);
-      if (error) throw error;
+      await api.deleteTrainee(confirmDelete.id);
       toast.success("Trainee removed");
       setConfirmDelete(null);
       await load();
     } catch (err) {
-      toast.error(err.message || "Delete failed");
+      toast.error(errMsg(err));
     }
   };
 
@@ -230,24 +197,11 @@ export default function Trainees() {
     }
     setPromotingId(t.id);
     try {
-      const newHistory = [
-        ...(Array.isArray(t.history) ? t.history : []),
-        {
-          type: "promotion",
-          from: t.current_level ?? 0,
-          to: next,
-          at: new Date().toISOString(),
-        },
-      ];
-      const { error } = await supabase
-        .from("trainees")
-        .update({ current_level: next, history: newHistory })
-        .eq("id", t.id);
-      if (error) throw error;
+      await api.promoteTrainee(t.id);
       toast.success(`${t.name} promoted to Level ${next}`);
       await load();
     } catch (err) {
-      toast.error(err.message || "Promote failed");
+      toast.error(errMsg(err));
     } finally {
       setPromotingId(null);
     }
@@ -545,8 +499,8 @@ export default function Trainees() {
               Remove {confirmDelete?.name}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This removes the trainee record. Their authentication login
-              remains in Supabase but they will no longer be tracked here.
+              This permanently removes the trainee, their login and their
+              lesson progress.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

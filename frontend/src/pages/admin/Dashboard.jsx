@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { api } from "@/lib/api";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Users, TrendingUp, CheckCircle2, PauseCircle } from "lucide-react";
+import { toast } from "sonner";
 
 const Stat = ({ icon: Icon, label, value, accent, testId }) => (
   <Card
@@ -62,12 +63,14 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("trainees")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setTrainees(data || []);
-      setLoading(false);
+      try {
+        const data = await api.listTrainees();
+        setTrainees(Array.isArray(data) ? data : []);
+      } catch (e) {
+        toast.error("Could not load trainees");
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -79,7 +82,6 @@ export default function AdminDashboard() {
     (lvl) => trainees.filter((t) => (t.current_level ?? 0) === lvl).length
   );
 
-  // promotions this month: count of level changes where last history entry is in current month
   const now = new Date();
   const promotionsThisMonth = trainees.reduce((acc, t) => {
     const history = Array.isArray(t.history) ? t.history : [];

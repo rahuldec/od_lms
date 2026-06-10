@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { supabase, ADMIN_USERNAME, ADMIN_DEFAULT_PASSWORD, usernameToEmail } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Loader2, KeyRound, GraduationCap } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import axios from "axios";
 
 const Tab = ({ active, onClick, children, testId }) => (
   <button
@@ -26,50 +27,11 @@ const Tab = ({ active, onClick, children, testId }) => (
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signInAs, loadRole } = useAuth();
+  const { signInAs, refreshMe } = useAuth();
   const [tab, setTab] = useState("trainee");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const ensureAdminBootstrap = async () => {
-    // Try sign in as admin with default password. If user does not exist, create it.
-    const email = usernameToEmail(ADMIN_USERNAME, "admin");
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: ADMIN_DEFAULT_PASSWORD,
-    });
-    if (!error) {
-      // Already exists; ensure role row
-      const { data: u } = await supabase.auth.getUser();
-      if (u?.user) {
-        const { data: rr } = await supabase
-          .from("user_roles")
-          .select("id")
-          .eq("user_id", u.user.id);
-        if (!rr || rr.length === 0) {
-          await supabase
-            .from("user_roles")
-            .insert({ user_id: u.user.id, role: "admin" });
-        }
-      }
-      await supabase.auth.signOut();
-      return { created: false };
-    }
-    // Try to create
-    const { data: signed, error: e2 } = await supabase.auth.signUp({
-      email,
-      password: ADMIN_DEFAULT_PASSWORD,
-    });
-    if (e2) return { error: e2 };
-    if (signed?.user) {
-      await supabase
-        .from("user_roles")
-        .insert({ user_id: signed.user.id, role: "admin" });
-      await supabase.auth.signOut();
-    }
-    return { created: true };
-  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -85,18 +47,11 @@ export default function Login() {
         roleHint: tab,
       });
       if (error) {
-        // If admin login fails with the default password, attempt bootstrap once.
-        if (
-          tab === "admin" &&
-          username.trim().toLowerCase() === ADMIN_USERNAME &&
-          password === ADMIN_DEFAULT_PASSWORD
-        ) {
-          const boot = await ensureAdminBootstrap();
-          if (boot.error) {
-            toast.error(boot.error.message || "Setup failed");
-            setBusy(false);
-            return;
-          }
+        // If admin login fails, attempt to initialize and retry.
+        if (tab === "admin") {
+          await axios
+            .post(`${process.env.REACT_APP_BACKEND_URL}/api/setup/init`)
+            .catch(() => {});
           const retry = await signInAs({
             username,
             password,
@@ -113,16 +68,14 @@ export default function Login() {
           return;
         }
       }
-      // Refresh role and route
-      const { data: u } = await supabase.auth.getUser();
-      await loadRole(u?.user?.id);
-      const { data: rr } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", u.user.id);
-      const userRole = rr?.[0]?.role;
+      const { data: s } = await supabase.auth.getSession();
+      await refreshMe(s.session?.access_token);
+      const { data } = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/me`,
+        { headers: { Authorization: `Bearer ${s.session?.access_token}` } }
+      );
       toast.success("Welcome back");
-      navigate(userRole === "admin" ? "/admin" : "/trainee", { replace: true });
+      navigate(data.role === "admin" ? "/admin" : "/trainee", { replace: true });
     } catch (err) {
       toast.error(err.message || "Login failed");
     } finally {
