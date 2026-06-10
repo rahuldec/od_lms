@@ -31,19 +31,13 @@ const fetchSISResult = async (traineeName) => {
     if (!res.ok) return null;
     const text = await res.text();
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-
     const row = parsed.data.find(
       (r) =>
         (r["Name"] || "").trim().toLowerCase() ===
         traineeName.trim().toLowerCase()
     );
-
     if (!row) return null;
-
-    const questions = parsed.meta.fields.filter(
-      (f) => !SKIP_COLS.includes(f)
-    );
-
+    const questions = parsed.meta.fields.filter((f) => !SKIP_COLS.includes(f));
     return { row, questions };
   } catch {
     return null;
@@ -58,6 +52,7 @@ export default function TraineeDetail() {
   const [sisResult, setSisResult] = useState(null);
   const [sisLoading, setSisLoading] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [showSisQuestions, setShowSisQuestions] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -69,7 +64,6 @@ export default function TraineeDetail() {
         setTrainee(tRes.trainee || null);
         setProgress(tRes.progress || []);
         setModules(mods || []);
-
         if (tRes.trainee?.name) {
           const sis = await fetchSISResult(tRes.trainee.name);
           setSisResult(sis);
@@ -124,9 +118,7 @@ export default function TraineeDetail() {
     );
   }
 
-  const sisScore = sisResult
-    ? parseFloat(sisResult.row["Overall Score"] || 0)
-    : null;
+  const sisScore = sisResult ? parseFloat(sisResult.row["Overall Score"] || 0) : null;
   const sisTotal = sisResult ? sisResult.questions.length : 15;
   const sisLink = sisResult ? sisResult.row["Link"] : null;
 
@@ -188,7 +180,7 @@ export default function TraineeDetail() {
           )}
         </Card>
 
-        {/* Right column — Progress + SIS Score */}
+        {/* Right column */}
         <div className="flex flex-col gap-6">
           {/* Video Progress */}
           <Card className="rounded-2xl border-neutral-200/80 p-7">
@@ -257,7 +249,7 @@ export default function TraineeDetail() {
                   {sisScore / sisTotal >= 0.7 ? "✓ Pass" : "✗ Needs Improvement"}
                 </p>
                 {sisLink && (
-                  <a
+                  
                     href={sisLink}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -266,6 +258,36 @@ export default function TraineeDetail() {
                     View submission →
                   </a>
                 )}
+                <button
+                  onClick={() => setShowSisQuestions((p) => !p)}
+                  className="mt-4 text-xs text-neutral-500 hover:text-neutral-800 flex items-center gap-1 w-full"
+                >
+                  {showSisQuestions ? "▲ Hide breakdown" : "▼ Show breakdown"}
+                </button>
+                {showSisQuestions && (
+                  <ul className="mt-3 divide-y divide-neutral-100 border border-neutral-100 rounded-xl overflow-hidden">
+                    {sisResult.questions.map((q, i) => {
+                      const ans = (sisResult.row[q] || "").trim().toLowerCase();
+                      const correct = ans === "yes";
+                      return (
+                        <li key={i} className="px-3 py-2 flex items-start gap-2 text-xs">
+                          {correct ? (
+                            <CheckCircle2
+                              className="h-3.5 w-3.5 flex-shrink-0 mt-0.5"
+                              style={{ color: "#16a34a" }}
+                            />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-red-500" />
+                          )}
+                          <p className="flex-1 text-neutral-700">{q}</p>
+                          <span className={`font-medium ${correct ? "text-green-600" : "text-red-500"}`}>
+                            {correct ? "Yes" : "No"}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </>
             ) : (
               <p className="text-sm text-neutral-400 mt-2">Not attempted yet</p>
@@ -273,47 +295,6 @@ export default function TraineeDetail() {
           </Card>
         </div>
       </div>
-
-      {/* SIS Question-wise Breakdown */}
-      {sisResult && (
-        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-6">
-          <h2 className="text-xl font-semibold mb-1">
-            SIS Assignment — Question Breakdown
-          </h2>
-          <p className="text-sm text-neutral-500 mb-6">
-            Question-wise responses for the SIS module assignment.
-          </p>
-          <ul className="divide-y divide-neutral-100 border border-neutral-100 rounded-xl overflow-hidden">
-            {sisResult.questions.map((q, i) => {
-              const ans = (sisResult.row[q] || "").trim().toLowerCase();
-              const correct = ans === "yes";
-              return (
-                <li
-                  key={i}
-                  className="px-4 py-3 flex items-start gap-3 text-sm"
-                >
-                  {correct ? (
-                    <CheckCircle2
-                      className="h-4 w-4 flex-shrink-0 mt-0.5"
-                      style={{ color: "#16a34a" }}
-                    />
-                  ) : (
-                    <XCircle className="h-4 w-4 flex-shrink-0 mt-0.5 text-red-500" />
-                  )}
-                  <p className="flex-1 text-neutral-700">{q}</p>
-                  <span
-                    className={`text-xs font-medium ${
-                      correct ? "text-green-600" : "text-red-500"
-                    }`}
-                  >
-                    {correct ? "Yes" : "No"}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
 
       {/* Lesson Activity */}
       <Card className="rounded-2xl border-neutral-200/80 p-7">
@@ -332,10 +313,7 @@ export default function TraineeDetail() {
                   const p = progressByLessonId[l.id];
                   const watched = !!p?.watched;
                   return (
-                    <li
-                      key={l.id}
-                      className="px-4 py-3 flex items-center gap-3 text-sm"
-                    >
+                    <li key={l.id} className="px-4 py-3 flex items-center gap-3 text-sm">
                       {watched ? (
                         <CheckCircle2
                           className="h-4 w-4 flex-shrink-0"
