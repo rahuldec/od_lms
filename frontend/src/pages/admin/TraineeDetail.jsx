@@ -249,7 +249,7 @@ export default function TraineeDetail() {
                   {sisScore / sisTotal >= 0.7 ? "✓ Pass" : "✗ Needs Improvement"}
                 </p>
                 {sisLink && (
-                  
+                  <a
                     href={sisLink}
                     target="_blank"
                     rel="noopener noreferrer"
