@@ -41,7 +41,7 @@ export default function Login() {
     }
     setBusy(true);
     try {
-      const { error } = await signInAs({
+      const { data: signed, error } = await signInAs({
         username,
         password,
         roleHint: tab,
@@ -62,17 +62,20 @@ export default function Login() {
             setBusy(false);
             return;
           }
+          // use retry session
+          var token = retry.data?.session?.access_token;
         } else {
           toast.error(error.message || "Login failed");
           setBusy(false);
           return;
         }
       }
-      const { data: s } = await supabase.auth.getSession();
-      await refreshMe(s.session?.access_token);
+      // eslint-disable-next-line no-var
+      var accessToken = (typeof token !== "undefined" && token) || signed?.session?.access_token;
+      await refreshMe(accessToken);
       const { data } = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/me`,
-        { headers: { Authorization: `Bearer ${s.session?.access_token}` } }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       toast.success("Welcome back");
       navigate(data.role === "admin" ? "/admin" : "/trainee", { replace: true });

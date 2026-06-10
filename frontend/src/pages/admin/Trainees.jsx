@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -364,6 +365,11 @@ export default function Trainees() {
             <DialogTitle>
               {editing ? "Edit trainee" : "Add a new trainee"}
             </DialogTitle>
+            <DialogDescription>
+              {editing
+                ? "Update trainee details. Username cannot be changed."
+                : "Create a new trainee account with login credentials."}
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">

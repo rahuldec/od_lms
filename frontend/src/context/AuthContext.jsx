@@ -37,11 +37,13 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     let mounted = true;
-    // ensure admin user is set up server-side on initial load (idempotent)
-    axios.post(`${BASE}/setup/init`).catch(() => {});
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
       setSession(data.session);
+      // Bootstrap admin once on initial load (idempotent server-side, but skip if already logged in)
+      if (!data.session) {
+        axios.post(`${BASE}/setup/init`).catch(() => {});
+      }
       await refreshMe(data.session?.access_token);
       setLoading(false);
     });
@@ -66,7 +68,14 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: "global" });
+    } catch (e) {
+      await supabase.auth.signOut();
+    }
+    try {
+      localStorage.removeItem("odk-training-auth");
+    } catch (e) {}
     setSession(null);
     setRole(null);
     setTrainee(null);
