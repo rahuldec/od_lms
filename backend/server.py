@@ -89,6 +89,7 @@ class TraineeIn(BaseModel):
     notes: Optional[str] = ""
     username: str
     password: str
+    batch_id: Optional[str] = None
 
 
 class TraineeUpdate(BaseModel):
@@ -98,6 +99,7 @@ class TraineeUpdate(BaseModel):
     manager: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    batch_id: Optional[str] = None
 
 
 class ProgressIn(BaseModel):
@@ -105,6 +107,24 @@ class ProgressIn(BaseModel):
     watched: Optional[bool] = None
     watch_seconds_delta: Optional[int] = 0
     set_watch_seconds: Optional[int] = None
+
+
+class BatchIn(BaseModel):
+    name: str
+    start_date: Optional[str] = None
+    status: Optional[str] = "Active"
+    notes: Optional[str] = ""
+
+
+class BatchUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[str] = None
+    status: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class AssignBatchIn(BaseModel):
+    batch_id: Optional[str] = None
 
 
 # ---------- setup / health ----------
@@ -119,7 +139,6 @@ async def setup_init():
     and has role=admin in user_roles."""
     email = f"{ADMIN_USERNAME}@odk.local"
     async with httpx.AsyncClient(timeout=20) as cx:
-        # check if user exists by listing
         r = await cx.get(
             f"{AUTH}/admin/users?per_page=200",
             headers=ADMIN_HEADERS,
@@ -144,7 +163,6 @@ async def setup_init():
             created = True
         else:
             user_id = existing["id"]
-            # reset password to known value (idempotent setup)
             await cx.put(
                 f"{AUTH}/admin/users/{user_id}",
                 headers=ADMIN_HEADERS,
@@ -152,7 +170,6 @@ async def setup_init():
             )
             created = False
 
-        # ensure role row
         rr = await cx.get(
             f"{REST}/user_roles?user_id=eq.{user_id}&select=id",
             headers=ADMIN_HEADERS,
@@ -200,7 +217,6 @@ async def create_trainee(body: TraineeIn, _=Depends(require_admin)):
     username = body.username.strip().lower()
     email = f"{username}@trainee.local"
     async with httpx.AsyncClient(timeout=30) as cx:
-        # check if username/email already exists
         existing_r = await cx.get(
             f"{REST}/trainees?username=eq.{username}&select=id",
             headers=ADMIN_HEADERS,
@@ -208,7 +224,6 @@ async def create_trainee(body: TraineeIn, _=Depends(require_admin)):
         if existing_r.status_code == 200 and len(existing_r.json()) > 0:
             raise HTTPException(status_code=400, detail="Username already taken")
 
-        # create auth user
         r = await cx.post(
             f"{AUTH}/admin/users",
             headers=ADMIN_HEADERS,
@@ -222,7 +237,6 @@ async def create_trainee(body: TraineeIn, _=Depends(require_admin)):
             raise HTTPException(status_code=400, detail=f"Auth create failed: {r.text}")
         auth_user_id = r.json()["id"]
 
-        # insert trainee
         today = datetime.now(timezone.utc).date().isoformat()
         payload = {
             "name": body.name,
@@ -235,6 +249,7 @@ async def create_trainee(body: TraineeIn, _=Depends(require_admin)):
             "username": username,
             "auth_user_id": auth_user_id,
             "current_level": 0,
+            "batch_id": body.batch_id or None,
             "history": [
                 {
                     "type": "joined",
@@ -249,7 +264,6 @@ async def create_trainee(body: TraineeIn, _=Depends(require_admin)):
             json=payload,
         )
         if r2.status_code not in (200, 201):
-            # rollback auth user
             await cx.delete(f"{AUTH}/admin/users/{auth_user_id}", headers=ADMIN_HEADERS)
             raise HTTPException(status_code=400, detail=f"Trainee insert failed: {r2.text}")
         trainee = r2.json()[0]
@@ -284,7 +298,6 @@ async def update_trainee(trainee_id: str, body: TraineeUpdate, _=Depends(require
 @api.delete("/admin/trainees/{trainee_id}")
 async def delete_trainee(trainee_id: str, _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
-        # fetch trainee to get auth_user_id
         r = await cx.get(
             f"{REST}/trainees?id=eq.{trainee_id}&select=*",
             headers=ADMIN_HEADERS,
@@ -295,12 +308,10 @@ async def delete_trainee(trainee_id: str, _=Depends(require_admin)):
         t = rows[0]
         auth_user_id = t.get("auth_user_id")
 
-        # delete lesson_progress
         await cx.delete(
             f"{REST}/lesson_progress?trainee_id=eq.{trainee_id}",
             headers=ADMIN_HEADERS,
         )
-        # delete trainee
         await cx.delete(
             f"{REST}/trainees?id=eq.{trainee_id}",
             headers=ADMIN_HEADERS,
@@ -369,6 +380,97 @@ async def get_trainee(trainee_id: str, _=Depends(require_admin)):
             headers=ADMIN_HEADERS,
         )
     return {"trainee": rows[0], "progress": p.json() if p.status_code == 200 else []}
+
+
+# ---------- admin batches ----------
+@api.get("/admin/batches")
+async def list_batches(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/batches?select=*&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+    return r.json()
+
+
+@api.post("/admin/batches")
+async def create_batch(body: BatchIn, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.post(
+            f"{REST}/batches",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={
+                "name": body.name,
+                "start_date": body.start_date or None,
+                "status": body.status or "Active",
+                "notes": body.notes or "",
+            },
+        )
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0]
+
+
+@api.put("/admin/batches/{batch_id}")
+async def update_batch(batch_id: str, body: BatchUpdate, _=Depends(require_admin)):
+    patch = {k: v for k, v in body.dict().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(
+            f"{REST}/batches?id=eq.{batch_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json=patch,
+        )
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.delete("/admin/batches/{batch_id}")
+async def delete_batch(batch_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await cx.patch(
+            f"{REST}/trainees?batch_id=eq.{batch_id}",
+            headers=ADMIN_HEADERS,
+            json={"batch_id": None},
+        )
+        await cx.delete(
+            f"{REST}/batches?id=eq.{batch_id}",
+            headers=ADMIN_HEADERS,
+        )
+    return {"ok": True}
+
+
+@api.get("/admin/batches/{batch_id}")
+async def get_batch(batch_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        rb = await cx.get(
+            f"{REST}/batches?id=eq.{batch_id}&select=*",
+            headers=ADMIN_HEADERS,
+        )
+        rows = rb.json() if rb.status_code == 200 else []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Batch not found")
+        rt = await cx.get(
+            f"{REST}/trainees?batch_id=eq.{batch_id}&select=*&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+        trainees = rt.json() if rt.status_code == 200 else []
+    return {"batch": rows[0], "trainees": trainees}
+
+
+@api.patch("/admin/trainees/{trainee_id}/batch")
+async def assign_batch(trainee_id: str, body: AssignBatchIn, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(
+            f"{REST}/trainees?id=eq.{trainee_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"batch_id": body.batch_id},
+        )
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
 
 
 # ---------- trainee progress ----------
