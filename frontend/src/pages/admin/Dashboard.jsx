@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { fetchAllAssignmentResults } from "@/lib/assignments";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 
-const Stat = ({ icon: Icon, label, value, accent, testId }) => (
+const Stat = ({ icon: Icon, label, value, testId }) => (
   <Card
     data-testid={testId}
     className="rounded-2xl border-neutral-200/80 p-6 hover:shadow-sm transition-shadow"
@@ -17,10 +18,7 @@ const Stat = ({ icon: Icon, label, value, accent, testId }) => (
         <p className="text-xs uppercase tracking-[0.14em] text-neutral-500">{label}</p>
         <p className="text-4xl font-semibold mt-3 text-neutral-900 tabular-nums">{value}</p>
       </div>
-      <div
-        className="h-9 w-9 rounded-xl grid place-items-center"
-        style={{ backgroundColor: accent || "#FFF0E8", color: "#E05A2B" }}
-      >
+      <div className="h-9 w-9 rounded-xl grid place-items-center" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
         <Icon className="h-5 w-5" />
       </div>
     </div>
@@ -43,14 +41,19 @@ const fmtDate = (iso) => {
 
 export default function AdminDashboard() {
   const [trainees, setTrainees] = useState([]);
+  const [assignmentResults, setAssignmentResults] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedLevel, setExpandedLevel] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await api.listTrainees();
+        const [data, aResults] = await Promise.all([
+          api.listTrainees(),
+          fetchAllAssignmentResults().catch(() => ({})),
+        ]);
         setTrainees(Array.isArray(data) ? data : []);
+        setAssignmentResults(aResults || {});
       } catch (e) {
         toast.error("Could not load trainees");
       } finally {
@@ -74,14 +77,15 @@ export default function AdminDashboard() {
     const inMonth = history.some((h) => {
       if (!h?.at) return false;
       const d = new Date(h.at);
-      return (
-        d.getMonth() === now.getMonth() &&
-        d.getFullYear() === now.getFullYear() &&
-        h.type === "promotion"
-      );
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && h.type === "promotion";
     });
     return acc + (inMonth ? 1 : 0);
   }, 0);
+
+  const getAssignments = (name) => {
+    if (!name) return [];
+    return assignmentResults[name.trim().toLowerCase()] || [];
+  };
 
   return (
     <AppShell navItems={navItems} subtitle="Admin">
@@ -100,13 +104,12 @@ export default function AdminDashboard() {
         <Stat testId="stat-promotions" icon={TrendingUp} label="Promotions this month" value={loading ? "—" : promotionsThisMonth} />
       </div>
 
-      {/* Level Distribution */}
       <Card className="rounded-2xl border-neutral-200/80 p-7">
         <div className="flex items-baseline justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">Level distribution</h2>
             <p className="text-sm text-neutral-500 mt-1">
-              Click a level to see trainees and their promotion history.
+              Click a level to see trainees, assignment scores and promotion history.
             </p>
           </div>
           <span className="text-sm text-neutral-400">{total} total</span>
@@ -118,7 +121,6 @@ export default function AdminDashboard() {
             const isExpanded = expandedLevel === level;
             return (
               <div key={level} className="border border-neutral-100 rounded-2xl overflow-hidden">
-                {/* Level Row */}
                 <button
                   onClick={() => setExpandedLevel(isExpanded ? null : level)}
                   className="w-full px-5 py-4 flex items-center gap-4 hover:bg-neutral-50 transition-colors"
@@ -150,14 +152,15 @@ export default function AdminDashboard() {
                   )}
                 </button>
 
-                {/* Expanded Trainees */}
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 divide-y divide-neutral-50">
                     {lvlTrainees.map((t) => {
                       const history = Array.isArray(t.history) ? t.history : [];
                       const promotions = history.filter((h) => h.type === "promotion");
+                      const assignments = getAssignments(t.name);
                       return (
                         <div key={t.id} className="px-5 py-4">
+                          {/* Trainee Header */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <div
@@ -188,41 +191,75 @@ export default function AdminDashboard() {
                               }`}>
                                 {t.status}
                               </span>
-                              <Badge
-                                className="rounded-full text-xs"
-                                style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}
-                              >
+                              <Badge className="rounded-full text-xs" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
                                 L{t.current_level ?? 0}
                               </Badge>
                             </div>
                           </div>
 
-                          {/* Promotion History */}
-                          {promotions.length > 0 && (
-                            <div className="mt-3 ml-11">
-                              <p className="text-xs text-neutral-400 uppercase tracking-wider mb-2">
-                                Promotion history
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {promotions.map((h, i) => (
-                                  <span
-                                    key={i}
-                                    className="inline-flex items-center gap-1 text-xs bg-neutral-50 border border-neutral-200 rounded-full px-2.5 py-1"
-                                  >
-                                    <TrendingUp className="h-3 w-3 text-orange-500" />
-                                    L{h.from} → L{h.to}
-                                    <span className="text-neutral-400">· {fmtDate(h.at)}</span>
-                                  </span>
-                                ))}
+                          {/* Assignment Scores */}
+                          <div className="mt-3 ml-11">
+                            {assignments.length > 0 ? (
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                {assignments.map((a) => {
+                                  const pct = a.total ? a.score / a.total : 0;
+                                  const color = pct >= 0.7 ? "#16a34a" : pct >= 0.5 ? "#d97706" : "#dc2626";
+                                  return (
+                                    <div
+                                      key={a.id}
+                                      className="inline-flex items-center gap-1.5 text-xs border rounded-full px-2.5 py-1"
+                                      style={{ borderColor: color + "40", backgroundColor: color + "10" }}
+                                    >
+                                      <span className="font-medium text-neutral-700">{a.name}:</span>
+                                      <span className="font-semibold" style={{ color }}>
+                                        {a.score}/{a.total}
+                                      </span>
+                                      <span style={{ color }}>
+                                        {pct >= 0.7 ? "✓ Pass" : "✗ Fail"}
+                                      </span>
+                                      {a.link && (
+                                        
+                                          href={a.link}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="underline ml-0.5"
+                                          style={{ color: "#2563eb" }}
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          View
+                                        </a>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            </div>
-                          )}
+                            ) : (
+                              <p className="text-xs text-neutral-400 mb-2">No assignments attempted</p>
+                            )}
 
-                          {promotions.length === 0 && (
-                            <div className="mt-2 ml-11">
+                            {/* Promotion History */}
+                            {promotions.length > 0 ? (
+                              <>
+                                <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1.5">
+                                  Promotion history
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {promotions.map((h, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-flex items-center gap-1 text-xs bg-neutral-50 border border-neutral-200 rounded-full px-2.5 py-1"
+                                    >
+                                      <TrendingUp className="h-3 w-3 text-orange-500" />
+                                      L{h.from} → L{h.to}
+                                      <span className="text-neutral-400">· {fmtDate(h.at)}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
                               <p className="text-xs text-neutral-400">No promotions yet</p>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
                       );
                     })}
