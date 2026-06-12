@@ -202,8 +202,7 @@ export default function AdminDashboard() {
                             {assignments.length > 0 ? (
                               <div className="flex flex-wrap gap-2 mb-3">
                                 {assignments.map((a) => {
-                                  const pct = a.total ? a.score / a.total : 0;
-                                  const color = pct >= 0.7 ? "#16a34a" : pct >= 0.5 ? "#d97706" : "#dc2626";
+                                  const color = a.passed ? "#16a34a" : "#dc2626";
                                   return (
                                     <div
                                       key={a.id}
@@ -215,10 +214,10 @@ export default function AdminDashboard() {
                                         {a.score}/{a.total}
                                       </span>
                                       <span style={{ color }}>
-                                        {pct >= 0.7 ? "✓ Pass" : "✗ Fail"}
+                                        {a.passed ? "✓ Pass" : "✗ Fail"}
                                       </span>
                                       {a.link && (
-                                        <a
+                                        
                                           href={a.link}
                                           target="_blank"
                                           rel="noopener noreferrer"
