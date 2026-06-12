@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import os
 import logging
 import httpx
+import re
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -37,6 +38,14 @@ ADMIN_HEADERS = {
 
 logger = logging.getLogger("training-api")
 logging.basicConfig(level=logging.INFO)
+
+# ---------- Zoho report URLs ----------
+ZOHO_REPORTS = {
+    "SIS": "https://forms.zohopublic.in/odforms1/report/SIS/reportperma/4tMQi4s1xd13XlzrERR2J42hJWZbE6VznPPcwaz9xQ0",
+    "Fee Module": "https://forms.zohopublic.in/odforms1/report/FeeModuleAssignment/reportperma/_x9CwE0qH6Xr5XGb55H_oStvU0M6uUjrZr9mLsNyHuA",
+}
+
+PASS_THRESHOLD = 9   # score >= 9 out of 50 is Pass
 
 app = FastAPI()
 api = APIRouter(prefix="/api")
@@ -77,6 +86,82 @@ async def require_admin(ctx=Depends(require_user)):
     if ctx["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return ctx
+
+
+# ---------- Zoho score fetcher ----------
+async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[float]:
+    """
+    Fetches the 'Overall Score' for a trainee from a Zoho public report.
+    Matches trainee by first name (case-insensitive).
+    Returns the score as float, or None if not found.
+    """
+    url = ZOHO_REPORTS.get(assignment_name)
+    if not url:
+        raise HTTPException(status_code=400, detail=f"Unknown assignment: {assignment_name}. Valid: {list(ZOHO_REPORTS.keys())}")
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as cx:
+            r = await cx.get(url, headers=headers)
+
+        if r.status_code != 200:
+            logger.warning(f"Zoho report fetch failed: status {r.status_code}")
+            return None
+
+        html = r.text
+
+        # Try to find score via JSON embedded in the page (Zoho often embeds data as JS/JSON)
+        # Pattern: find table rows in the HTML
+        # Zoho reports render as HTML tables — parse with regex
+        # Find all table rows: extract Name and Overall Score columns
+
+        # Remove HTML tags for easier parsing
+        # Find header row to get column positions
+        th_matches = re.findall(r'<th[^>]*>(.*?)</th>', html, re.IGNORECASE | re.DOTALL)
+        headers_clean = [re.sub(r'<[^>]+>', '', h).strip() for h in th_matches]
+
+        name_idx = None
+        score_idx = None
+        for i, h in enumerate(headers_clean):
+            if h.lower() == "name":
+                name_idx = i
+            if "overall score" in h.lower() or "score" in h.lower():
+                score_idx = i
+
+        logger.info(f"Zoho headers found: {headers_clean}, name_idx={name_idx}, score_idx={score_idx}")
+
+        if name_idx is None or score_idx is None:
+            # Fallback: try to find score near the trainee name in raw HTML
+            logger.warning("Could not find Name/Score columns in Zoho report headers")
+            return None
+
+        # Find all <tr> rows
+        tr_matches = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.IGNORECASE | re.DOTALL)
+        for row in tr_matches:
+            td_matches = re.findall(r'<td[^>]*>(.*?)</td>', row, re.IGNORECASE | re.DOTALL)
+            cells = [re.sub(r'<[^>]+>', '', td).strip() for td in td_matches]
+            if len(cells) > max(name_idx, score_idx):
+                cell_name = cells[name_idx].strip().lower()
+                target_name = trainee_name.strip().lower()
+                # Match by first name or full name
+                if cell_name == target_name or cell_name.startswith(target_name.split()[0].lower()):
+                    raw_score = cells[score_idx].strip()
+                    try:
+                        return float(raw_score)
+                    except ValueError:
+                        logger.warning(f"Could not parse score '{raw_score}' for {trainee_name}")
+                        return None
+
+        logger.info(f"Trainee '{trainee_name}' not found in Zoho report for '{assignment_name}'")
+        return None
+
+    except Exception as e:
+        logger.error(f"Zoho fetch error: {e}")
+        return None
 
 
 # ---------- models ----------
@@ -125,6 +210,15 @@ class BatchUpdate(BaseModel):
 
 class AssignBatchIn(BaseModel):
     batch_id: Optional[str] = None
+
+
+class AssignmentScoreIn(BaseModel):
+    assignment_name: str          # "SIS" or "Fee Module"
+    score: Optional[float] = None  # manual override; if None, fetch from Zoho
+
+
+class RecordingIn(BaseModel):
+    recording_url: str            # Google Drive URL
 
 
 # ---------- setup / health ----------
@@ -313,6 +407,10 @@ async def delete_trainee(trainee_id: str, _=Depends(require_admin)):
             headers=ADMIN_HEADERS,
         )
         await cx.delete(
+            f"{REST}/assignments?trainee_id=eq.{trainee_id}",
+            headers=ADMIN_HEADERS,
+        )
+        await cx.delete(
             f"{REST}/trainees?id=eq.{trainee_id}",
             headers=ADMIN_HEADERS,
         )
@@ -379,7 +477,190 @@ async def get_trainee(trainee_id: str, _=Depends(require_admin)):
             f"{REST}/lesson_progress?trainee_id=eq.{trainee_id}&select=*",
             headers=ADMIN_HEADERS,
         )
-    return {"trainee": rows[0], "progress": p.json() if p.status_code == 200 else []}
+        a = await cx.get(
+            f"{REST}/assignments?trainee_id=eq.{trainee_id}&select=*&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+    return {
+        "trainee": rows[0],
+        "progress": p.json() if p.status_code == 200 else [],
+        "assignments": a.json() if a.status_code == 200 else [],
+    }
+
+
+# ---------- assignments ----------
+
+@api.get("/admin/assignments/{trainee_id}")
+async def list_assignments(trainee_id: str, _=Depends(require_admin)):
+    """List all assignments for a trainee."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/assignments?trainee_id=eq.{trainee_id}&select=*&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/assignments/{trainee_id}")
+async def upsert_assignment(trainee_id: str, body: AssignmentScoreIn, _=Depends(require_admin)):
+    """
+    Fetch score from Zoho (or use manual override) and save/update the assignment record.
+    Pass threshold: score >= 9 out of 50.
+    """
+    # Get trainee name for Zoho lookup
+    async with httpx.AsyncClient(timeout=20) as cx:
+        tr = await cx.get(
+            f"{REST}/trainees?id=eq.{trainee_id}&select=name",
+            headers=ADMIN_HEADERS,
+        )
+        rows = tr.json() if tr.status_code == 200 else []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Trainee not found")
+        trainee_name = rows[0]["name"]
+
+    # Determine score
+    if body.score is not None:
+        score = body.score
+        source = "manual"
+    else:
+        score = await fetch_zoho_score(body.assignment_name, trainee_name)
+        source = "zoho"
+        if score is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Could not find score for '{trainee_name}' in Zoho report '{body.assignment_name}'. "
+                       f"Please enter score manually."
+            )
+
+    passed = score >= PASS_THRESHOLD
+    now = datetime.now(timezone.utc).isoformat()
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        # Check if assignment record already exists for this trainee + assignment
+        existing_r = await cx.get(
+            f"{REST}/assignments?trainee_id=eq.{trainee_id}&assignment_name=eq.{body.assignment_name}&select=*",
+            headers=ADMIN_HEADERS,
+        )
+        existing = existing_r.json()[0] if existing_r.status_code == 200 and existing_r.json() else None
+
+        payload = {
+            "trainee_id": trainee_id,
+            "assignment_name": body.assignment_name,
+            "score": score,
+            "total_marks": 50,
+            "passed": passed,
+            "source": source,
+            "updated_at": now,
+        }
+
+        if existing:
+            # Preserve existing recording_url if present
+            if existing.get("recording_url"):
+                payload["recording_url"] = existing["recording_url"]
+            r2 = await cx.patch(
+                f"{REST}/assignments?id=eq.{existing['id']}",
+                headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+                json=payload,
+            )
+        else:
+            payload["created_at"] = now
+            payload["recording_url"] = None
+            r2 = await cx.post(
+                f"{REST}/assignments",
+                headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+                json=payload,
+            )
+
+    if r2.status_code not in (200, 201, 204):
+        raise HTTPException(status_code=400, detail=r2.text)
+
+    result = r2.json()[0] if r2.json() else payload
+    return {**result, "passed": passed, "score": score, "total_marks": 50}
+
+
+@api.patch("/admin/assignments/{trainee_id}/{assignment_name}/recording")
+async def update_recording(trainee_id: str, assignment_name: str, body: RecordingIn, _=Depends(require_admin)):
+    """Add or update the Google Drive recording URL for a specific trainee's assignment."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        existing_r = await cx.get(
+            f"{REST}/assignments?trainee_id=eq.{trainee_id}&assignment_name=eq.{assignment_name}&select=*",
+            headers=ADMIN_HEADERS,
+        )
+        existing = existing_r.json()[0] if existing_r.status_code == 200 and existing_r.json() else None
+
+        now = datetime.now(timezone.utc).isoformat()
+
+        if existing:
+            r = await cx.patch(
+                f"{REST}/assignments?id=eq.{existing['id']}",
+                headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+                json={"recording_url": body.recording_url, "updated_at": now},
+            )
+        else:
+            # Create a placeholder assignment record with just the recording URL
+            r = await cx.post(
+                f"{REST}/assignments",
+                headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+                json={
+                    "trainee_id": trainee_id,
+                    "assignment_name": assignment_name,
+                    "score": None,
+                    "total_marks": 50,
+                    "passed": None,
+                    "source": "manual",
+                    "recording_url": body.recording_url,
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            )
+
+    if r.status_code not in (200, 201, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.get("/admin/assignments/{trainee_id}/{assignment_name}/zoho-fetch")
+async def fetch_score_from_zoho(trainee_id: str, assignment_name: str, _=Depends(require_admin)):
+    """
+    Fetch and preview the score from Zoho without saving.
+    Admin can confirm before saving.
+    """
+    async with httpx.AsyncClient(timeout=20) as cx:
+        tr = await cx.get(
+            f"{REST}/trainees?id=eq.{trainee_id}&select=name",
+            headers=ADMIN_HEADERS,
+        )
+        rows = tr.json() if tr.status_code == 200 else []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Trainee not found")
+        trainee_name = rows[0]["name"]
+
+    score = await fetch_zoho_score(assignment_name, trainee_name)
+    if score is None:
+        return {
+            "found": False,
+            "trainee_name": trainee_name,
+            "assignment_name": assignment_name,
+            "message": f"No submission found for '{trainee_name}' in Zoho report.",
+        }
+
+    passed = score >= PASS_THRESHOLD
+    return {
+        "found": True,
+        "trainee_name": trainee_name,
+        "assignment_name": assignment_name,
+        "score": score,
+        "total_marks": 50,
+        "passed": passed,
+        "pass_threshold": PASS_THRESHOLD,
+    }
+
+
+# ---------- available assignments list ----------
+@api.get("/admin/assignments-list")
+async def get_assignments_list(_=Depends(require_admin)):
+    """Return the list of available assignment names."""
+    return {"assignments": list(ZOHO_REPORTS.keys())}
 
 
 # ---------- admin batches ----------
@@ -492,7 +773,15 @@ async def my_progress(ctx=Depends(require_user)):
             f"{REST}/lesson_progress?trainee_id=eq.{trainee['id']}&select=*",
             headers=ADMIN_HEADERS,
         )
-    return {"trainee": trainee, "progress": p.json() if p.status_code == 200 else []}
+        a = await cx.get(
+            f"{REST}/assignments?trainee_id=eq.{trainee['id']}&select=*&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+    return {
+        "trainee": trainee,
+        "progress": p.json() if p.status_code == 200 else [],
+        "assignments": a.json() if a.status_code == 200 else [],
+    }
 
 
 @api.post("/trainee/progress")
