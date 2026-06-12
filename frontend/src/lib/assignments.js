@@ -1,13 +1,14 @@
 export const ASSIGNMENTS = [
   {
     id: "sis",
-    name: "SIS Assignment",
+    name: "SIS",
     csvUrl:
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vRdhlvmjnqv5YBTpK4oxX914j6HApyK26brmNyqqkIoKGDLJUPyigKBLOlgB4msgfEacRqTuDZtsU3C/pub?output=csv",
-    skipCols: ["Added Time", "IP Address", "Name", "Overall Score", "Link"],
     scoreCol: "Overall Score",
     linkCol: "Link",
     nameCol: "Name",
+    totalMarks: 50,
+    passThreshold: 9,
   },
 ];
 
@@ -26,14 +27,12 @@ export const fetchAllAssignmentResults = async () => {
           if (!name) return;
           if (!results[name]) results[name] = [];
           const score = parseFloat(row[assignment.scoreCol] || 0);
-          const questions = parsed.meta.fields.filter(
-            (f) => !assignment.skipCols.includes(f)
-          );
           results[name].push({
             id: assignment.id,
             name: assignment.name,
             score,
-            total: questions.length,
+            total: assignment.totalMarks,
+            passed: score >= assignment.passThreshold,
             link: row[assignment.linkCol] || null,
           });
         });
