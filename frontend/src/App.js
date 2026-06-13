@@ -3,7 +3,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
-import Protected from "@/components/Protected";
+import Protected from "@/components/Protected"; 
 import Login from "@/pages/Login";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import Trainees from "@/pages/admin/Trainees";
