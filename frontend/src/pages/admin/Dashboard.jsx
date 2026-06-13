@@ -95,7 +95,7 @@ function AssignmentModal({ assignment, onClose }) {
                     color: item.answer === "Yes" ? "#16a34a" : item.answer === "No" ? "#dc2626" : "#374151",
                   }}
                 >
-                  {item.answer || "—"}
+                  {item.answer || "-"}
                 </span>
               </div>
             </div>
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-medium text-neutral-900">Level {level}</span>
                       <span className="text-xs text-neutral-500 tabular-nums">
-                        {lvlTrainees.length} trainees · {pct}%
+                        {lvlTrainees.length} trainees - {pct}%
                       </span>
                     </div>
                     <div className="h-1.5 bg-neutral-100 rounded-full overflow-hidden">
@@ -249,8 +249,8 @@ export default function AdminDashboard() {
                                 </Link>
                                 <p className="text-xs text-neutral-500">
                                   @{t.username}
-                                  {t.manager ? ` · ${t.manager}` : ""}
-                                  {t.join_date ? ` · Joined ${fmtDate(t.join_date)}` : ""}
+                                  {t.manager ? ` - ${t.manager}` : ""}
+                                  {t.join_date ? ` - Joined ${fmtDate(t.join_date)}` : ""}
                                 </p>
                               </div>
                             </div>
@@ -313,7 +313,7 @@ export default function AdminDashboard() {
                                     >
                                       <TrendingUp className="h-3 w-3 text-orange-500" />
                                       L{h.from} to L{h.to}
-                                      <span className="text-neutral-400">· {fmtDate(h.at)}</span>
+                                      <span className="text-neutral-400">- {fmtDate(h.at)}</span>
                                     </span>
                                   ))}
                                 </div>
