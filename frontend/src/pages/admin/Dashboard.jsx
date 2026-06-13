@@ -56,11 +56,14 @@ function AssignmentModal({ assignment, onClose }) {
           <div className="flex items-center gap-3">
             <div
               className="inline-flex items-center gap-1.5 text-sm border rounded-full px-3 py-1 font-semibold"
-              style={{ borderColor: color + "40", backgroundColor: color + "10", color }}
+              style={{ borderColor: color + "40", backgroundColor: color + "10", color: color }}
             >
               {assignment.score}/{assignment.total} {assignment.passed ? "Pass" : "Fail"}
             </div>
-            <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-neutral-100 grid place-items-center">
+            <button
+              onClick={onClose}
+              className="h-8 w-8 rounded-full hover:bg-neutral-100 grid place-items-center"
+            >
               <X className="h-4 w-4 text-neutral-500" />
             </button>
           </div>
@@ -142,7 +145,11 @@ export default function AdminDashboard() {
     const inMonth = history.some((h) => {
       if (!h?.at) return false;
       const d = new Date(h.at);
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear() && h.type === "promotion";
+      return (
+        d.getMonth() === now.getMonth() &&
+        d.getFullYear() === now.getFullYear() &&
+        h.type === "promotion"
+      );
     });
     return acc + (inMonth ? 1 : 0);
   }, 0);
@@ -158,15 +165,15 @@ export default function AdminDashboard() {
         <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Overview</p>
         <h1 className="text-4xl font-semibold mt-1 tracking-tight">Training operations</h1>
         <p className="text-neutral-500 mt-2 max-w-xl">
-          A snapshot of where every trainee stands, who needs attention, and who's ready for the next level.
+          A snapshot of where every trainee stands, who needs attention, and who is ready for the next level.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        <Stat testId="stat-total" icon={Users} label="Total trainees" value={loading ? "—" : total} />
-        <Stat testId="stat-active" icon={CheckCircle2} label="Active" value={loading ? "—" : active} />
-        <Stat testId="stat-onhold" icon={PauseCircle} label="On hold" value={loading ? "—" : onHold} />
-        <Stat testId="stat-promotions" icon={TrendingUp} label="Promotions this month" value={loading ? "—" : promotionsThisMonth} />
+        <Stat testId="stat-total" icon={Users} label="Total trainees" value={loading ? "-" : total} />
+        <Stat testId="stat-active" icon={CheckCircle2} label="Active" value={loading ? "-" : active} />
+        <Stat testId="stat-onhold" icon={PauseCircle} label="On hold" value={loading ? "-" : onHold} />
+        <Stat testId="stat-promotions" icon={TrendingUp} label="Promotions this month" value={loading ? "-" : promotionsThisMonth} />
       </div>
 
       <Card className="rounded-2xl border-neutral-200/80 p-7">
@@ -248,14 +255,19 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ring-1 ${
-                                t.status === "Active"
-                                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                                  : "bg-neutral-100 text-neutral-600 ring-neutral-200"
-                              }`}>
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ring-1 ${
+                                  t.status === "Active"
+                                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                                    : "bg-neutral-100 text-neutral-600 ring-neutral-200"
+                                }`}
+                              >
                                 {t.status}
                               </span>
-                              <Badge className="rounded-full text-xs" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
+                              <Badge
+                                className="rounded-full text-xs"
+                                style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}
+                              >
                                 L{t.current_level ?? 0}
                               </Badge>
                             </div>
@@ -274,10 +286,10 @@ export default function AdminDashboard() {
                                       style={{ borderColor: color + "40", backgroundColor: color + "10" }}
                                     >
                                       <span className="font-medium text-neutral-700">{a.name}:</span>
-                                      <span className="font-semibold" style={{ color }}>
+                                      <span className="font-semibold" style={{ color: color }}>
                                         {a.score}/{a.total}
                                       </span>
-                                      <span style={{ color }}>
+                                      <span style={{ color: color }}>
                                         {a.passed ? "Pass" : "Fail"}
                                       </span>
                                     </button>
@@ -289,7 +301,7 @@ export default function AdminDashboard() {
                             )}
 
                             {promotions.length > 0 ? (
-                              <>
+                              <div>
                                 <p className="text-xs text-neutral-400 uppercase tracking-wider mb-1.5">
                                   Promotion history
                                 </p>
@@ -300,12 +312,12 @@ export default function AdminDashboard() {
                                       className="inline-flex items-center gap-1 text-xs bg-neutral-50 border border-neutral-200 rounded-full px-2.5 py-1"
                                     >
                                       <TrendingUp className="h-3 w-3 text-orange-500" />
-                                      L{h.from} → L{h.to}
+                                      L{h.from} to L{h.to}
                                       <span className="text-neutral-400">· {fmtDate(h.at)}</span>
                                     </span>
                                   ))}
                                 </div>
-                              </>
+                              </div>
                             ) : (
                               <p className="text-xs text-neutral-400">No promotions yet</p>
                             )}
