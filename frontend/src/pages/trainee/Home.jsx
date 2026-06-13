@@ -46,7 +46,7 @@ function AssignmentModal({ assignment, onClose }) {
           <div className="flex items-center gap-3">
             <div
               className="inline-flex items-center gap-1.5 text-sm border rounded-full px-3 py-1 font-semibold"
-              style={{ borderColor: color + "40", backgroundColor: color + "10", color }}
+              style={{ borderColor: color + "40", backgroundColor: color + "10", color: color }}
             >
               {assignment.score}/{assignment.total} {assignment.passed ? "Pass" : "Fail"}
             </div>
@@ -61,7 +61,7 @@ function AssignmentModal({ assignment, onClose }) {
 
         {assignment.link && (
           <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-100">
-            
+            <a
               href={assignment.link}
               target="_blank"
               rel="noopener noreferrer"
@@ -82,15 +82,10 @@ function AssignmentModal({ assignment, onClose }) {
                 <span
                   className="text-sm font-semibold"
                   style={{
-                    color:
-                      item.answer === "Yes"
-                        ? "#16a34a"
-                        : item.answer === "No"
-                        ? "#dc2626"
-                        : "#374151",
+                    color: item.answer === "Yes" ? "#16a34a" : item.answer === "No" ? "#dc2626" : "#374151",
                   }}
                 >
-                  {item.answer || "—"}
+                  {item.answer || "-"}
                 </span>
               </div>
             </div>
@@ -144,15 +139,10 @@ export default function TraineeHome() {
   }, [trainee?.id]);
 
   const stats = useMemo(() => {
-    const lessons = modules.flatMap((m) =>
-      m.lessons.filter((l) => l.kind === "video")
-    );
+    const lessons = modules.flatMap((m) => m.lessons.filter((l) => l.kind === "video"));
     const total = lessons.length;
     const watched = lessons.filter((l) => progress[l.id]?.watched).length;
-    const seconds = Object.values(progress).reduce(
-      (acc, p) => acc + (p.watch_seconds || 0),
-      0
-    );
+    const seconds = Object.values(progress).reduce((acc, p) => acc + (p.watch_seconds || 0), 0);
     return { total, watched, seconds, pct: total ? (watched / total) * 100 : 0 };
   }, [modules, progress]);
 
@@ -249,8 +239,7 @@ export default function TraineeHome() {
       <AppShell navItems={navItems} subtitle="Trainee">
         <Card className="p-8 rounded-2xl">
           <p className="text-neutral-700">
-            Your trainee profile is not set up yet. Please reach out to your HR
-            to be added to the program.
+            Your trainee profile is not set up yet. Please reach out to your HR to be added to the program.
           </p>
         </Card>
       </AppShell>
@@ -265,7 +254,7 @@ export default function TraineeHome() {
           Hi, {trainee.name?.split(" ")[0]}.
         </h1>
         <p className="text-neutral-500 mt-2 max-w-xl">
-          Your Okie Dokie ERP training program — modules, video lessons and assignments, all in one place.
+          Your Okie Dokie ERP training program - modules, video lessons and assignments, all in one place.
         </p>
       </div>
 
@@ -273,7 +262,10 @@ export default function TraineeHome() {
         <div className="flex items-baseline justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Overall progress</p>
-            <p className="text-5xl font-semibold mt-2 tabular-nums" data-testid="overall-progress-value">
+            <p
+              className="text-5xl font-semibold mt-2 tabular-nums"
+              data-testid="overall-progress-value"
+            >
               {stats.watched}
               <span className="text-neutral-300 text-3xl">/{stats.total}</span>
             </p>
@@ -308,10 +300,10 @@ export default function TraineeHome() {
                   style={{ borderColor: color + "40", backgroundColor: color + "10" }}
                 >
                   <span className="font-medium text-neutral-700">{a.name}</span>
-                  <span className="font-bold tabular-nums" style={{ color }}>
+                  <span className="font-bold tabular-nums" style={{ color: color }}>
                     {a.score}/{a.total}
                   </span>
-                  <span className="text-xs font-medium" style={{ color }}>
+                  <span className="text-xs font-medium" style={{ color: color }}>
                     {a.passed ? "Pass" : "Fail"}
                   </span>
                 </button>
@@ -352,7 +344,10 @@ export default function TraineeHome() {
                       >
                         {l.kind === "video" ? (
                           watched ? (
-                            <CheckCircle2 className="h-5 w-5 flex-shrink-0" style={{ color: "#E05A2B" }} />
+                            <CheckCircle2
+                              className="h-5 w-5 flex-shrink-0"
+                              style={{ color: "#E05A2B" }}
+                            />
                           ) : (
                             <Circle className="h-5 w-5 text-neutral-300 flex-shrink-0" />
                           )
@@ -406,7 +401,12 @@ export default function TraineeHome() {
                 </p>
                 <p className="font-semibold truncate">{activeLesson.title}</p>
               </div>
-              <Button data-testid="close-video" variant="ghost" onClick={closeLesson} className="rounded-full">
+              <Button
+                data-testid="close-video"
+                variant="ghost"
+                onClick={closeLesson}
+                className="rounded-full"
+              >
                 Close
               </Button>
             </div>
