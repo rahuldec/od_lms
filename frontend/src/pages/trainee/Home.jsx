@@ -38,7 +38,6 @@ function AssignmentModal({ assignment, onClose }) {
         className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="px-6 py-4 flex items-center justify-between border-b border-neutral-100">
           <div>
             <p className="text-xs text-neutral-500 uppercase tracking-wider mb-0.5">Assignment</p>
@@ -49,7 +48,7 @@ function AssignmentModal({ assignment, onClose }) {
               className="inline-flex items-center gap-1.5 text-sm border rounded-full px-3 py-1 font-semibold"
               style={{ borderColor: color + "40", backgroundColor: color + "10", color }}
             >
-              {assignment.score}/{assignment.total} {assignment.passed ? "✓ Pass" : "✗ Fail"}
+              {assignment.score}/{assignment.total} {assignment.passed ? "Pass" : "Fail"}
             </div>
             <button
               onClick={onClose}
@@ -60,7 +59,6 @@ function AssignmentModal({ assignment, onClose }) {
           </div>
         </div>
 
-        {/* Recording */}
         {assignment.link && (
           <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-100">
             
@@ -69,12 +67,11 @@ function AssignmentModal({ assignment, onClose }) {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
             >
-              🎥 View Recording
+              View Recording
             </a>
           </div>
         )}
 
-        {/* Q&A */}
         <div className="overflow-y-auto max-h-[60vh] px-6 py-4 space-y-4">
           {(assignment.qa || []).map((item, i) => (
             <div key={i} className="border border-neutral-100 rounded-xl p-4">
@@ -272,7 +269,6 @@ export default function TraineeHome() {
         </p>
       </div>
 
-      {/* Overall Progress */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-6">
         <div className="flex items-baseline justify-between">
           <div>
@@ -298,7 +294,6 @@ export default function TraineeHome() {
         </div>
       </Card>
 
-      {/* Assignment Scores */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
         <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Assignment scores</p>
         {assignments.length > 0 ? (
@@ -317,7 +312,7 @@ export default function TraineeHome() {
                     {a.score}/{a.total}
                   </span>
                   <span className="text-xs font-medium" style={{ color }}>
-                    {a.passed ? "✓ Pass" : "✗ Fail"}
+                    {a.passed ? "Pass" : "Fail"}
                   </span>
                 </button>
               );
@@ -328,7 +323,6 @@ export default function TraineeHome() {
         )}
       </Card>
 
-      {/* Modules */}
       <div className="space-y-8">
         {modules.map((mod) => {
           const modLessons = mod.lessons.filter((l) => l.kind === "video");
@@ -393,10 +387,8 @@ export default function TraineeHome() {
         })}
       </div>
 
-      {/* Assignment Detail Modal */}
       <AssignmentModal assignment={activeAssignment} onClose={() => setActiveAssignment(null)} />
 
-      {/* Video Modal */}
       {activeLesson && (
         <div
           data-testid="video-modal"
