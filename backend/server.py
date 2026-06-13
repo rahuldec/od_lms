@@ -90,11 +90,6 @@ async def require_admin(ctx=Depends(require_user)):
 
 # ---------- Zoho score fetcher ----------
 async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[float]:
-    """
-    Fetches the 'Overall Score' for a trainee from a Zoho public report.
-    Matches trainee by first name (case-insensitive).
-    Returns the score as float, or None if not found.
-    """
     url = ZOHO_REPORTS.get(assignment_name)
     if not url:
         raise HTTPException(status_code=400, detail=f"Unknown assignment: {assignment_name}. Valid: {list(ZOHO_REPORTS.keys())}")
@@ -114,13 +109,6 @@ async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[
 
         html = r.text
 
-        # Try to find score via JSON embedded in the page (Zoho often embeds data as JS/JSON)
-        # Pattern: find table rows in the HTML
-        # Zoho reports render as HTML tables — parse with regex
-        # Find all table rows: extract Name and Overall Score columns
-
-        # Remove HTML tags for easier parsing
-        # Find header row to get column positions
         th_matches = re.findall(r'<th[^>]*>(.*?)</th>', html, re.IGNORECASE | re.DOTALL)
         headers_clean = [re.sub(r'<[^>]+>', '', h).strip() for h in th_matches]
 
@@ -135,11 +123,9 @@ async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[
         logger.info(f"Zoho headers found: {headers_clean}, name_idx={name_idx}, score_idx={score_idx}")
 
         if name_idx is None or score_idx is None:
-            # Fallback: try to find score near the trainee name in raw HTML
             logger.warning("Could not find Name/Score columns in Zoho report headers")
             return None
 
-        # Find all <tr> rows
         tr_matches = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.IGNORECASE | re.DOTALL)
         for row in tr_matches:
             td_matches = re.findall(r'<td[^>]*>(.*?)</td>', row, re.IGNORECASE | re.DOTALL)
@@ -147,7 +133,6 @@ async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[
             if len(cells) > max(name_idx, score_idx):
                 cell_name = cells[name_idx].strip().lower()
                 target_name = trainee_name.strip().lower()
-                # Match by first name or full name
                 if cell_name == target_name or cell_name.startswith(target_name.split()[0].lower()):
                     raw_score = cells[score_idx].strip()
                     try:
@@ -213,12 +198,33 @@ class AssignBatchIn(BaseModel):
 
 
 class AssignmentScoreIn(BaseModel):
-    assignment_name: str          # "SIS" or "Fee Module"
-    score: Optional[float] = None  # manual override; if None, fetch from Zoho
+    assignment_name: str
+    score: Optional[float] = None
 
 
 class RecordingIn(BaseModel):
-    recording_url: str            # Google Drive URL
+    recording_url: str
+
+
+class ResourceCategoryIn(BaseModel):
+    name: str
+
+
+class ResourceCategoryUpdate(BaseModel):
+    name: str
+
+
+class ResourceLinkIn(BaseModel):
+    category_id: str
+    title: str
+    url: str
+    description: Optional[str] = ""
+
+
+class ResourceLinkUpdate(BaseModel):
+    title: Optional[str] = None
+    url: Optional[str] = None
+    description: Optional[str] = None
 
 
 # ---------- setup / health ----------
@@ -229,8 +235,6 @@ async def root():
 
 @api.post("/setup/init")
 async def setup_init():
-    """Idempotently ensure the admin user exists with the configured password
-    and has role=admin in user_roles."""
     email = f"{ADMIN_USERNAME}@odk.local"
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.get(
@@ -489,10 +493,8 @@ async def get_trainee(trainee_id: str, _=Depends(require_admin)):
 
 
 # ---------- assignments ----------
-
 @api.get("/admin/assignments/{trainee_id}")
 async def list_assignments(trainee_id: str, _=Depends(require_admin)):
-    """List all assignments for a trainee."""
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.get(
             f"{REST}/assignments?trainee_id=eq.{trainee_id}&select=*&order=created_at.desc",
@@ -503,11 +505,6 @@ async def list_assignments(trainee_id: str, _=Depends(require_admin)):
 
 @api.post("/admin/assignments/{trainee_id}")
 async def upsert_assignment(trainee_id: str, body: AssignmentScoreIn, _=Depends(require_admin)):
-    """
-    Fetch score from Zoho (or use manual override) and save/update the assignment record.
-    Pass threshold: score >= 9 out of 50.
-    """
-    # Get trainee name for Zoho lookup
     async with httpx.AsyncClient(timeout=20) as cx:
         tr = await cx.get(
             f"{REST}/trainees?id=eq.{trainee_id}&select=name",
@@ -518,7 +515,6 @@ async def upsert_assignment(trainee_id: str, body: AssignmentScoreIn, _=Depends(
             raise HTTPException(status_code=404, detail="Trainee not found")
         trainee_name = rows[0]["name"]
 
-    # Determine score
     if body.score is not None:
         score = body.score
         source = "manual"
@@ -536,7 +532,6 @@ async def upsert_assignment(trainee_id: str, body: AssignmentScoreIn, _=Depends(
     now = datetime.now(timezone.utc).isoformat()
 
     async with httpx.AsyncClient(timeout=20) as cx:
-        # Check if assignment record already exists for this trainee + assignment
         existing_r = await cx.get(
             f"{REST}/assignments?trainee_id=eq.{trainee_id}&assignment_name=eq.{body.assignment_name}&select=*",
             headers=ADMIN_HEADERS,
@@ -554,7 +549,6 @@ async def upsert_assignment(trainee_id: str, body: AssignmentScoreIn, _=Depends(
         }
 
         if existing:
-            # Preserve existing recording_url if present
             if existing.get("recording_url"):
                 payload["recording_url"] = existing["recording_url"]
             r2 = await cx.patch(
@@ -580,7 +574,6 @@ async def upsert_assignment(trainee_id: str, body: AssignmentScoreIn, _=Depends(
 
 @api.patch("/admin/assignments/{trainee_id}/{assignment_name}/recording")
 async def update_recording(trainee_id: str, assignment_name: str, body: RecordingIn, _=Depends(require_admin)):
-    """Add or update the Google Drive recording URL for a specific trainee's assignment."""
     async with httpx.AsyncClient(timeout=20) as cx:
         existing_r = await cx.get(
             f"{REST}/assignments?trainee_id=eq.{trainee_id}&assignment_name=eq.{assignment_name}&select=*",
@@ -597,7 +590,6 @@ async def update_recording(trainee_id: str, assignment_name: str, body: Recordin
                 json={"recording_url": body.recording_url, "updated_at": now},
             )
         else:
-            # Create a placeholder assignment record with just the recording URL
             r = await cx.post(
                 f"{REST}/assignments",
                 headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
@@ -621,10 +613,6 @@ async def update_recording(trainee_id: str, assignment_name: str, body: Recordin
 
 @api.get("/admin/assignments/{trainee_id}/{assignment_name}/zoho-fetch")
 async def fetch_score_from_zoho(trainee_id: str, assignment_name: str, _=Depends(require_admin)):
-    """
-    Fetch and preview the score from Zoho without saving.
-    Admin can confirm before saving.
-    """
     async with httpx.AsyncClient(timeout=20) as cx:
         tr = await cx.get(
             f"{REST}/trainees?id=eq.{trainee_id}&select=name",
@@ -656,10 +644,8 @@ async def fetch_score_from_zoho(trainee_id: str, assignment_name: str, _=Depends
     }
 
 
-# ---------- available assignments list ----------
 @api.get("/admin/assignments-list")
 async def get_assignments_list(_=Depends(require_admin)):
-    """Return the list of available assignment names."""
     return {"assignments": list(ZOHO_REPORTS.keys())}
 
 
@@ -752,6 +738,114 @@ async def assign_batch(trainee_id: str, body: AssignBatchIn, _=Depends(require_a
     if r.status_code not in (200, 204):
         raise HTTPException(status_code=400, detail=r.text)
     return r.json()[0] if r.json() else {"ok": True}
+
+
+# ---------- admin resources ----------
+@api.get("/admin/resources")
+async def list_resources(_=Depends(require_admin)):
+    """Return all categories with their links nested inside."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        rc = await cx.get(
+            f"{REST}/resource_categories?select=*&order=created_at.asc",
+            headers=ADMIN_HEADERS,
+        )
+        rl = await cx.get(
+            f"{REST}/resource_links?select=*&order=created_at.asc",
+            headers=ADMIN_HEADERS,
+        )
+    categories = rc.json() if rc.status_code == 200 else []
+    links = rl.json() if rl.status_code == 200 else []
+
+    # Nest links inside their category
+    for cat in categories:
+        cat["links"] = [l for l in links if l.get("category_id") == cat["id"]]
+
+    return categories
+
+
+@api.post("/admin/resources/categories")
+async def create_resource_category(body: ResourceCategoryIn, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.post(
+            f"{REST}/resource_categories",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"name": body.name},
+        )
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0]
+
+
+@api.put("/admin/resources/categories/{category_id}")
+async def update_resource_category(category_id: str, body: ResourceCategoryUpdate, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(
+            f"{REST}/resource_categories?id=eq.{category_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"name": body.name},
+        )
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.delete("/admin/resources/categories/{category_id}")
+async def delete_resource_category(category_id: str, _=Depends(require_admin)):
+    """Deletes category and all its links (cascade handled by DB or we delete manually)."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await cx.delete(
+            f"{REST}/resource_links?category_id=eq.{category_id}",
+            headers=ADMIN_HEADERS,
+        )
+        await cx.delete(
+            f"{REST}/resource_categories?id=eq.{category_id}",
+            headers=ADMIN_HEADERS,
+        )
+    return {"ok": True}
+
+
+@api.post("/admin/resources/links")
+async def create_resource_link(body: ResourceLinkIn, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.post(
+            f"{REST}/resource_links",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={
+                "category_id": body.category_id,
+                "title": body.title,
+                "url": body.url,
+                "description": body.description or "",
+            },
+        )
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0]
+
+
+@api.put("/admin/resources/links/{link_id}")
+async def update_resource_link(link_id: str, body: ResourceLinkUpdate, _=Depends(require_admin)):
+    patch = {k: v for k, v in body.dict().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(
+            f"{REST}/resource_links?id=eq.{link_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json=patch,
+        )
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.delete("/admin/resources/links/{link_id}")
+async def delete_resource_link(link_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await cx.delete(
+            f"{REST}/resource_links?id=eq.{link_id}",
+            headers=ADMIN_HEADERS,
+        )
+    return {"ok": True}
 
 
 # ---------- trainee progress ----------
