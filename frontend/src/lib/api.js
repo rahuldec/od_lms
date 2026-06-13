@@ -74,4 +74,34 @@ export const api = {
     axios
       .post(`${BASE}/trainee/progress`, body, { headers: await authHeader() })
       .then((r) => r.data),
+
+  // Resources
+  listResourceCategories: async () =>
+    axios
+      .get(`${BASE}/admin/resources`, { headers: await authHeader() })
+      .then((r) => r.data),
+  createResourceCategory: async (body) =>
+    axios
+      .post(`${BASE}/admin/resources/categories`, body, { headers: await authHeader() })
+      .then((r) => r.data),
+  updateResourceCategory: async (id, body) =>
+    axios
+      .put(`${BASE}/admin/resources/categories/${id}`, body, { headers: await authHeader() })
+      .then((r) => r.data),
+  deleteResourceCategory: async (id) =>
+    axios
+      .delete(`${BASE}/admin/resources/categories/${id}`, { headers: await authHeader() })
+      .then((r) => r.data),
+  createResourceLink: async (body) =>
+    axios
+      .post(`${BASE}/admin/resources/links`, body, { headers: await authHeader() })
+      .then((r) => r.data),
+  updateResourceLink: async (id, body) =>
+    axios
+      .put(`${BASE}/admin/resources/links/${id}`, body, { headers: await authHeader() })
+      .then((r) => r.data),
+  deleteResourceLink: async (id) =>
+    axios
+      .delete(`${BASE}/admin/resources/links/${id}`, { headers: await authHeader() })
+      .then((r) => r.data),
 };
