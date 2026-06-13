@@ -10,8 +10,8 @@ import Trainees from "@/pages/admin/Trainees";
 import TraineeDetail from "@/pages/admin/TraineeDetail";
 import Batches from "@/pages/admin/Batches";
 import BatchDetail from "@/pages/admin/BatchDetail";
+import Resources from "@/pages/admin/Resources";
 import TraineeHome from "@/pages/trainee/Home";
-
 function RootRedirect() {
   const { session, role, loading } = useAuth();
   if (loading) return null;
@@ -19,7 +19,6 @@ function RootRedirect() {
   if (role === "admin") return <Navigate to="/admin" replace />;
   return <Navigate to="/trainee" replace />;
 }
-
 export default function App() {
   return (
     <AuthProvider>
@@ -70,6 +69,14 @@ export default function App() {
             element={
               <Protected requireRole="admin">
                 <BatchDetail />
+              </Protected>
+            }
+          />
+          <Route
+            path="/admin/resources"
+            element={
+              <Protected requireRole="admin">
+                <Resources />
               </Protected>
             }
           />
