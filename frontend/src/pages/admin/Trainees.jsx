@@ -70,6 +70,7 @@ const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
+  { to: "/admin/resources", label: "Resources", testId: "nav-resources" },
 ];
 
 const errMsg = (e) =>
