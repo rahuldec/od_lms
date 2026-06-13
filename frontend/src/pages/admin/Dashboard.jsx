@@ -36,6 +36,16 @@ const fmtDate = (iso) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const daysSince = (iso) => {
+  if (!iso) return null;
+  const joined = new Date(iso);
+  const today = new Date();
+  joined.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((today - joined) / (1000 * 60 * 60 * 24));
+  return diff;
+};
+
 function AssignmentModal({ assignment, onClose }) {
   if (!assignment) return null;
   const color = assignment.passed ? "#16a34a" : "#dc2626";
@@ -230,6 +240,7 @@ export default function AdminDashboard() {
                       const history = Array.isArray(t.history) ? t.history : [];
                       const promotions = history.filter((h) => h.type === "promotion");
                       const assignments = getAssignments(t.name);
+                      const days = daysSince(t.join_date);
                       return (
                         <div key={t.id} className="px-5 py-4">
                           <div className="flex items-center justify-between">
@@ -241,12 +252,19 @@ export default function AdminDashboard() {
                                 {t.name?.charAt(0).toUpperCase()}
                               </div>
                               <div>
-                                <Link
-                                  to={`/admin/trainees/${t.id}`}
-                                  className="text-sm font-medium text-neutral-900 hover:underline"
-                                >
-                                  {t.name}
-                                </Link>
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    to={`/admin/trainees/${t.id}`}
+                                    className="text-sm font-medium text-neutral-900 hover:underline"
+                                  >
+                                    {t.name}
+                                  </Link>
+                                  {days !== null && (
+                                    <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-orange-50 text-orange-600 ring-1 ring-orange-200">
+                                      Day {days}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-neutral-500">
                                   @{t.username}
                                   {t.manager ? ` - ${t.manager}` : ""}
