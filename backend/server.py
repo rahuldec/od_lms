@@ -4,7 +4,7 @@ The frontend authenticates with Supabase directly (Supabase Auth + anon key).
 For any write that requires bypassing RLS (creating trainees, assigning roles,
 updating progress, deleting users), the frontend calls these endpoints with
 its Supabase access token. The backend verifies the token and uses the
-service_role key to perform privileged operations.
+service_role key to perform privileged operations. 
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
