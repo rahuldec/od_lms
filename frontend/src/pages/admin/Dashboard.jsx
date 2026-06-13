@@ -70,7 +70,7 @@ function AssignmentModal({ assignment, onClose }) {
         {/* Recording */}
         {assignment.link && (
           <div className="px-6 py-3 bg-neutral-50 border-b border-neutral-100">
-            <a
+            
               href={assignment.link}
               target="_blank"
               rel="noopener noreferrer"
