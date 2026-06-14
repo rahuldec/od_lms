@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ExternalLink, FolderPlus, Link2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, FolderPlus, Link2, X, FileText } from "lucide-react";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -35,7 +35,12 @@ const navItems = [
 
 const errMsg = (e) => e?.response?.data?.detail || e?.message || "Operation failed";
 
-const emptyLinkForm = { title: "", urls: [""], description: "" };
+const emptyLinkForm = {
+  title: "",
+  urls: [{ label: "", url: "" }],
+  practice_sheet_url: "",
+  description: "",
+};
 const emptyCatForm = { name: "" };
 
 const ensureHttps = (url) => {
@@ -43,11 +48,18 @@ const ensureHttps = (url) => {
   return url.startsWith("http") ? url : `https://${url}`;
 };
 
-// Parse urls field — could be array (new) or string (old single url)
 const parseUrls = (link) => {
-  if (Array.isArray(link.urls) && link.urls.length > 0) return link.urls;
-  if (link.url) return [link.url];
-  return [""];
+  // New format: array of {label, url}
+  if (Array.isArray(link.urls) && link.urls.length > 0 && typeof link.urls[0] === "object") {
+    return link.urls;
+  }
+  // Old format: array of strings
+  if (Array.isArray(link.urls) && link.urls.length > 0) {
+    return link.urls.map((u) => ({ label: "", url: u }));
+  }
+  // Legacy single url
+  if (link.url) return [{ label: "", url: link.url }];
+  return [{ label: "", url: "" }];
 };
 
 export default function Resources() {
@@ -130,19 +142,19 @@ export default function Resources() {
   };
 
   // --- URL field helpers ---
-  const setUrl = (index, value) => {
+  const setUrlEntry = (index, field, value) => {
     const urls = [...linkForm.urls];
-    urls[index] = value;
+    urls[index] = { ...urls[index], [field]: value };
     setLinkForm({ ...linkForm, urls });
   };
 
   const addUrl = () => {
-    setLinkForm({ ...linkForm, urls: [...linkForm.urls, ""] });
+    setLinkForm({ ...linkForm, urls: [...linkForm.urls, { label: "", url: "" }] });
   };
 
   const removeUrl = (index) => {
     const urls = linkForm.urls.filter((_, i) => i !== index);
-    setLinkForm({ ...linkForm, urls: urls.length ? urls : [""] });
+    setLinkForm({ ...linkForm, urls: urls.length ? urls : [{ label: "", url: "" }] });
   };
 
   // --- Link handlers ---
@@ -159,6 +171,7 @@ export default function Resources() {
     setLinkForm({
       title: link.title || "",
       urls: parseUrls(link),
+      practice_sheet_url: link.practice_sheet_url || "",
       description: link.description || "",
     });
     setLinkModalOpen(true);
@@ -167,14 +180,17 @@ export default function Resources() {
   const saveLink = async (e) => {
     e?.preventDefault?.();
     if (!linkForm.title.trim()) { toast.error("Title required"); return; }
-    const cleanUrls = linkForm.urls.map(ensureHttps).filter(Boolean);
+    const cleanUrls = linkForm.urls
+      .map((entry) => ({ label: entry.label.trim(), url: ensureHttps(entry.url) }))
+      .filter((entry) => entry.url);
     if (cleanUrls.length === 0) { toast.error("At least one URL required"); return; }
     setSavingLink(true);
     try {
       const payload = {
         title: linkForm.title,
         urls: cleanUrls,
-        url: cleanUrls[0], // keep for backward compat
+        url: cleanUrls[0].url,
+        practice_sheet_url: ensureHttps(linkForm.practice_sheet_url),
         description: linkForm.description,
       };
       if (editingLink) {
@@ -236,7 +252,6 @@ export default function Resources() {
         <div className="space-y-6">
           {categories.map((cat) => (
             <Card key={cat.id} className="rounded-2xl border-neutral-200/80 p-6">
-              {/* Category header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <div
@@ -260,17 +275,11 @@ export default function Resources() {
                   >
                     <Plus className="h-3.5 w-3.5" /> Add link
                   </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => openEditCat(cat)}
-                    className="rounded-full h-8 w-8"
-                  >
+                  <Button size="icon" variant="ghost" onClick={() => openEditCat(cat)} className="rounded-full h-8 w-8">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
-                    size="icon"
-                    variant="ghost"
+                    size="icon" variant="ghost"
                     onClick={() => setConfirmDeleteCat(cat)}
                     className="rounded-full h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                   >
@@ -279,7 +288,6 @@ export default function Resources() {
                 </div>
               </div>
 
-              {/* Links */}
               {(cat.links || []).length === 0 ? (
                 <div
                   className="border border-dashed border-neutral-200 rounded-xl px-4 py-5 text-center cursor-pointer hover:bg-neutral-50 transition-colors"
@@ -292,44 +300,56 @@ export default function Resources() {
                   {(cat.links || []).map((link) => {
                     const urls = parseUrls(link);
                     return (
-                      <div key={link.id} className="flex items-start justify-between py-3 group">
+                      <div key={link.id} className="flex items-start justify-between py-4 group">
                         <div className="flex items-start gap-3 min-w-0 flex-1">
                           <div className="h-8 w-8 rounded-lg bg-neutral-100 grid place-items-center flex-shrink-0 mt-0.5">
                             <Link2 className="h-4 w-4 text-neutral-400" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-neutral-900 mb-1">{link.title}</p>
+                            <p className="text-sm font-semibold text-neutral-900 mb-2">{link.title}</p>
                             {link.description && (
-                              <p className="text-xs text-neutral-500 mb-1.5">{link.description}</p>
+                              <p className="text-xs text-neutral-500 mb-2">{link.description}</p>
                             )}
-                            <div className="flex flex-col gap-1">
-                              {urls.filter(Boolean).map((u, i) => (
+                            {/* URLs */}
+                            <div className="flex flex-col gap-1.5 mb-2">
+                              {urls.filter((e) => e.url).map((entry, i) => (
                                 <a
                                   key={i}
-                                  href={u}
+                                  href={entry.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline truncate max-w-sm"
+                                  className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
                                 >
                                   <ExternalLink className="h-3 w-3 flex-shrink-0" />
-                                  {u}
+                                  <span className="font-medium">{entry.label || `Link ${i + 1}`}</span>
+                                  <span className="text-neutral-400 truncate max-w-xs">{entry.url}</span>
                                 </a>
                               ))}
                             </div>
+                            {/* Practice Sheet */}
+                            {link.practice_sheet_url && (
+                              <a
+                                href={link.practice_sheet_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-emerald-600 hover:underline"
+                              >
+                                <FileText className="h-3 w-3 flex-shrink-0" />
+                                <span className="font-medium">Practice Sheet</span>
+                              </a>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
                           <Button
-                            size="icon"
-                            variant="ghost"
+                            size="icon" variant="ghost"
                             onClick={() => openEditLink(link, cat.id)}
                             className="rounded-full h-7 w-7"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
-                            size="icon"
-                            variant="ghost"
+                            size="icon" variant="ghost"
                             onClick={() => setConfirmDeleteLink(link)}
                             className="rounded-full h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
                           >
@@ -367,15 +387,8 @@ export default function Resources() {
               />
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setCatModalOpen(false)} className="rounded-full">
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={savingCat}
-                className="rounded-full text-white"
-                style={{ backgroundColor: "#E05A2B" }}
-              >
+              <Button type="button" variant="ghost" onClick={() => setCatModalOpen(false)} className="rounded-full">Cancel</Button>
+              <Button type="submit" disabled={savingCat} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
                 {savingCat ? "Saving..." : editingCat ? "Save changes" : "Create"}
               </Button>
             </DialogFooter>
@@ -385,27 +398,29 @@ export default function Resources() {
 
       {/* Link Modal */}
       <Dialog open={linkModalOpen} onOpenChange={setLinkModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="sm:max-w-lg rounded-2xl">
           <DialogHeader>
             <DialogTitle>{editingLink ? "Edit link" : "Add link"}</DialogTitle>
             <DialogDescription>
-              {editingLink ? "Update this link." : "Add a new link entry with one or more URLs."}
+              {editingLink ? "Update this link entry." : "Add a new link entry with URLs and optional practice sheet."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={saveLink} className="space-y-4">
+            {/* Title */}
             <div>
               <Label className="text-xs text-neutral-600">Title</Label>
               <Input
                 value={linkForm.title}
                 onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
                 className="h-10 rounded-xl mt-1"
-                placeholder="e.g. SIS Assignment"
+                placeholder="e.g. SIS Module Assignment"
                 autoFocus
               />
             </div>
 
+            {/* URLs with labels */}
             <div>
-              <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center justify-between mb-2">
                 <Label className="text-xs text-neutral-600">URLs</Label>
                 <button
                   type="button"
@@ -417,12 +432,18 @@ export default function Resources() {
                 </button>
               </div>
               <div className="space-y-2">
-                {linkForm.urls.map((u, i) => (
+                {linkForm.urls.map((entry, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <Input
-                      value={u}
-                      onChange={(e) => setUrl(i, e.target.value)}
-                      className="h-10 rounded-xl"
+                      value={entry.label}
+                      onChange={(e) => setUrlEntry(i, "label", e.target.value)}
+                      className="h-10 rounded-xl w-32 flex-shrink-0"
+                      placeholder="Label"
+                    />
+                    <Input
+                      value={entry.url}
+                      onChange={(e) => setUrlEntry(i, "url", e.target.value)}
+                      className="h-10 rounded-xl flex-1"
                       placeholder="https://..."
                     />
                     {linkForm.urls.length > 1 && (
@@ -439,6 +460,23 @@ export default function Resources() {
               </div>
             </div>
 
+            {/* Practice Sheet URL */}
+            <div>
+              <Label className="text-xs text-neutral-600">
+                Practice Sheet URL <span className="text-neutral-400">(optional — Google Drive PDF link)</span>
+              </Label>
+              <div className="flex items-center gap-2 mt-1">
+                <FileText className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                <Input
+                  value={linkForm.practice_sheet_url}
+                  onChange={(e) => setLinkForm({ ...linkForm, practice_sheet_url: e.target.value })}
+                  className="h-10 rounded-xl"
+                  placeholder="https://drive.google.com/..."
+                />
+              </div>
+            </div>
+
+            {/* Description */}
             <div>
               <Label className="text-xs text-neutral-600">Description <span className="text-neutral-400">(optional)</span></Label>
               <Input
@@ -450,15 +488,8 @@ export default function Resources() {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setLinkModalOpen(false)} className="rounded-full">
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={savingLink}
-                className="rounded-full text-white"
-                style={{ backgroundColor: "#E05A2B" }}
-              >
+              <Button type="button" variant="ghost" onClick={() => setLinkModalOpen(false)} className="rounded-full">Cancel</Button>
+              <Button type="submit" disabled={savingLink} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
                 {savingLink ? "Saving..." : editingLink ? "Save changes" : "Add link"}
               </Button>
             </DialogFooter>
@@ -471,15 +502,11 @@ export default function Resources() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{confirmDeleteCat?.name}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              All links inside this category will also be deleted. This cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogDescription>All links inside this category will also be deleted. This cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={doDeleteCat} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={doDeleteCat} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -489,15 +516,11 @@ export default function Resources() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{confirmDeleteLink?.title}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This link will be permanently removed.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This link will be permanently removed.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={doDeleteLink} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={doDeleteLink} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
