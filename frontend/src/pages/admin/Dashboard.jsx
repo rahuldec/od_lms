@@ -244,20 +244,22 @@ export default function AdminDashboard() {
   const [token, setToken] = useState(null);
 
   useEffect(() => {
-    // Get token from localStorage (standard Supabase key)
-    const stored = localStorage.getItem("sb-rlenfsigkfxppxkskqks-auth-token");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setToken(parsed?.access_token || null);
-      } catch {
-        setToken(null);
+    // Get token — scan all localStorage keys for any Supabase auth token
+    let resolvedToken = null;
+    try {
+      const sbKey = Object.keys(localStorage).find(
+        (k) => k.startsWith("sb-") && k.endsWith("-auth-token")
+      );
+      if (sbKey) {
+        const parsed = JSON.parse(localStorage.getItem(sbKey));
+        resolvedToken = parsed?.access_token || null;
       }
+    } catch {
+      resolvedToken = null;
     }
-  }, []);
+    setToken(resolvedToken);
 
-  useEffect(() => {
-    if (!token) return;
+    // Load trainees and assignments immediately — don't wait for token state
     (async () => {
       try {
         const [data, aResults] = await Promise.all([
@@ -267,13 +269,15 @@ export default function AdminDashboard() {
         setTrainees(Array.isArray(data) ? data : []);
         setAssignmentResults(aResults || {});
 
-        // Fetch last-seen for all trainees
-        const lsRes = await fetch(`${API_BASE}/admin/trainees/last-seen/all`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (lsRes.ok) {
-          const lsData = await lsRes.json();
-          setLastSeen(lsData || {});
+        // Fetch last-seen using resolved token directly
+        if (resolvedToken) {
+          const lsRes = await fetch(`${API_BASE}/admin/trainees/last-seen/all`, {
+            headers: { Authorization: `Bearer ${resolvedToken}` },
+          });
+          if (lsRes.ok) {
+            const lsData = await lsRes.json();
+            setLastSeen(lsData || {});
+          }
         }
       } catch (e) {
         toast.error("Could not load trainees");
@@ -281,7 +285,7 @@ export default function AdminDashboard() {
         setLoading(false);
       }
     })();
-  }, [token]);
+  }, []);
 
   const total = trainees.length;
   const active = trainees.filter((t) => t.status === "Active").length;
