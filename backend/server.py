@@ -350,6 +350,7 @@ async def delete_trainee(trainee_id: str, _=Depends(require_admin)):
         auth_user_id = t.get("auth_user_id")
         await cx.delete(f"{REST}/lesson_progress?trainee_id=eq.{trainee_id}", headers=ADMIN_HEADERS)
         await cx.delete(f"{REST}/assignments?trainee_id=eq.{trainee_id}", headers=ADMIN_HEADERS)
+        await cx.delete(f"{REST}/login_events?trainee_id=eq.{trainee_id}", headers=ADMIN_HEADERS)
         await cx.delete(f"{REST}/trainees?id=eq.{trainee_id}", headers=ADMIN_HEADERS)
         if auth_user_id:
             await cx.delete(f"{REST}/user_roles?user_id=eq.{auth_user_id}", headers=ADMIN_HEADERS)
@@ -398,6 +399,74 @@ async def get_trainee(trainee_id: str, _=Depends(require_admin)):
         "progress": p.json() if p.status_code == 200 else [],
         "assignments": a.json() if a.status_code == 200 else [],
     }
+
+
+# ---------- login timeline ----------
+@api.get("/admin/trainees/{trainee_id}/timeline")
+async def get_login_timeline(trainee_id: str, _=Depends(require_admin)):
+    """Return last 50 login events for a trainee, newest first."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/login_events?trainee_id=eq.{trainee_id}&select=id,created_at&order=created_at.desc&limit=50",
+            headers=ADMIN_HEADERS,
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.get("/admin/trainees/last-seen/all")
+async def get_all_last_seen(_=Depends(require_admin)):
+    """Return the most recent login timestamp for every trainee in one call."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        # Fetch all login events ordered desc, then dedupe by trainee_id on server
+        r = await cx.get(
+            f"{REST}/login_events?select=trainee_id,created_at&order=created_at.desc&limit=1000",
+            headers=ADMIN_HEADERS,
+        )
+    rows = r.json() if r.status_code == 200 else []
+    # Keep only the first (most recent) row per trainee
+    seen = {}
+    for row in rows:
+        tid = row["trainee_id"]
+        if tid not in seen:
+            seen[tid] = row["created_at"]
+    return seen
+
+
+# ---------- trainee login ping ----------
+@api.post("/trainee/login-ping")
+async def login_ping(ctx=Depends(require_user)):
+    """Called by the frontend on login and on page visits. Records a login event."""
+    if ctx["role"] != "trainee":
+        raise HTTPException(status_code=403, detail="Trainee only")
+    user = ctx["user"]
+    async with httpx.AsyncClient(timeout=15) as cx:
+        rt = await cx.get(
+            f"{REST}/trainees?auth_user_id=eq.{user['id']}&select=id",
+            headers=ADMIN_HEADERS,
+        )
+        rows = rt.json() if rt.status_code == 200 else []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Trainee not found")
+        trainee_id = rows[0]["id"]
+
+        # Rate-limit: only insert if no event in last 10 minutes to avoid spam
+        from datetime import timedelta
+        ten_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        recent_r = await cx.get(
+            f"{REST}/login_events?trainee_id=eq.{trainee_id}&created_at=gte.{ten_min_ago}&select=id&limit=1",
+            headers=ADMIN_HEADERS,
+        )
+        if recent_r.status_code == 200 and recent_r.json():
+            return {"ok": True, "recorded": False, "reason": "rate_limited"}
+
+        r = await cx.post(
+            f"{REST}/login_events",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"trainee_id": trainee_id, "created_at": datetime.now(timezone.utc).isoformat()},
+        )
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=r.text)
+    return {"ok": True, "recorded": True}
 
 
 # ---------- assignments ----------
