@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
-import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,38 +50,6 @@ const daysSince = (iso) => {
 function AssignmentModal({ assignment, onClose }) {
   if (!assignment) return null;
   const color = assignment.passed ? "#16a34a" : "#dc2626";
-
-  const getModuleProgress = (progressRows) => {
-    if (!modules.length) return null;
-    const watchedSet = new Set((progressRows || []).filter(p => p.watched).map(p => p.lesson_id));
-    let overallVideos = 0;
-    let overallWatched = 0;
-    for (const module of modules) {
-      const videoLessons = (module.lessons || []).filter(l => l.kind === "video");
-      const total = videoLessons.length;
-      const watched = videoLessons.filter(l => watchedSet.has(l.id)).length;
-      overallVideos += total;
-      overallWatched += watched;
-      if (watched < total) {
-        return {moduleName: module.name,moduleWatched: watched,moduleTotal: total,overallPct: overallVideos ? Math.round((overallWatched/overallVideos)*100):0,completed:false};
-      }
-    }
-    return {moduleName: modules[modules.length-1]?.name || "Completed",moduleWatched: overallVideos,moduleTotal: overallVideos,overallPct:100,completed:true};
-  };
-
-  useEffect(() => {
-    if (expandedLevel === null) return;
-    const levelData = levelGroups.find(g => g.level === expandedLevel);
-    if (!levelData) return;
-    levelData.trainees.forEach(async (t) => {
-      if (traineeProgress[t.id]) return;
-      try {
-        const data = await api.getTrainee(t.id);
-        setTraineeProgress(prev => ({...prev,[t.id]: data.progress || []}));
-      } catch(e) {}
-    });
-  }, [expandedLevel]);
-
   return (
     <div
       className="fixed inset-0 z-50 bg-neutral-900/70 backdrop-blur-sm flex items-center justify-center p-4"
@@ -158,19 +125,15 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [expandedLevel, setExpandedLevel] = useState(null);
   const [activeAssignment, setActiveAssignment] = useState(null);
-  const [modules, setModules] = useState([]);
-  const [traineeProgress, setTraineeProgress] = useState({});
 
   useEffect(() => {
     (async () => {
       try {
-        const [data, aResults, batchData, moduleData] = await Promise.all([
+        const [data, aResults, batchData] = await Promise.all([
           api.listTrainees(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listBatches().catch(() => []),
-          fetchSheetModules().catch(() => []),
         ]);
-        setModules(moduleData || []);
         setTrainees(Array.isArray(data) ? data : []);
         setAssignmentResults(aResults || {});
         setBatches(Array.isArray(batchData) ? batchData : []);
@@ -314,7 +277,6 @@ export default function AdminDashboard() {
                         const assignments = getAssignments(t.name);
                         const days = daysSince(t.join_date);
                         const latestPromotion = promotions[promotions.length - 1];
-                        const progressInfo = getModuleProgress(traineeProgress[t.id]);
                         return (
                           <div
                             key={t.id}
@@ -369,27 +331,6 @@ export default function AdminDashboard() {
                                   <TrendingUp className="h-2.5 w-2.5" />
                                   {fmtDate(latestPromotion.at)}
                                 </span>
-                              )}
-                            </div>
-
-                            
-                            <div className="mb-3 rounded-lg border border-orange-100 bg-orange-50 p-2">
-                              {progressInfo ? (
-                                <>
-                                  <p className="text-[10px] uppercase tracking-wider text-neutral-500">Current Module</p>
-                                  <p className="text-xs font-semibold mt-1">{progressInfo.moduleName}</p>
-                                  <p className="text-[11px] text-neutral-600">{progressInfo.completed ? "Completed ✓" : `${progressInfo.moduleWatched}/${progressInfo.moduleTotal} Videos`}</p>
-                                  <div className="mt-2">
-                                    <div className="flex justify-between text-[10px] text-neutral-500">
-                                      <span>Overall</span><span>{progressInfo.overallPct}%</span>
-                                    </div>
-                                    <div className="h-1.5 bg-neutral-200 rounded-full overflow-hidden mt-1">
-                                      <div className="h-full bg-orange-500" style={{ width: `${progressInfo.overallPct}%` }} />
-                                    </div>
-                                  </div>
-                                </>
-                              ) : (
-                                <p className="text-[11px] text-neutral-400">Loading module progress...</p>
                               )}
                             </div>
 
