@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { fetchSheetModules } from "@/lib/sheet";
@@ -11,18 +11,11 @@ import {
   Circle,
   FileText,
   Play,
-  Clock,
   ChevronRight,
   Loader2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const fmt = (sec) => {
-  const m = Math.floor((sec || 0) / 60);
-  const s = Math.floor((sec || 0) % 60);
-  return `${m}m ${s.toString().padStart(2, "0")}s`;
-};
 
 const navItems = [{ to: "/trainee", label: "Training", testId: "nav-training" }];
 
@@ -104,19 +97,6 @@ export default function TraineeHome() {
   const [activeAssignment, setActiveAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeLesson, setActiveLesson] = useState(null);
-  const activeLessonRef = useRef(null);
-  const tickRef = useRef(null);
-  const tickStartRef = useRef(null);
-  const progressRef = useRef({});
-
-  useEffect(() => {
-    progressRef.current = progress;
-  }, [progress]);
-
-  // Keep activeLessonRef in sync so event listeners can access it
-  useEffect(() => {
-    activeLessonRef.current = activeLesson;
-  }, [activeLesson]);
 
   const reloadProgress = async () => {
     const res = await api.myProgress();
@@ -148,93 +128,8 @@ export default function TraineeHome() {
     const lessons = modules.flatMap((m) => m.lessons.filter((l) => l.kind === "video"));
     const total = lessons.length;
     const watched = lessons.filter((l) => progress[l.id]?.watched).length;
-    const seconds = Object.values(progress).reduce((acc, p) => acc + (p.watch_seconds || 0), 0);
-    return { total, watched, seconds, pct: total ? (watched / total) * 100 : 0 };
+    return { total, watched, pct: total ? (watched / total) * 100 : 0 };
   }, [modules, progress]);
-
-  const pauseTimer = () => {
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    const ref = tickStartRef.current;
-    if (ref) {
-      const delta = Math.floor((Date.now() - ref.startedAt) / 1000);
-      if (delta > 0) {
-        api.upsertProgress({ lesson_id: ref.lessonId, watch_seconds_delta: delta }).catch(() => {});
-      }
-      tickStartRef.current = null;
-    }
-  };
-
-  const resumeTimer = (lessonId) => {
-    if (!lessonId || tickRef.current) return;
-    tickStartRef.current = { lessonId, startedAt: Date.now() };
-    tickRef.current = setInterval(async () => {
-      const ref = tickStartRef.current;
-      if (!ref) return;
-      const delta = Math.floor((Date.now() - ref.startedAt) / 1000);
-      if (delta < 5) return;
-      tickStartRef.current = { ...ref, startedAt: Date.now() };
-      try {
-        const updated = await api.upsertProgress({
-          lesson_id: ref.lessonId,
-          watch_seconds_delta: delta,
-        });
-        setProgress((prev) => ({ ...prev, [ref.lessonId]: updated }));
-      } catch (e) {}
-    }, 5000);
-  };
-
-  const startTimer = (lesson) => {
-    stopTimer();
-    resumeTimer(lesson.id);
-  };
-
-  const stopTimer = async () => {
-    if (tickRef.current) {
-      clearInterval(tickRef.current);
-      tickRef.current = null;
-    }
-    const ref = tickStartRef.current;
-    if (ref) {
-      const delta = Math.floor((Date.now() - ref.startedAt) / 1000);
-      if (delta > 0) {
-        try {
-          const updated = await api.upsertProgress({
-            lesson_id: ref.lessonId,
-            watch_seconds_delta: delta,
-          });
-          setProgress((prev) => ({ ...prev, [ref.lessonId]: updated }));
-        } catch (e) {}
-      }
-      tickStartRef.current = null;
-    }
-  };
-
-  // Pause timer when user switches tabs, minimizes, or leaves page
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        pauseTimer();
-      } else {
-        const lesson = activeLessonRef.current;
-        if (lesson?.kind === "video") {
-          resumeTimer(lesson.id);
-        }
-      }
-    };
-    const handleBeforeUnload = () => { pauseTimer(); };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, []);
-
-  useEffect(() => () => { stopTimer(); }, []);
 
   const openLesson = (lesson) => {
     if (lesson.kind === "assignment" && lesson.assignmentUrl) {
@@ -250,11 +145,9 @@ export default function TraineeHome() {
       return;
     }
     setActiveLesson(lesson);
-    if (lesson.kind === "video") startTimer(lesson);
   };
 
-  const closeLesson = async () => {
-    await stopTimer();
+  const closeLesson = () => {
     setActiveLesson(null);
   };
 
@@ -314,12 +207,6 @@ export default function TraineeHome() {
               {stats.watched}
               <span className="text-neutral-300 text-3xl">/{stats.total}</span>
             </p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-neutral-500 inline-flex items-center gap-2">
-              <Clock className="h-4 w-4" /> Watch time
-            </p>
-            <p className="text-lg font-medium mt-1">{fmt(stats.seconds)}</p>
           </div>
         </div>
         <div className="h-2 bg-neutral-100 rounded-full overflow-hidden mt-6">
@@ -404,7 +291,6 @@ export default function TraineeHome() {
                             {l.day}
                             {l.kind === "assignment" && " · Assignment PDF"}
                             {l.kind === "review" && " · Review"}
-                            {p?.watch_seconds ? ` · ${fmt(p.watch_seconds)} watched` : ""}
                           </p>
                         </div>
                         {l.kind === "video" && l.videoEmbedUrl && (
@@ -461,11 +347,7 @@ export default function TraineeHome() {
                 className="w-full h-full"
               />
             </div>
-            <div className="px-6 py-4 flex items-center justify-between bg-white">
-              <div className="text-sm text-neutral-600 flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                {fmt(progress[activeLesson.id]?.watch_seconds || 0)} watched
-              </div>
+            <div className="px-6 py-4 flex items-center justify-end bg-white">
               <Button
                 data-testid="toggle-watched"
                 onClick={() => toggleWatched(activeLesson)}
