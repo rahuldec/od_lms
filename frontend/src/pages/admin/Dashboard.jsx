@@ -280,9 +280,21 @@ export default function AdminDashboard() {
                         return (
                           <div
                             key={t.id}
-                            className="border border-neutral-200 rounded-xl p-3.5 hover:shadow-sm hover:border-neutral-300 transition-all bg-white"
+                            className="relative border border-neutral-200 rounded-xl p-3.5 hover:shadow-sm hover:border-neutral-300 transition-all bg-white overflow-hidden"
                           >
-                            <div className="flex items-start justify-between mb-2.5">
+                            {days !== null && (
+                              <div
+                                className="absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
+                                style={{
+                                  fontSize: "3.75rem",
+                                  color: "#E05A2B",
+                                  opacity: 0.07,
+                                }}
+                              >
+                                {days}
+                              </div>
+                            )}
+                            <div className="relative flex items-start justify-between mb-2.5">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 <div
                                   className="h-8 w-8 rounded-full grid place-items-center text-white text-xs font-semibold flex-shrink-0"
@@ -299,7 +311,6 @@ export default function AdminDashboard() {
                                   </Link>
                                   <p className="text-xs text-neutral-400 truncate">
                                     @{t.username}
-                                    {days !== null ? ` · Day ${days}` : ""}
                                   </p>
                                 </div>
                               </div>
