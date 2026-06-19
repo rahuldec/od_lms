@@ -30,23 +30,55 @@ export const AuthProvider = ({ children }) => {
       setRole(data.role);
       setTrainee(data.trainee);
     } catch (e) {
+      if (e?.response?.status !== 401) {
+        // Non-auth error (network blip, 500, backend cold-start, etc).
+        // Don't sign the user out for this - just clear stale data and
+        // let the next successful call repopulate it.
+        setRole(null);
+        setTrainee(null);
+        return;
+      }
+
+      // 401: token might just be stale (e.g. tab was backgrounded and the
+      // browser throttled the auto-refresh timer). Try one explicit
+      // refresh before giving up.
+      let refreshed = null;
+      try {
+        const { data: refreshData, error: refreshErr } =
+          await supabase.auth.refreshSession();
+        if (!refreshErr && refreshData?.session?.access_token) {
+          refreshed = refreshData.session;
+        }
+      } catch (refreshCatchErr) {
+        refreshed = null;
+      }
+
+      if (refreshed) {
+        try {
+          const { data } = await axios.get(`${BASE}/me`, {
+            headers: { Authorization: `Bearer ${refreshed.access_token}` },
+          });
+          setSession(refreshed);
+          setRole(data.role);
+          setTrainee(data.trainee);
+          return; // recovered - do not sign out
+        } catch (retryErr) {
+          // retry also failed - fall through to sign-out below
+        }
+      }
+
+      // Refresh failed or retry still failed - session is genuinely dead.
       setRole(null);
       setTrainee(null);
-      // A 401 here means the backend has rejected this token outright (expired,
-      // revoked, or otherwise invalid) and a plain retry won't help - the safest
-      // move is a clean sign-out so the user lands on the login screen instead of
-      // a half-loaded dashboard showing zeros everywhere.
-      if (e?.response?.status === 401) {
-        try {
-          await supabase.auth.signOut({ scope: "global" });
-        } catch (signOutErr) {
-          await supabase.auth.signOut();
-        }
-        try {
-          localStorage.removeItem("odk-training-auth");
-        } catch (storageErr) {}
-        setSession(null);
+      try {
+        await supabase.auth.signOut({ scope: "global" });
+      } catch (signOutErr) {
+        await supabase.auth.signOut();
       }
+      try {
+        localStorage.removeItem("odk-training-auth");
+      } catch (storageErr) {}
+      setSession(null);
     }
   }, []);
 
@@ -70,6 +102,26 @@ export const AuthProvider = ({ children }) => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
+  }, [refreshMe]);
+
+  // Proactively re-sync the session when the tab regains focus. This is
+  // what actually prevents the 401 in most cases: getSession() will
+  // auto-refresh an expired/near-expired token, so by the time any API
+  // call fires after the trainee switches back to this tab, the token
+  // is already fresh.
+  useEffect(() => {
+    const handleVisibility = async () => {
+      if (document.visibilityState === "visible") {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          setSession(data.session);
+          await refreshMe(data.session.access_token);
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibility);
   }, [refreshMe]);
 
   const signInAs = async ({ username, password, roleHint }) => {
