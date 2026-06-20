@@ -2,6 +2,33 @@ import axios from "axios";
 import { supabase } from "@/lib/supabaseClient";
 const BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// --- Single-flight refresh lock ---------------------------------------
+// Supabase refresh tokens are single-use/rotating. If multiple API calls
+// fire in parallel (e.g. an admin dashboard loading me() + listTrainees()
+// + listBatches() at once) and each one independently calls
+// supabase.auth.refreshSession(), only the first call actually succeeds -
+// every other concurrent call gets back a 400 invalid_grant because the
+// refresh token it was holding has already been rotated out from under it.
+// That failure then looked like "the user's session is dead" and triggered
+// a sign-out, even though the session was perfectly fine.
+//
+// Fix: never call refreshSession() directly. Always go through this
+// helper, which guarantees that no matter how many callers ask for a
+// refresh at the same time, only ONE actual network call happens. Every
+// other caller just awaits that same in-flight promise and gets the
+// same result.
+let refreshPromise = null;
+const refreshSessionOnce = () => {
+  if (!refreshPromise) {
+    refreshPromise = supabase.auth
+      .refreshSession()
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+};
+
 // If the access token is missing or expires within the next 60s, proactively
 // refresh it instead of handing the backend a token that's about to (or already)
 // stopped working. This covers the common case where a tab has been idle/backgrounded
@@ -15,7 +42,7 @@ const getFreshSession = async () => {
   const isExpiringSoon = expiresAtMs - Date.now() < 60 * 1000;
 
   if (isExpiringSoon) {
-    const { data: refreshed, error } = await supabase.auth.refreshSession();
+    const { data: refreshed, error } = await refreshSessionOnce();
     if (!error && refreshed.session) return refreshed.session;
     // Refresh failed (e.g. refresh token also invalid) - fall back to whatever we had.
     return session;
@@ -38,7 +65,7 @@ const withAuthRetry = async (makeRequest) => {
     return await makeRequest(await authHeader());
   } catch (err) {
     if (err?.response?.status === 401) {
-      const { data: refreshed } = await supabase.auth.refreshSession();
+      const { data: refreshed } = await refreshSessionOnce();
       const token = refreshed?.session?.access_token;
       if (token) {
         return await makeRequest({ Authorization: `Bearer ${token}` });
@@ -47,6 +74,7 @@ const withAuthRetry = async (makeRequest) => {
     throw err;
   }
 };
+
 export const api = {
   setupInit: () => axios.post(`${BASE}/setup/init`).then((r) => r.data),
   me: () =>
