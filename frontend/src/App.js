@@ -12,6 +12,7 @@ import Batches from "@/pages/admin/Batches";
 import BatchDetail from "@/pages/admin/BatchDetail";
 import Resources from "@/pages/admin/Resources";
 import TraineeHome from "@/pages/trainee/Home";
+import PublicLearn from "@/pages/public/Learn";
 function RootRedirect() {
   const { session, role, loading } = useAuth();
   if (loading) return null;
@@ -32,6 +33,7 @@ export default function App() {
         />
         <Routes>
           <Route path="/" element={<RootRedirect />} />
+          <Route path="/learn" element={<PublicLearn />} />
           <Route
             path="/admin"
             element={
