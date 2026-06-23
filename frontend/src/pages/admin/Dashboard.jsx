@@ -16,6 +16,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  LabelList,
+  ReferenceLine,
 } from "recharts";
 
 const Stat = ({ icon: Icon, label, value, testId }) => (
@@ -135,23 +137,38 @@ function AssignmentModal({ assignment, onClose }) {
 }
 
 // Custom tooltip for the module comparison chart - lists every trainee's score
-// for the hovered module, sorted highest first.
+// for the hovered module, sorted highest first. Colors each score red/green
+// based on the passing mark (9) and shows the module's total when available.
+const PASSING_MARK = 9;
+
 function ModuleComparisonTooltip({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) return null;
+  const total = payload[0]?.payload?.total;
   const rows = payload
-    .filter((p) => p.value !== undefined && p.value !== null)
+    .filter((p) => p.dataKey !== "total" && p.value !== undefined && p.value !== null)
     .sort((a, b) => b.value - a.value);
   return (
     <div className="bg-white border border-neutral-200 rounded-xl shadow-lg px-4 py-3 max-h-64 overflow-y-auto">
-      <p className="text-xs font-semibold text-neutral-800 mb-2">{label}</p>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className="text-xs font-semibold text-neutral-800">{label}</p>
+        {total != null && <p className="text-xs text-neutral-400">out of {total}</p>}
+      </div>
       <div className="space-y-1">
-        {rows.map((r) => (
-          <div key={r.dataKey} className="flex items-center gap-2 text-xs">
-            <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
-            <span className="text-neutral-600 truncate">{r.dataKey}</span>
-            <span className="ml-auto font-medium text-neutral-900 tabular-nums">{r.value}</span>
-          </div>
-        ))}
+        {rows.map((r) => {
+          const passed = r.value >= PASSING_MARK;
+          return (
+            <div key={r.dataKey} className="flex items-center gap-2 text-xs">
+              <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+              <span className="text-neutral-600 truncate">{r.dataKey}</span>
+              <span
+                className="ml-auto font-medium tabular-nums"
+                style={{ color: passed ? "#16a34a" : "#dc2626" }}
+              >
+                {total != null ? `${r.value}/${total}` : r.value}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -234,8 +251,9 @@ export default function AdminDashboard() {
 
   // ---- Module-wise comparison of trainees ----------------------------
   // Reshapes assignmentResults (keyed by trainee name) into one row per
-  // module, with each trainee's score as its own key, e.g.:
-  // [{ module: "SIS", "Rahul": 8, "Sultan": 9 }, { module: "Fee Module", ... }]
+  // module, with each trainee's score as its own key, plus a "total" field
+  // (max possible score for that module) used to draw a pass-line reference.
+  // e.g. [{ module: "SIS", total: 15, "Rahul": 8, "Sultan": 9 }, ...]
   const moduleComparison = useMemo(() => {
     const moduleNames = new Set();
     const rowsByModule = {};
@@ -245,16 +263,31 @@ export default function AdminDashboard() {
       assignments.forEach((a) => {
         if (!a?.name) return;
         moduleNames.add(a.name);
-        if (!rowsByModule[a.name]) rowsByModule[a.name] = { module: a.name };
+        if (!rowsByModule[a.name]) rowsByModule[a.name] = { module: a.name, total: a.total ?? null };
         rowsByModule[a.name][t.name] = a.score ?? null;
+        if (rowsByModule[a.name].total == null && a.total != null) {
+          rowsByModule[a.name].total = a.total;
+        }
       });
     });
 
+    // Order trainees by their average score across modules (highest first)
+    // so the strongest performers' bars consistently appear first in every
+    // group, making cross-module comparison easier at a glance.
+    const traineeAverages = filteredTrainees
+      .map((t) => {
+        const scores = Array.from(moduleNames)
+          .map((m) => rowsByModule[m]?.[t.name])
+          .filter((v) => v != null);
+        const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : -1;
+        return { name: t.name, avg, hasData: scores.length > 0 };
+      })
+      .filter((t) => t.hasData)
+      .sort((a, b) => b.avg - a.avg);
+
     return {
       data: Array.from(moduleNames).map((m) => rowsByModule[m]),
-      traineeNames: filteredTrainees
-        .map((t) => t.name)
-        .filter((name) => Array.from(moduleNames).some((m) => rowsByModule[m]?.[name] != null)),
+      traineeNames: traineeAverages.map((t) => t.name),
     };
   }, [filteredTrainees, getAssignments]);
 
@@ -299,7 +332,7 @@ export default function AdminDashboard() {
           <h2 className="text-xl font-semibold">Module-wise comparison</h2>
         </div>
         <p className="text-sm text-neutral-500 mb-6">
-          Every trainee's score side by side, grouped by module. Hover a bar group to see the full breakdown.
+          Every trainee's score side by side, grouped by module and sorted by average performance. Hover a bar group to see the full breakdown.
         </p>
         {loading ? (
           <p className="text-sm text-neutral-400">Loading...</p>
@@ -308,19 +341,39 @@ export default function AdminDashboard() {
         ) : (
           <div style={{ width: "100%", height: 380 }}>
             <ResponsiveContainer>
-              <BarChart data={moduleComparison.data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
-                <XAxis dataKey="module" tick={{ fontSize: 12, fill: "#737373" }} />
-                <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} />
-                <Tooltip content={<ModuleComparisonTooltip />} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
+              <BarChart
+                data={moduleComparison.data}
+                margin={{ top: 24, right: 10, left: 0, bottom: 10 }}
+                barCategoryGap="28%"
+                barGap={3}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" vertical={false} />
+                <XAxis dataKey="module" tick={{ fontSize: 12, fill: "#737373" }} axisLine={{ stroke: "#e5e5e5" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                <ReferenceLine
+                  y={PASSING_MARK}
+                  stroke="#d4d4d4"
+                  strokeDasharray="4 4"
+                  label={{ value: `Pass (${PASSING_MARK})`, position: "right", fontSize: 11, fill: "#a3a3a3" }}
+                />
+                <Tooltip content={<ModuleComparisonTooltip />} cursor={{ fill: "#fafafa" }} />
+                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} iconType="circle" iconSize={8} />
                 {moduleComparison.traineeNames.map((name, i) => (
                   <Bar
                     key={name}
                     dataKey={name}
                     fill={TRAINEE_COLORS[i % TRAINEE_COLORS.length]}
-                    radius={[4, 4, 0, 0]}
-                  />
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={26}
+                  >
+                    <LabelList
+                      dataKey={name}
+                      position="top"
+                      fontSize={10}
+                      fill="#a3a3a3"
+                      formatter={(v) => (v != null ? v : "")}
+                    />
+                  </Bar>
                 ))}
               </BarChart>
             </ResponsiveContainer>
