@@ -55,6 +55,34 @@ export const ASSIGNMENTS = [
       "Change default payment mode to Bnak Transfer",
     ],
   },
+  {
+    id: "academic",
+    name: "Academic Module",
+    csvUrl:
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiB9myHbpIiCVCK2Yikqy6VeQ_Lr6mt1XCdvQIxMdGQemIYpTp5UehEKN1GDiYQwRuBFB6tbuxGyzh/pub?gid=0&single=true&output=csv",
+    scoreCol: "Overall Score",
+    linkCol: "Link",
+    nameCol: "Name",
+    totalMarks: 15,
+    passThreshold: 9,
+    questions: [
+      "Difference between optional and additional subject?",
+      "Assign french as optional subject to any student in any class",
+      "If the Periodic Test is conducted out of 50 marks and needs to be reflected as 10 marks on the report card, what weightage should be set in the assessment config??",
+      "Use case of subject group",
+      "Use case of display name",
+      "Where to assign coordinator?",
+      "How to update grading criteria in bulk ?",
+      "Explain \"Include in total\" concept",
+      "If I need to display only the Periodic Test marks on the report card without including them in the final result calculation, how should I configure the assessment setup?\"",
+      "Explain sequence number setup in assessment group",
+      "We have 2 assessments as UT I and UT II of marks 20 each but in report card it is showing as IA with marks 5. How?",
+      "There is an assessment as Half Yearly, while doing marks entry for this assessment grades are coming as A, B, C but these should be A1, A2, B1, B2 and so on, fix it.",
+      "On report card page client is not able to add working days present days, remark, result and is also not able to declare result for specific term, resolve it.",
+      "Why do we different assessment modals, what do you understand by co-scholastic, displine, skill ?",
+      "Assign a single coordinator to all classes and sections at once.",
+    ],
+  },
 ];
 
 export const fetchAllAssignmentResults = async () => {
