@@ -1,12 +1,22 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 const Stat = ({ icon: Icon, label, value, testId }) => (
   <Card data-testid={testId} className="rounded-2xl border-neutral-200/80 p-6 hover:shadow-sm transition-shadow">
@@ -30,6 +40,13 @@ const navItems = [
 ];
 
 const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
+
+// Palette for per-trainee bars in the module comparison chart. Cycled if more
+// trainees than colors.
+const TRAINEE_COLORS = [
+  "#E05A2B", "#16a34a", "#2563eb", "#9333ea", "#0891b2",
+  "#ca8a04", "#dc2626", "#4f46e5", "#0d9488", "#db2777",
+];
 
 const fmtDate = (iso) => {
   if (!iso) return "";
@@ -117,6 +134,29 @@ function AssignmentModal({ assignment, onClose }) {
   );
 }
 
+// Custom tooltip for the module comparison chart - lists every trainee's score
+// for the hovered module, sorted highest first.
+function ModuleComparisonTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const rows = payload
+    .filter((p) => p.value !== undefined && p.value !== null)
+    .sort((a, b) => b.value - a.value);
+  return (
+    <div className="bg-white border border-neutral-200 rounded-xl shadow-lg px-4 py-3 max-h-64 overflow-y-auto">
+      <p className="text-xs font-semibold text-neutral-800 mb-2">{label}</p>
+      <div className="space-y-1">
+        {rows.map((r) => (
+          <div key={r.dataKey} className="flex items-center gap-2 text-xs">
+            <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+            <span className="text-neutral-600 truncate">{r.dataKey}</span>
+            <span className="ml-auto font-medium text-neutral-900 tabular-nums">{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [trainees, setTrainees] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -181,10 +221,42 @@ export default function AdminDashboard() {
     return acc + (inMonth ? 1 : 0);
   }, 0);
 
-  const getAssignments = (name) => {
-    if (!name) return [];
-    return assignmentResults[name.trim().toLowerCase()] || [];
-  };
+  // Stable across renders unless assignmentResults itself changes, so it's
+  // safe to include in dependency arrays (e.g. moduleComparison below)
+  // without causing infinite re-renders or breaking memoization.
+  const getAssignments = useCallback(
+    (name) => {
+      if (!name) return [];
+      return assignmentResults[name.trim().toLowerCase()] || [];
+    },
+    [assignmentResults]
+  );
+
+  // ---- Module-wise comparison of trainees ----------------------------
+  // Reshapes assignmentResults (keyed by trainee name) into one row per
+  // module, with each trainee's score as its own key, e.g.:
+  // [{ module: "SIS", "Rahul": 8, "Sultan": 9 }, { module: "Fee Module", ... }]
+  const moduleComparison = useMemo(() => {
+    const moduleNames = new Set();
+    const rowsByModule = {};
+
+    filteredTrainees.forEach((t) => {
+      const assignments = getAssignments(t.name);
+      assignments.forEach((a) => {
+        if (!a?.name) return;
+        moduleNames.add(a.name);
+        if (!rowsByModule[a.name]) rowsByModule[a.name] = { module: a.name };
+        rowsByModule[a.name][t.name] = a.score ?? null;
+      });
+    });
+
+    return {
+      data: Array.from(moduleNames).map((m) => rowsByModule[m]),
+      traineeNames: filteredTrainees
+        .map((t) => t.name)
+        .filter((name) => Array.from(moduleNames).some((m) => rowsByModule[m]?.[name] != null)),
+    };
+  }, [filteredTrainees, getAssignments]);
 
   return (
     <AppShell navItems={navItems} subtitle="Admin">
@@ -219,6 +291,42 @@ export default function AdminDashboard() {
           <option value="none">No batch assigned</option>
         </select>
       </div>
+
+      {/* Module-wise comparison of trainees */}
+      <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
+        <div className="flex items-center gap-2 mb-1">
+          <BarChart3 className="h-4 w-4 text-neutral-400" />
+          <h2 className="text-xl font-semibold">Module-wise comparison</h2>
+        </div>
+        <p className="text-sm text-neutral-500 mb-6">
+          Every trainee's score side by side, grouped by module. Hover a bar group to see the full breakdown.
+        </p>
+        {loading ? (
+          <p className="text-sm text-neutral-400">Loading...</p>
+        ) : moduleComparison.data.length === 0 ? (
+          <p className="text-sm text-neutral-400">No assignment scores recorded yet.</p>
+        ) : (
+          <div style={{ width: "100%", height: 380 }}>
+            <ResponsiveContainer>
+              <BarChart data={moduleComparison.data} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" />
+                <XAxis dataKey="module" tick={{ fontSize: 12, fill: "#737373" }} />
+                <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} />
+                <Tooltip content={<ModuleComparisonTooltip />} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                {moduleComparison.traineeNames.map((name, i) => (
+                  <Bar
+                    key={name}
+                    dataKey={name}
+                    fill={TRAINEE_COLORS[i % TRAINEE_COLORS.length]}
+                    radius={[4, 4, 0, 0]}
+                  />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
 
       <Card className="rounded-2xl border-neutral-200/80 p-7">
         <div className="flex items-baseline justify-between mb-6">
