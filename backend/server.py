@@ -202,6 +202,10 @@ class BatchUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class BatchModulesIn(BaseModel):
+    module_names: List[str]
+
+
 class AssignBatchIn(BaseModel):
     batch_id: Optional[str] = None
 
@@ -625,6 +629,7 @@ async def update_batch(batch_id: str, body: BatchUpdate, _=Depends(require_admin
 async def delete_batch(batch_id: str, _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
         await cx.patch(f"{REST}/trainees?batch_id=eq.{batch_id}", headers=ADMIN_HEADERS, json={"batch_id": None})
+        await cx.delete(f"{REST}/batch_module_assignments?batch_id=eq.{batch_id}", headers=ADMIN_HEADERS)
         await cx.delete(f"{REST}/batches?id=eq.{batch_id}", headers=ADMIN_HEADERS)
     return {"ok": True}
 
@@ -647,6 +652,58 @@ async def assign_batch(trainee_id: str, body: AssignBatchIn, _=Depends(require_a
     if r.status_code not in (200, 204):
         raise HTTPException(status_code=400, detail=r.text)
     return r.json()[0] if r.json() else {"ok": True}
+
+
+# ---------- admin batch <-> module assignment ----------
+@api.get("/admin/batches/{batch_id}/modules")
+async def get_batch_modules(batch_id: str, _=Depends(require_admin)):
+    """Return the active module assignments for a single batch."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/batch_module_assignments?batch_id=eq.{batch_id}&is_active=eq.true&select=*",
+            headers=ADMIN_HEADERS,
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/batches/{batch_id}/modules")
+async def set_batch_modules(batch_id: str, body: BatchModulesIn, _=Depends(require_admin)):
+    """Replace the set of active modules for a batch with body.module_names."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        # Deactivate everything for this batch first, then re-activate the selected set.
+        await cx.patch(
+            f"{REST}/batch_module_assignments?batch_id=eq.{batch_id}",
+            headers=ADMIN_HEADERS,
+            json={"is_active": False},
+        )
+        for name in body.module_names:
+            r = await cx.post(
+                f"{REST}/batch_module_assignments?on_conflict=batch_id,module_name",
+                headers={**ADMIN_HEADERS, "Prefer": "resolution=merge-duplicates"},
+                json={"batch_id": batch_id, "module_name": name, "is_active": True},
+            )
+            if r.status_code not in (200, 201, 204):
+                raise HTTPException(status_code=400, detail=r.text)
+    return {"ok": True, "module_names": body.module_names}
+
+
+@api.get("/admin/batches/{batch_id}/analytics")
+async def batch_analytics(batch_id: str, _=Depends(require_admin)):
+    """Return raw trainee + assignment + lesson_progress data for a batch, for the frontend to chart."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        rt = await cx.get(f"{REST}/trainees?batch_id=eq.{batch_id}&select=id,name", headers=ADMIN_HEADERS)
+        trainees = rt.json() if rt.status_code == 200 else []
+        trainee_ids = [t["id"] for t in trainees]
+        if not trainee_ids:
+            return {"trainees": [], "assignments": [], "lesson_progress": []}
+        id_list = ",".join(trainee_ids)
+        ra = await cx.get(f"{REST}/assignments?trainee_id=in.({id_list})&select=*", headers=ADMIN_HEADERS)
+        rl = await cx.get(f"{REST}/lesson_progress?trainee_id=in.({id_list})&select=*", headers=ADMIN_HEADERS)
+    return {
+        "trainees": trainees,
+        "assignments": ra.json() if ra.status_code == 200 else [],
+        "lesson_progress": rl.json() if rl.status_code == 200 else [],
+    }
 
 
 # ---------- admin resources ----------
