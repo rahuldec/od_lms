@@ -88,6 +88,23 @@ export default function BatchDetail() {
     [modules]
   );
 
+  // For each module, how many trainees in this batch have watched every
+  // video lesson in it. Keyed by module name -> { completed, total }.
+  const moduleCompletion = useMemo(() => {
+    const map = {};
+    modules.forEach((m) => {
+      const videoLessonIds = m.lessons.filter((l) => l.kind === "video").map((l) => l.id);
+      const completed = trainees.filter((t) => {
+        const watchedIds = new Set(
+          (progressMap[t.id] || []).filter((p) => p.watched).map((p) => p.lesson_id)
+        );
+        return videoLessonIds.length > 0 && videoLessonIds.every((lid) => watchedIds.has(lid));
+      }).length;
+      map[m.name] = { completed, total: trainees.length };
+    });
+    return map;
+  }, [modules, trainees, progressMap]);
+
   const toggleModule = async (moduleName) => {
     const next = new Set(assignedModules);
     if (next.has(moduleName)) {
@@ -213,6 +230,7 @@ export default function BatchDetail() {
             {modules.map((m) => {
               const checked = assignedModules.has(m.name);
               const isSaving = savingModule === m.name;
+              const completion = moduleCompletion[m.name] || { completed: 0, total: trainees.length };
               return (
                 <label
                   key={m.name}
@@ -228,7 +246,12 @@ export default function BatchDetail() {
                     onChange={() => toggleModule(m.name)}
                     className="h-4 w-4 rounded border-neutral-300 accent-[#E05A2B]"
                   />
-                  <span className="text-sm font-medium text-neutral-800">{m.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-neutral-800 block truncate">{m.name}</span>
+                    <span className="text-xs text-neutral-500">
+                      {completion.completed}/{completion.total} trainees completed
+                    </span>
+                  </div>
                 </label>
               );
             })}
