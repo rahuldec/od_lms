@@ -2,10 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
+import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3 } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -174,6 +175,140 @@ function ModuleComparisonTooltip({ active, payload, label }) {
   );
 }
 
+// Quick module-assignment widget for the dashboard: pick a batch, then toggle
+// which modules are visible to trainees in that batch. Mirrors the same
+// checkboxes/behavior used on the batch detail page, just without having to
+// navigate into a specific batch first.
+function BatchModulesPanel({ batches }) {
+  const [selectedBatchId, setSelectedBatchId] = useState("");
+  const [modules, setModules] = useState([]);
+  const [modulesLoading, setModulesLoading] = useState(true);
+  const [assignedModules, setAssignedModules] = useState(new Set());
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [savingModule, setSavingModule] = useState(null);
+
+  // Curriculum modules only need to load once.
+  useEffect(() => {
+    (async () => {
+      try {
+        const mods = await fetchSheetModules();
+        setModules(mods || []);
+      } catch {
+        setModules([]);
+      } finally {
+        setModulesLoading(false);
+      }
+    })();
+  }, []);
+
+  // Default to the first batch once batches arrive.
+  useEffect(() => {
+    if (!selectedBatchId && batches.length > 0) {
+      setSelectedBatchId(batches[0].id);
+    }
+  }, [batches, selectedBatchId]);
+
+  useEffect(() => {
+    if (!selectedBatchId) return;
+    setAssignmentsLoading(true);
+    (async () => {
+      try {
+        const rows = await api.getBatchModules(selectedBatchId);
+        setAssignedModules(new Set((rows || []).map((row) => row.module_name)));
+      } catch {
+        setAssignedModules(new Set());
+        toast.error("Failed to load module assignments for this batch");
+      } finally {
+        setAssignmentsLoading(false);
+      }
+    })();
+  }, [selectedBatchId]);
+
+  const toggleModule = async (moduleName) => {
+    const next = new Set(assignedModules);
+    if (next.has(moduleName)) {
+      next.delete(moduleName);
+    } else {
+      next.add(moduleName);
+    }
+    setSavingModule(moduleName);
+    try {
+      await api.setBatchModules(selectedBatchId, Array.from(next));
+      setAssignedModules(next);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || "Failed to update module assignment");
+    } finally {
+      setSavingModule(null);
+    }
+  };
+
+  return (
+    <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
+      <div className="flex items-center justify-between gap-4 flex-wrap mb-1">
+        <div className="flex items-center gap-2">
+          <Layers className="h-4 w-4 text-neutral-400" />
+          <h2 className="text-xl font-semibold">Assign modules to a batch</h2>
+        </div>
+        {batches.length > 0 && (
+          <select
+            value={selectedBatchId}
+            onChange={(e) => setSelectedBatchId(e.target.value)}
+            className="text-sm border border-neutral-200 rounded-full px-4 py-1.5 bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
+          >
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <p className="text-sm text-neutral-500 mb-5">
+        Only checked modules will be visible to trainees in the selected batch.
+      </p>
+
+      {batches.length === 0 ? (
+        <p className="text-sm text-neutral-400">
+          No batches yet. Create one from the Batches page first.
+        </p>
+      ) : modulesLoading ? (
+        <p className="text-sm text-neutral-400">Loading modules…</p>
+      ) : modules.length === 0 ? (
+        <p className="text-sm text-neutral-400">No modules found in the training sheet.</p>
+      ) : (
+        <div
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 transition-opacity ${
+            assignmentsLoading ? "opacity-50 pointer-events-none" : ""
+          }`}
+        >
+          {modules.map((m) => {
+            const checked = assignedModules.has(m.name);
+            const isSaving = savingModule === m.name;
+            return (
+              <label
+                key={m.name}
+                className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border cursor-pointer transition-colors ${
+                  checked
+                    ? "border-[#E05A2B]/30 bg-[#FFF0E8]"
+                    : "border-neutral-200 hover:bg-neutral-50"
+                } ${isSaving ? "opacity-60 pointer-events-none" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleModule(m.name)}
+                  className="h-4 w-4 rounded border-neutral-300 accent-[#E05A2B]"
+                />
+                <span className="text-sm font-medium text-neutral-800">{m.name}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function AdminDashboard() {
   const [trainees, setTrainees] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -324,6 +459,9 @@ export default function AdminDashboard() {
           <option value="none">No batch assigned</option>
         </select>
       </div>
+
+      {/* Quick module assignment per batch */}
+      <BatchModulesPanel batches={batches} />
 
       {/* Module-wise comparison of trainees */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
