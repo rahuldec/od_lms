@@ -186,6 +186,8 @@ function BatchModulesPanel({ batches }) {
   const [assignedModules, setAssignedModules] = useState(new Set());
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [savingModule, setSavingModule] = useState(null);
+  const [batchTrainees, setBatchTrainees] = useState([]);
+  const [progressMap, setProgressMap] = useState({});
 
   // Curriculum modules only need to load once.
   useEffect(() => {
@@ -213,16 +215,54 @@ function BatchModulesPanel({ batches }) {
     setAssignmentsLoading(true);
     (async () => {
       try {
-        const rows = await api.getBatchModules(selectedBatchId);
+        const [rows, bRes] = await Promise.all([
+          api.getBatchModules(selectedBatchId),
+          api.getBatch(selectedBatchId).catch(() => ({ trainees: [] })),
+        ]);
         setAssignedModules(new Set((rows || []).map((row) => row.module_name)));
+
+        const trainees = bRes.trainees || [];
+        setBatchTrainees(trainees);
+
+        const pm = {};
+        await Promise.all(
+          trainees.map(async (t) => {
+            try {
+              const res = await api.getTrainee(t.id);
+              pm[t.id] = res.progress || [];
+            } catch {
+              pm[t.id] = [];
+            }
+          })
+        );
+        setProgressMap(pm);
       } catch {
         setAssignedModules(new Set());
+        setBatchTrainees([]);
+        setProgressMap({});
         toast.error("Failed to load module assignments for this batch");
       } finally {
         setAssignmentsLoading(false);
       }
     })();
   }, [selectedBatchId]);
+
+  // For each module, how many trainees in the selected batch have watched
+  // every video lesson in it. Keyed by module name -> { completed, total }.
+  const moduleCompletion = useMemo(() => {
+    const map = {};
+    modules.forEach((m) => {
+      const videoLessonIds = m.lessons.filter((l) => l.kind === "video").map((l) => l.id);
+      const completed = batchTrainees.filter((t) => {
+        const watchedIds = new Set(
+          (progressMap[t.id] || []).filter((p) => p.watched).map((p) => p.lesson_id)
+        );
+        return videoLessonIds.length > 0 && videoLessonIds.every((lid) => watchedIds.has(lid));
+      }).length;
+      map[m.name] = { completed, total: batchTrainees.length };
+    });
+    return map;
+  }, [modules, batchTrainees, progressMap]);
 
   const toggleModule = async (moduleName) => {
     const next = new Set(assignedModules);
@@ -284,6 +324,7 @@ function BatchModulesPanel({ batches }) {
           {modules.map((m) => {
             const checked = assignedModules.has(m.name);
             const isSaving = savingModule === m.name;
+            const completion = moduleCompletion[m.name] || { completed: 0, total: batchTrainees.length };
             return (
               <label
                 key={m.name}
@@ -299,7 +340,12 @@ function BatchModulesPanel({ batches }) {
                   onChange={() => toggleModule(m.name)}
                   className="h-4 w-4 rounded border-neutral-300 accent-[#E05A2B]"
                 />
-                <span className="text-sm font-medium text-neutral-800">{m.name}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium text-neutral-800 block truncate">{m.name}</span>
+                  <span className="text-xs text-neutral-500">
+                    {completion.completed}/{completion.total} trainees completed
+                  </span>
+                </div>
               </label>
             );
           })}
