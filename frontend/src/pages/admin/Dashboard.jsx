@@ -40,6 +40,7 @@ const navItems = [
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources" },
+  { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules" },
 ];
 
 const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
