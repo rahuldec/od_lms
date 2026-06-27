@@ -41,6 +41,7 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 
 const STATUSES = ["Active", "On Hold", "Exited"];
@@ -87,6 +88,7 @@ export default function Trainees() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [promotingId, setPromotingId] = useState(null);
+  const [demotingId, setDemotingId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -219,6 +221,21 @@ export default function Trainees() {
     }
   };
 
+  const demote = async (t) => {
+    const next = (t.current_level ?? 0) - 1;
+    if (next < 0) { toast.info("Already at Level 0"); return; }
+    setDemotingId(t.id);
+    try {
+      await api.demoteTrainee(t.id);
+      toast.success(`${t.name} demoted to Level ${next}`);
+      await load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setDemotingId(null);
+    }
+  };
+
   return (
     <AppShell navItems={navItems} subtitle="Admin">
       <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
@@ -323,6 +340,17 @@ export default function Trainees() {
                         >
                           <TrendingUp className="h-3.5 w-3.5 mr-1" />
                           Promote
+                        </Button>
+                        <Button
+                          data-testid={`demote-${t.id}`}
+                          size="sm"
+                          variant="outline"
+                          disabled={(t.current_level ?? 0) <= 0 || demotingId === t.id}
+                          onClick={() => demote(t)}
+                          className="rounded-full"
+                        >
+                          <TrendingDown className="h-3.5 w-3.5 mr-1" />
+                          Demote
                         </Button>
                         <Button
                           data-testid={`edit-${t.id}`}
