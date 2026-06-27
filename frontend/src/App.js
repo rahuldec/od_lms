@@ -11,6 +11,7 @@ import TraineeDetail from "@/pages/admin/TraineeDetail";
 import Batches from "@/pages/admin/Batches";
 import BatchDetail from "@/pages/admin/BatchDetail";
 import Resources from "@/pages/admin/Resources";
+import TrainingModules from "@/pages/admin/TrainingModules";
 import TraineeHome from "@/pages/trainee/Home";
 import PublicLearn from "@/pages/Learn";
 function RootRedirect() {
@@ -79,6 +80,14 @@ export default function App() {
             element={
               <Protected requireRole="admin">
                 <Resources />
+              </Protected>
+            }
+          />
+          <Route
+            path="/admin/training-modules"
+            element={
+              <Protected requireRole="admin">
+                <TrainingModules />
               </Protected>
             }
           />
