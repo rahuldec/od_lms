@@ -410,6 +410,33 @@ async def promote_trainee(trainee_id: str, _=Depends(require_admin)):
     return r2.json()[0]
 
 
+@api.post("/admin/trainees/{trainee_id}/demote")
+async def demote_trainee(trainee_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(f"{REST}/trainees?id=eq.{trainee_id}&select=*", headers=ADMIN_HEADERS)
+        rows = r.json() if r.status_code == 200 else []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Not found")
+        t = rows[0]
+        current = t.get("current_level") or 0
+        if current <= 0:
+            raise HTTPException(status_code=400, detail="Already at Level 0")
+        next_level = current - 1
+        history = t.get("history") or []
+        if not isinstance(history, list):
+            history = []
+        history.append({"type": "demotion", "from": current, "to": next_level, "at": datetime.now(timezone.utc).isoformat()})
+        today = datetime.now(timezone.utc).date().isoformat()
+        r2 = await cx.patch(
+            f"{REST}/trainees?id=eq.{trainee_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"current_level": next_level, "history": history, "level_since_date": today},
+        )
+    if r2.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r2.text)
+    return r2.json()[0]
+
+
 @api.get("/admin/trainees/{trainee_id}")
 async def get_trainee(trainee_id: str, _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
