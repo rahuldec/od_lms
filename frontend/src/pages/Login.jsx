@@ -97,12 +97,11 @@ export default function Login() {
     >
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-10">
-          <div
-            className="h-10 w-10 rounded-2xl grid place-items-center text-white text-sm font-semibold"
-            style={{ backgroundColor: "#E05A2B" }}
-          >
-            OD
-          </div>
+          <img
+            src="https://okiedokie-erp-images.s3.ap-south-1.amazonaws.com/Okie%20Dokie/2025/12/sourceURL/26aebcbe10f4ac5a3e8b-611ed1b9032568edd4f3-Okie_Dokie_App_icon__2___2_-removebg-preview.png"
+            alt="Okie Dokie"
+            className="h-10 w-10 rounded-2xl object-contain"
+          />
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">
               Okie Dokie Solutions
