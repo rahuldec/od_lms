@@ -216,4 +216,22 @@ export const api = {
         .delete(`${BASE}/admin/resources/links/${id}`, { headers })
         .then((r) => r.data)
     ),
+
+  // Training Modules
+  listTrainingModules: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/training-modules`, { headers }).then((r) => r.data)
+    ),
+  createTrainingModule: (body) =>
+    withAuthRetry((headers) =>
+      axios.post(`${BASE}/admin/training-modules`, body, { headers }).then((r) => r.data)
+    ),
+  updateTrainingModule: (id, body) =>
+    withAuthRetry((headers) =>
+      axios.put(`${BASE}/admin/training-modules/${id}`, body, { headers }).then((r) => r.data)
+    ),
+  deleteTrainingModule: (id) =>
+    withAuthRetry((headers) =>
+      axios.delete(`${BASE}/admin/training-modules/${id}`, { headers }).then((r) => r.data)
+    ),
 };
