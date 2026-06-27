@@ -13,6 +13,8 @@ const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
+  { to: "/admin/resources", label: "Resources", testId: "nav-resources" },
+  { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules" },
 ];
 
 const fmtMinutes = (sec) => {
