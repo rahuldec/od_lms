@@ -44,11 +44,27 @@ const ASSIGNMENTS = [
     name: "Academic Module",
     csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTiB9myHbpIiCVCK2Yikqy6VeQ_Lr6mt1XCdvQIxMdGQemIYpTp5UehEKN1GDiYQwRuBFB6tbuxGyzh/pub?gid=0&single=true&output=csv",
   },
+  {
+    name: "Attendance",
+    csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPHkFJjJ8CF7lXGPPNS1dAWpQwAVJ_EyIx-_afkvkSFZ0ggkowqwvuFkDOCzTlJfRx04Kf86RlOTo7/pub?output=csv",
+  },
 ];
 
-const fetchAssignmentResult = async (csvUrl, traineeName) => {
+// Case-insensitive lookup of the first candidate column name that actually
+// exists in a parsed CSV row.
+const resolveColumn = (row, candidates) => {
+  if (!row) return null;
+  const keys = Object.keys(row);
+  for (const candidate of candidates) {
+    const match = keys.find((k) => k.trim().toLowerCase() === candidate.trim().toLowerCase());
+    if (match) return match;
+  }
+  return null;
+};
+
+const fetchAssignmentResult = async (assignment, traineeName) => {
   try {
-    const res = await fetch(csvUrl, { cache: "no-store" });
+    const res = await fetch(assignment.csvUrl, { cache: "no-store" });
     if (!res.ok) return null;
     const text = await res.text();
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
@@ -56,8 +72,13 @@ const fetchAssignmentResult = async (csvUrl, traineeName) => {
       (r) => (r["Name"] || "").trim().toLowerCase() === traineeName.trim().toLowerCase()
     );
     if (!row) return null;
-    const questions = parsed.meta.fields.filter((f) => !SKIP_COLS.includes(f));
-    return { row, questions };
+    const scoreCol = assignment.scoreColCandidates
+      ? resolveColumn(row, assignment.scoreColCandidates)
+      : "Overall Score";
+    const questions = assignment.noBreakdown
+      ? []
+      : parsed.meta.fields.filter((f) => !SKIP_COLS.includes(f));
+    return { row, questions, scoreCol };
   } catch {
     return null;
   }
@@ -88,7 +109,7 @@ export default function TraineeDetail() {
         if (tRes.trainee?.name) {
           const name = tRes.trainee.name;
           const results = await Promise.all(
-            ASSIGNMENTS.map((a) => fetchAssignmentResult(a.csvUrl, name))
+            ASSIGNMENTS.map((a) => fetchAssignmentResult(a, name))
           );
           const map = {};
           ASSIGNMENTS.forEach((a, i) => { map[a.name] = results[i]; });
@@ -212,8 +233,9 @@ export default function TraineeDetail() {
           {/* Assignment Cards — one per assignment */}
           {ASSIGNMENTS.map((a) => {
             const result = assignmentResults[a.name];
-            const score = result ? parseFloat(result.row["Overall Score"] || 0) : null;
-            const total = result ? result.questions.length : 15;
+            const score = result && result.scoreCol ? parseFloat(result.row[result.scoreCol] || 0) : null;
+            const total = a.totalMarks || (result ? result.questions.length : 15);
+            const passThreshold = a.passThreshold != null ? a.passThreshold / total : 0.7;
             const ratio = score !== null ? score / total : null;
             const color = ratio !== null ? scoreColor(ratio) : "#94a3b8";
             const link = result ? result.row["Link"] : null;
@@ -237,7 +259,7 @@ export default function TraineeDetail() {
                       />
                     </div>
                     <p className="text-sm mt-3 font-medium" style={{ color }}>
-                      {ratio >= 0.7 ? "✓ Pass" : "✗ Needs Improvement"}
+                      {ratio >= passThreshold ? "✓ Pass" : "✗ Needs Improvement"}
                     </p>
                     {link && (
                       <a
@@ -249,13 +271,15 @@ export default function TraineeDetail() {
                         View submission →
                       </a>
                     )}
-                    <button
-                      onClick={() => setExpandedAssignment(isExpanded ? null : a.name)}
-                      className="mt-4 text-xs text-neutral-500 hover:text-neutral-800 flex items-center gap-1 w-full"
-                    >
-                      {isExpanded ? "▲ Hide breakdown" : "▼ Show breakdown"}
-                    </button>
-                    {isExpanded && (
+                    {!a.noBreakdown && (
+                      <button
+                        onClick={() => setExpandedAssignment(isExpanded ? null : a.name)}
+                        className="mt-4 text-xs text-neutral-500 hover:text-neutral-800 flex items-center gap-1 w-full"
+                      >
+                        {isExpanded ? "▲ Hide breakdown" : "▼ Show breakdown"}
+                      </button>
+                    )}
+                    {!a.noBreakdown && isExpanded && (
                       <ul className="mt-3 divide-y divide-neutral-100 border border-neutral-100 rounded-xl overflow-hidden">
                         {result.questions.map((q, i) => {
                           const ans = (result.row[q] || "").trim().toLowerCase();
