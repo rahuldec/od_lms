@@ -83,7 +83,47 @@ export const ASSIGNMENTS = [
       "Assign a single coordinator to all classes and sections at once.",
     ],
   },
+  {
+    id: "attendance",
+    name: "Attendance",
+    csvUrl:
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPHkFJjJ8CF7lXGPPNS1dAWpQwAVJ_EyIx-_afkvkSFZ0ggkowqwvuFkDOCzTlJfRx04Kf86RlOTo7/pub?output=csv",
+    scoreCol: "Overall Score",
+    linkCol: "Link",
+    nameCol: "Name",
+    totalMarks: 15,
+    passThreshold: 9,
+    questions: [
+      "Is it mandatory to include a break in the timetable?",
+      "How to add holiday attendance value?",
+      "Where to check load of one specific employee?",
+      "How to print attendance shortage letter?",
+      "How can you check which teacher has not marked attendance? (School Case)",
+      "How can i switch between day-wise and lecture-wise attendance?",
+      "How to adjust lecture of any employee?",
+      "How to check time table of any employee?",
+      "Where can I check which students have applied for leave?",
+      "How to delete lecture of a particular faculty member??",
+      "Coordinator has assigned a time table of a course for a week. Now attendance is marked till Wednesday. Coordinator wants to add a new faculty from the starting of the week how can we do the same.",
+      "Admin has adjusted one lecture to another faculty now the substituted faculty is also not available. Can we adjust the lecture again to another faculty?",
+      "While marking the attendance from attendance page, we have A, P, L but H is not coming, why?",
+      "Can we delete the lecture of a faculty for a specific course and semester. If yes how?",
+      "Can we schedule time table wise attendance in school?",
+    ],
+  },
 ];
+
+// Case-insensitive lookup of the first candidate column name that actually
+// exists in a parsed CSV row. Falls back to null if none match.
+const resolveColumn = (row, candidates) => {
+  if (!row) return null;
+  const keys = Object.keys(row);
+  for (const candidate of candidates) {
+    const match = keys.find((k) => k.trim().toLowerCase() === candidate.trim().toLowerCase());
+    if (match) return match;
+  }
+  return null;
+};
 
 export const fetchAllAssignmentResults = async () => {
   const results = {};
@@ -100,10 +140,14 @@ export const fetchAllAssignmentResults = async () => {
           const name = (row[assignment.nameCol] || "").trim().toLowerCase();
           if (!name) return;
           if (!results[name]) results[name] = [];
-          const score = parseFloat(row[assignment.scoreCol] || 0);
+          const scoreCol = assignment.scoreColCandidates
+            ? resolveColumn(row, assignment.scoreColCandidates)
+            : assignment.scoreCol;
+          if (!scoreCol) return; // none of the candidate column names matched this sheet
+          const score = parseFloat(row[scoreCol] || 0);
 
           // Build Q&A pairs
-          const qa = assignment.questions.map((q) => ({
+          const qa = (assignment.questions || []).map((q) => ({
             question: q,
             answer: (row[q] || "").trim(),
           }));
