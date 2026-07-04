@@ -235,6 +235,14 @@ function BatchModulesPanel({ batches }) {
     );
   };
 
+  // Batch 0 is a catch-all / pre-onboarding bucket, not a real sequential
+  // batch, so it should always render last regardless of its numeric name.
+  const sortedBatches = [...batches].sort((a, b2) => {
+    if (a.name === "Batch 0") return 1;
+    if (b2.name === "Batch 0") return -1;
+    return a.name.localeCompare(b2.name, undefined, { numeric: true });
+  });
+
   return (
     <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
       <div className="flex items-center gap-2 mb-1">
@@ -253,7 +261,7 @@ function BatchModulesPanel({ batches }) {
         <p className="text-sm text-neutral-400">Loading…</p>
       ) : (
         <div className="divide-y divide-neutral-100">
-          {batches.map((b) => {
+          {sortedBatches.map((b) => {
             const names = sortByCurriculum(assignmentsByBatch[b.id] || []);
             return (
               <div key={b.id} className="py-3.5 flex items-start gap-4 first:pt-0 last:pb-0">
