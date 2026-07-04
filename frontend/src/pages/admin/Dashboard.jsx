@@ -143,6 +143,33 @@ function AssignmentModal({ assignment, onClose }) {
 // based on the passing mark (9) and shows the module's total when available.
 const PASSING_MARK = 9;
 
+// Custom tooltip for the trainee-wise performance chart - lists every
+// module's score for the hovered trainee, plus their overall average %.
+function TraineePerformanceTooltip({ active, payload, label }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const avgPct = payload[0]?.payload?.avgPct;
+  const rows = payload.filter(
+    (p) => p.dataKey !== "avgPct" && p.value !== undefined && p.value !== null
+  );
+  return (
+    <div className="bg-white border border-neutral-200 rounded-xl shadow-lg px-4 py-3 max-h-64 overflow-y-auto">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className="text-xs font-semibold text-neutral-800">{label}</p>
+        {avgPct != null && <p className="text-xs text-neutral-400">avg {avgPct}%</p>}
+      </div>
+      <div className="space-y-1">
+        {rows.map((r) => (
+          <div key={r.dataKey} className="flex items-center gap-2 text-xs">
+            <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+            <span className="text-neutral-600 truncate">{r.dataKey}</span>
+            <span className="ml-auto font-medium tabular-nums text-neutral-800">{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ModuleComparisonTooltip({ active, payload, label }) {
   if (!active || !payload || payload.length === 0) return null;
   const total = payload[0]?.payload?.total;
@@ -423,6 +450,53 @@ export default function AdminDashboard() {
     };
   }, [filteredTrainees, getAssignments]);
 
+  // ---- Trainee-wise performance (same data as moduleComparison, pivoted) --
+  // One row per trainee, one bar per module, plus an overall avgPct (score
+  // sum / total sum across every module with a recorded total) and pass
+  // count, used to rank trainees and surface their weakest module.
+  const traineePerformance = useMemo(() => {
+    const moduleNamesSet = new Set();
+
+    const rows = filteredTrainees
+      .map((t) => {
+        const assignments = getAssignments(t.name);
+        const row = { name: t.name };
+        let scoreSum = 0;
+        let totalSum = 0;
+        let passedCount = 0;
+        let strongestModule = null;
+        let strongestRatio = -Infinity;
+
+        assignments.forEach((a) => {
+          if (!a?.name) return;
+          moduleNamesSet.add(a.name);
+          row[a.name] = a.score ?? null;
+          if (a.score != null && a.total != null) {
+            scoreSum += a.score;
+            totalSum += a.total;
+            const ratio = a.total > 0 ? a.score / a.total : 0;
+            if (ratio > strongestRatio) {
+              strongestRatio = ratio;
+              strongestModule = a.name;
+            }
+          }
+          if (a.passed) passedCount += 1;
+        });
+
+        return {
+          ...row,
+          avgPct: totalSum > 0 ? Math.round((scoreSum / totalSum) * 100) : null,
+          passedCount,
+          moduleCount: assignments.length,
+          strongestModule,
+        };
+      })
+      .filter((r) => r.moduleCount > 0)
+      .sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1));
+
+    return { data: rows, moduleNames: Array.from(moduleNamesSet) };
+  }, [filteredTrainees, getAssignments]);
+
   return (
     <AppShell navItems={navItems} subtitle="Admin">
       <div className="mb-8">
@@ -513,6 +587,104 @@ export default function AdminDashboard() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        )}
+      </Card>
+
+      {/* Trainee-wise performance: same scores, pivoted to rank trainees */}
+      <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
+        <div className="flex items-center gap-2 mb-1">
+          <BarChart3 className="h-4 w-4 text-neutral-400" />
+          <h2 className="text-xl font-semibold">Trainee-wise performance</h2>
+        </div>
+        <p className="text-sm text-neutral-500 mb-6">
+          Every trainee's scores across all modules, ranked by overall average. Hover a bar group for the full breakdown.
+        </p>
+        {loading ? (
+          <p className="text-sm text-neutral-400">Loading...</p>
+        ) : traineePerformance.data.length === 0 ? (
+          <p className="text-sm text-neutral-400">No assignment scores recorded yet.</p>
+        ) : (
+          <>
+            <div style={{ width: "100%", height: 380 }}>
+              <ResponsiveContainer>
+                <BarChart
+                  data={traineePerformance.data}
+                  margin={{ top: 24, right: 10, left: 0, bottom: 10 }}
+                  barCategoryGap="28%"
+                  barGap={3}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#737373" }} axisLine={{ stroke: "#e5e5e5" }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                  <ReferenceLine
+                    y={PASSING_MARK}
+                    stroke="#d4d4d4"
+                    strokeDasharray="4 4"
+                    label={{ value: `Pass (${PASSING_MARK})`, position: "right", fontSize: 11, fill: "#a3a3a3" }}
+                  />
+                  <Tooltip content={<TraineePerformanceTooltip />} cursor={{ fill: "#fafafa" }} />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} iconType="circle" iconSize={8} />
+                  {traineePerformance.moduleNames.map((name, i) => (
+                    <Bar
+                      key={name}
+                      dataKey={name}
+                      fill={TRAINEE_COLORS[i % TRAINEE_COLORS.length]}
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={26}
+                    >
+                      <LabelList
+                        dataKey={name}
+                        position="top"
+                        fontSize={10}
+                        fill="#a3a3a3"
+                        formatter={(v) => (v != null ? v : "")}
+                      />
+                    </Bar>
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs uppercase tracking-wider text-neutral-400 border-b border-neutral-100">
+                    <th className="py-2 pr-4 font-medium">Rank</th>
+                    <th className="py-2 pr-4 font-medium">Trainee</th>
+                    <th className="py-2 pr-4 font-medium">Avg %</th>
+                    <th className="py-2 pr-4 font-medium">Passed</th>
+                    <th className="py-2 pr-4 font-medium">Strongest module</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-50">
+                  {traineePerformance.data.map((row, i) => (
+                    <tr key={row.name}>
+                      <td className="py-2.5 pr-4 text-neutral-400 tabular-nums">{i + 1}</td>
+                      <td className="py-2.5 pr-4 font-medium text-neutral-800">{row.name}</td>
+                      <td className="py-2.5 pr-4 tabular-nums">
+                        {row.avgPct != null ? (
+                          <span
+                            className="font-medium"
+                            style={{ color: row.avgPct >= 60 ? "#16a34a" : "#dc2626" }}
+                          >
+                            {row.avgPct}%
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400">-</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pr-4 text-neutral-600 tabular-nums">
+                        {row.passedCount}/{row.moduleCount}
+                      </td>
+                      <td className="py-2.5 pr-4 text-neutral-600">
+                        {row.strongestModule || <span className="text-neutral-400">-</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </Card>
 
