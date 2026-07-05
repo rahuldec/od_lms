@@ -208,7 +208,7 @@ function ModuleComparisonTooltip({ active, payload, label }) {
 // batch is actively on. Editing assignments / current module happens on the
 // Batch Detail page — this is just a quick at-a-glance overview across all
 // batches.
-function BatchModulesPanel({ batches }) {
+function BatchModulesPanel({ batches, trainees }) {
   const [loading, setLoading] = useState(true);
   const [assignmentsByBatch, setAssignmentsByBatch] = useState({});
   const [moduleOrder, setModuleOrder] = useState([]);
@@ -270,6 +270,16 @@ function BatchModulesPanel({ batches }) {
     return a.name.localeCompare(b2.name, undefined, { numeric: true });
   });
 
+  const traineesByBatch = useMemo(() => {
+    const map = {};
+    (trainees || []).forEach((t) => {
+      if (!t.batch_id) return;
+      if (!map[t.batch_id]) map[t.batch_id] = [];
+      map[t.batch_id].push(t.name);
+    });
+    return map;
+  }, [trainees]);
+
   return (
     <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
       <div className="flex items-center gap-2 mb-1">
@@ -298,30 +308,38 @@ function BatchModulesPanel({ batches }) {
                 >
                   {b.name}
                 </Link>
-                <div className="flex-1 flex flex-wrap gap-1.5">
-                  {names.length === 0 ? (
-                    <span className="text-sm text-neutral-400">No modules assigned</span>
-                  ) : (
-                    names.map((name) => {
-                      const isCurrent = b.current_module === name;
-                      return (
-                        <Badge
-                          key={name}
-                          variant="secondary"
-                          className={`rounded-full font-medium inline-flex items-center gap-1 ${
-                            isCurrent ? "ring-1 ring-[#E05A2B]" : ""
-                          }`}
-                          style={
-                            isCurrent
-                              ? { backgroundColor: "#E05A2B", color: "white" }
-                              : { backgroundColor: "#FFF0E8", color: "#E05A2B" }
-                          }
-                        >
-                          {isCurrent && <Flag className="h-3 w-3" />}
-                          {name}
-                        </Badge>
-                      );
-                    })
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap gap-1.5">
+                    {names.length === 0 ? (
+                      <span className="text-sm text-neutral-400">No modules assigned</span>
+                    ) : (
+                      names.map((name) => {
+                        const isCurrent = b.current_module === name;
+                        return (
+                          <Badge
+                            key={name}
+                            variant="secondary"
+                            className={`rounded-full font-medium inline-flex items-center gap-1 ${
+                              isCurrent ? "ring-1 ring-[#E05A2B]" : ""
+                            }`}
+                            style={
+                              isCurrent
+                                ? { backgroundColor: "#E05A2B", color: "white" }
+                                : { backgroundColor: "#FFF0E8", color: "#E05A2B" }
+                            }
+                          >
+                            {isCurrent && <Flag className="h-3 w-3" />}
+                            {name}
+                          </Badge>
+                        );
+                      })
+                    )}
+                  </div>
+                  {(traineesByBatch[b.id] || []).length > 0 && (
+                    <p className="mt-1.5 text-xs text-neutral-400">
+                      <span className="text-neutral-500">Trainees:</span>{" "}
+                      {traineesByBatch[b.id].join(", ")}
+                    </p>
                   )}
                 </div>
               </div>
@@ -532,7 +550,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick module assignment per batch */}
-      <BatchModulesPanel batches={batches} />
+      <BatchModulesPanel batches={batches} trainees={trainees} />
 
       {/* Module-wise comparison of trainees */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
@@ -604,48 +622,7 @@ export default function AdminDashboard() {
         ) : traineePerformance.data.length === 0 ? (
           <p className="text-sm text-neutral-400">No assignment scores recorded yet.</p>
         ) : (
-          <>
-            <div style={{ width: "100%", height: 380 }}>
-              <ResponsiveContainer>
-                <BarChart
-                  data={traineePerformance.data}
-                  margin={{ top: 24, right: 10, left: 0, bottom: 10 }}
-                  barCategoryGap="28%"
-                  barGap={3}
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#737373" }} axisLine={{ stroke: "#e5e5e5" }} tickLine={false} />
-                  <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} axisLine={false} tickLine={false} />
-                  <ReferenceLine
-                    y={PASSING_MARK}
-                    stroke="#d4d4d4"
-                    strokeDasharray="4 4"
-                    label={{ value: `Pass (${PASSING_MARK})`, position: "right", fontSize: 11, fill: "#a3a3a3" }}
-                  />
-                  <Tooltip content={<TraineePerformanceTooltip />} cursor={{ fill: "#fafafa" }} />
-                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} iconType="circle" iconSize={8} />
-                  {traineePerformance.moduleNames.map((name, i) => (
-                    <Bar
-                      key={name}
-                      dataKey={name}
-                      fill={TRAINEE_COLORS[i % TRAINEE_COLORS.length]}
-                      radius={[3, 3, 0, 0]}
-                      maxBarSize={26}
-                    >
-                      <LabelList
-                        dataKey={name}
-                        position="top"
-                        fontSize={10}
-                        fill="#a3a3a3"
-                        formatter={(v) => (v != null ? v : "")}
-                      />
-                    </Bar>
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="mt-6 overflow-x-auto">
+          <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wider text-neutral-400 border-b border-neutral-100">
@@ -684,7 +661,6 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
-          </>
         )}
       </Card>
 
