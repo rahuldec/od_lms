@@ -6,7 +6,7 @@ import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -41,6 +41,7 @@ const navItems = [
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules" },
+  { to: "/admin/results", label: "Results", testId: "nav-results" },
 ];
 
 const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
@@ -359,18 +360,21 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [expandedLevel, setExpandedLevel] = useState(null);
   const [activeAssignment, setActiveAssignment] = useState(null);
+  const [results, setResults] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [data, aResults, batchData] = await Promise.all([
+        const [data, aResults, batchData, resultsData] = await Promise.all([
           api.listTrainees(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listBatches().catch(() => []),
+          api.listResultsAdmin().catch(() => []),
         ]);
         setTrainees(Array.isArray(data) ? data : []);
         setAssignmentResults(aResults || {});
         setBatches(Array.isArray(batchData) ? batchData : []);
+        setResults(Array.isArray(resultsData) ? resultsData.filter((r) => r.published).slice(0, 3) : []);
       } catch (e) {
         toast.error("Could not load trainees");
       } finally {
@@ -531,6 +535,36 @@ export default function AdminDashboard() {
         <Stat testId="stat-onhold" icon={PauseCircle} label="On hold" value={loading ? "-" : onHold} />
         <Stat testId="stat-promotions" icon={TrendingUp} label="Promotions this month" value={loading ? "-" : promotionsThisMonth} />
       </div>
+
+      {results.length > 0 && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Latest results</p>
+            <Link to="/admin/results" className="text-xs font-semibold" style={{ color: "#E05A2B" }}>
+              Manage results &rarr;
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {results.map((r) => (
+              <a
+                key={r.id}
+                href={r.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 border border-neutral-200 rounded-xl px-4 py-3 hover:bg-neutral-50 transition-colors"
+              >
+                <div className="h-9 w-9 rounded-lg grid place-items-center flex-shrink-0" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-neutral-900 truncate max-w-[220px]">{r.title}</p>
+                  <p className="text-xs text-neutral-500">{r.cycle || new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                </div>
+              </a>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-neutral-500">Filter by batch</p>
