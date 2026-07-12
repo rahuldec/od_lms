@@ -1,6 +1,6 @@
 """FastAPI backend that wraps Supabase admin operations using service_role key."""
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
@@ -99,6 +99,32 @@ async def require_admin(ctx=Depends(require_user)):
     if ctx["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     return ctx
+
+
+# ---------- Supabase Storage helpers (used by results/publishing) ----------
+RESULTS_BUCKET = "results"
+
+
+async def upload_to_supabase_storage(bucket: str, path: str, content: bytes, content_type: str) -> str:
+    url = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{path}"
+    headers = {
+        "apikey": SERVICE_KEY,
+        "Authorization": f"Bearer {SERVICE_KEY}",
+        "Content-Type": content_type or "application/octet-stream",
+        "x-upsert": "true",
+    }
+    async with httpx.AsyncClient(timeout=30) as cx:
+        r = await cx.post(url, headers=headers, content=content)
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=f"Storage upload failed: {r.text}")
+    return f"{SUPABASE_URL}/storage/v1/object/public/{bucket}/{path}"
+
+
+async def delete_from_supabase_storage(bucket: str, path: str) -> None:
+    url = f"{SUPABASE_URL}/storage/v1/object/{bucket}/{path}"
+    headers = {"apikey": SERVICE_KEY, "Authorization": f"Bearer {SERVICE_KEY}"}
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await cx.delete(url, headers=headers)
 
 
 # ---------- Zoho score fetcher ----------
@@ -895,6 +921,105 @@ async def delete_training_module(module_id: str, _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
         await cx.delete(f"{REST}/training_modules?id=eq.{module_id}", headers=ADMIN_HEADERS)
     return {"ok": True}
+
+
+# ---------- results ----------
+class ResultUpdate(BaseModel):
+    title: Optional[str] = None
+    cycle: Optional[str] = None
+    published: Optional[bool] = None
+
+
+@api.get("/admin/results")
+async def list_results_admin(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(f"{REST}/results?select=*&order=created_at.desc", headers=ADMIN_HEADERS)
+    if r.status_code != 200:
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()
+
+
+@api.post("/admin/results")
+async def upload_result(
+    title: str = Form(...),
+    cycle: str = Form(""),
+    file: UploadFile = File(...),
+    _=Depends(require_admin),
+):
+    is_pdf = (file.content_type == "application/pdf") or (file.filename or "").lower().endswith(".pdf")
+    if not is_pdf:
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    content = await file.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (max 20MB)")
+
+    safe_name = re.sub(r"[^a-zA-Z0-9._-]", "_", file.filename or "result.pdf")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    storage_path = f"{stamp}_{safe_name}"
+
+    public_url = await upload_to_supabase_storage(RESULTS_BUCKET, storage_path, content, file.content_type)
+
+    payload = {
+        "title": title,
+        "cycle": cycle,
+        "file_path": storage_path,
+        "file_name": file.filename or safe_name,
+        "file_size": len(content),
+        "file_url": public_url,
+        "published": True,
+    }
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.post(
+            f"{REST}/results",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json=payload,
+        )
+    if r.status_code not in (200, 201):
+        # Upload succeeded but the DB insert failed - clean up the orphaned file.
+        await delete_from_supabase_storage(RESULTS_BUCKET, storage_path)
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0]
+
+
+@api.patch("/admin/results/{result_id}")
+async def update_result(result_id: str, body: ResultUpdate, _=Depends(require_admin)):
+    patch = {k: v for k, v in body.dict(exclude_unset=True).items()}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(
+            f"{REST}/results?id=eq.{result_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json=patch,
+        )
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.delete("/admin/results/{result_id}")
+async def delete_result(result_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(f"{REST}/results?id=eq.{result_id}&select=file_path", headers=ADMIN_HEADERS)
+        rows = r.json() if r.status_code == 200 else []
+        if rows:
+            await delete_from_supabase_storage(RESULTS_BUCKET, rows[0]["file_path"])
+        await cx.delete(f"{REST}/results?id=eq.{result_id}", headers=ADMIN_HEADERS)
+    return {"ok": True}
+
+
+@api.get("/results")
+async def list_published_results(ctx=Depends(require_user)):
+    """Visible to any signed-in user (trainee or admin) - published results only."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/results?published=eq.true&select=id,title,cycle,file_name,file_url,created_at&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+    if r.status_code != 200:
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()
 
 
 # ---------- trainee progress ----------
