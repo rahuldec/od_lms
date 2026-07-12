@@ -97,6 +97,7 @@ export default function TraineeHome() {
   const [activeAssignment, setActiveAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeLesson, setActiveLesson] = useState(null);
+  const [results, setResults] = useState([]);
 
   const reloadProgress = async () => {
     const res = await api.myProgress();
@@ -115,6 +116,8 @@ export default function TraineeHome() {
         const allResults = await fetchAllAssignmentResults().catch(() => ({}));
         const key = (trainee.name || "").trim().toLowerCase();
         setAssignments(allResults[key] || []);
+        const publishedResults = await api.listResults().catch(() => []);
+        setResults(Array.isArray(publishedResults) ? publishedResults : []);
       } catch (e) {
         toast.error("Could not load training content");
       } finally {
@@ -246,6 +249,35 @@ export default function TraineeHome() {
           <p className="text-sm text-neutral-400">No assignments attempted yet.</p>
         )}
       </Card>
+
+      {results.length > 0 && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Results</p>
+          <div className="flex flex-col gap-2">
+            {results.map((r) => (
+              <a
+                key={r.id}
+                href={r.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 border border-neutral-200 rounded-xl px-4 py-3 hover:bg-neutral-50 transition-colors"
+              >
+                <div className="h-9 w-9 rounded-lg grid place-items-center flex-shrink-0" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-neutral-900 truncate">{r.title}</p>
+                  <p className="text-xs text-neutral-500">
+                    {r.cycle ? `${r.cycle} · ` : ""}
+                    {new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-neutral-300 flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <div className="space-y-8">
         {modules.map((mod) => {
