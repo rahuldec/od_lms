@@ -217,6 +217,36 @@ export const api = {
         .then((r) => r.data)
     ),
 
+  // Results
+  listResultsAdmin: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/results`, { headers }).then((r) => r.data)
+    ),
+  uploadResult: ({ title, cycle, file }) =>
+    withAuthRetry((headers) => {
+      const form = new FormData();
+      form.append("title", title);
+      form.append("cycle", cycle || "");
+      form.append("file", file);
+      return axios
+        .post(`${BASE}/admin/results`, form, {
+          headers: { ...headers, "Content-Type": "multipart/form-data" },
+        })
+        .then((r) => r.data);
+    }),
+  updateResult: (id, body) =>
+    withAuthRetry((headers) =>
+      axios.patch(`${BASE}/admin/results/${id}`, body, { headers }).then((r) => r.data)
+    ),
+  deleteResult: (id) =>
+    withAuthRetry((headers) =>
+      axios.delete(`${BASE}/admin/results/${id}`, { headers }).then((r) => r.data)
+    ),
+  listResults: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/results`, { headers }).then((r) => r.data)
+    ),
+
   // Training Modules
   listTrainingModules: () =>
     withAuthRetry((headers) =>
