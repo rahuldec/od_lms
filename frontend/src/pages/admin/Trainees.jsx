@@ -65,7 +65,10 @@ const emptyForm = {
   username: "",
   password: "",
   batch_id: "",
+  level_since_date: "",
 };
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -91,6 +94,7 @@ export default function Trainees() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [promotingId, setPromotingId] = useState(null);
   const [demotingId, setDemotingId] = useState(null);
+  const [levelDialog, setLevelDialog] = useState(null); // { trainee, action: "promote" | "demote", date }
 
   const load = async () => {
     setLoading(true);
@@ -145,6 +149,7 @@ export default function Trainees() {
       username: t.username || "",
       password: "",
       batch_id: t.batch_id || "",
+      level_since_date: t.level_since_date || "",
     });
     setModalOpen(true);
   };
@@ -166,6 +171,7 @@ export default function Trainees() {
           status: form.status,
           notes: form.notes,
           batch_id: form.batch_id || null,
+          level_since_date: form.level_since_date || null,
         });
         toast.success("Trainee updated");
       } else {
@@ -208,32 +214,38 @@ export default function Trainees() {
     }
   };
 
-  const promote = async (t) => {
+  const openPromote = (t) => {
     const next = (t.current_level ?? 0) + 1;
     if (next > 3) { toast.info("Already at Level 3"); return; }
-    setPromotingId(t.id);
+    setLevelDialog({ trainee: t, action: "promote", date: todayStr() });
+  };
+
+  const openDemote = (t) => {
+    const next = (t.current_level ?? 0) - 1;
+    if (next < 0) { toast.info("Already at Level 0"); return; }
+    setLevelDialog({ trainee: t, action: "demote", date: todayStr() });
+  };
+
+  const confirmLevelChange = async () => {
+    if (!levelDialog) return;
+    const { trainee: t, action, date } = levelDialog;
+    if (!date) { toast.error("Pick a date"); return; }
+    const isPromote = action === "promote";
+    const next = (t.current_level ?? 0) + (isPromote ? 1 : -1);
+    isPromote ? setPromotingId(t.id) : setDemotingId(t.id);
     try {
-      await api.promoteTrainee(t.id);
-      toast.success(`${t.name} promoted to Level ${next}`);
+      if (isPromote) {
+        await api.promoteTrainee(t.id, date);
+      } else {
+        await api.demoteTrainee(t.id, date);
+      }
+      toast.success(`${t.name} ${isPromote ? "promoted" : "demoted"} to Level ${next}`);
+      setLevelDialog(null);
       await load();
     } catch (err) {
       toast.error(errMsg(err));
     } finally {
       setPromotingId(null);
-    }
-  };
-
-  const demote = async (t) => {
-    const next = (t.current_level ?? 0) - 1;
-    if (next < 0) { toast.info("Already at Level 0"); return; }
-    setDemotingId(t.id);
-    try {
-      await api.demoteTrainee(t.id);
-      toast.success(`${t.name} demoted to Level ${next}`);
-      await load();
-    } catch (err) {
-      toast.error(errMsg(err));
-    } finally {
       setDemotingId(null);
     }
   };
@@ -329,6 +341,11 @@ export default function Trainees() {
                       >
                         L{t.current_level ?? 0}
                       </Badge>
+                      {t.level_since_date && (
+                        <div className="text-[11px] text-neutral-400 mt-1">
+                          since {t.level_since_date}
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="inline-flex items-center gap-1.5">
@@ -337,7 +354,7 @@ export default function Trainees() {
                           size="sm"
                           variant="outline"
                           disabled={(t.current_level ?? 0) >= 3 || promotingId === t.id}
-                          onClick={() => promote(t)}
+                          onClick={() => openPromote(t)}
                           className="rounded-full"
                         >
                           <TrendingUp className="h-3.5 w-3.5 mr-1" />
@@ -348,7 +365,7 @@ export default function Trainees() {
                           size="sm"
                           variant="outline"
                           disabled={(t.current_level ?? 0) <= 0 || demotingId === t.id}
-                          onClick={() => demote(t)}
+                          onClick={() => openDemote(t)}
                           className="rounded-full"
                         >
                           <TrendingDown className="h-3.5 w-3.5 mr-1" />
@@ -429,6 +446,18 @@ export default function Trainees() {
                   className="h-10 rounded-xl mt-1"
                 />
               </div>
+              {editing && (
+                <div>
+                  <Label className="text-xs text-neutral-600">Level since date</Label>
+                  <Input
+                    data-testid="form-levelsince"
+                    type="date"
+                    value={form.level_since_date}
+                    onChange={(e) => setForm({ ...form, level_since_date: e.target.value })}
+                    className="h-10 rounded-xl mt-1"
+                  />
+                </div>
+              )}
               <div>
                 <Label className="text-xs text-neutral-600">Status</Label>
                 <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
@@ -530,6 +559,49 @@ export default function Trainees() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!levelDialog} onOpenChange={(o) => !o && setLevelDialog(null)}>
+        <DialogContent data-testid="level-change-dialog" className="sm:max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {levelDialog?.action === "promote" ? "Promote" : "Demote"} {levelDialog?.trainee?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {levelDialog && (
+                <>
+                  Moving from Level {levelDialog.trainee.current_level ?? 0} to Level{" "}
+                  {(levelDialog.trainee.current_level ?? 0) + (levelDialog.action === "promote" ? 1 : -1)}.
+                  Choose the effective date.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label className="text-xs text-neutral-600">Effective date</Label>
+            <Input
+              data-testid="level-change-date"
+              type="date"
+              value={levelDialog?.date || ""}
+              onChange={(e) => setLevelDialog((d) => ({ ...d, date: e.target.value }))}
+              className="h-10 rounded-xl mt-1"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setLevelDialog(null)} className="rounded-full">
+              Cancel
+            </Button>
+            <Button
+              data-testid="confirm-level-change"
+              onClick={confirmLevelChange}
+              disabled={promotingId === levelDialog?.trainee?.id || demotingId === levelDialog?.trainee?.id}
+              className="rounded-full text-white"
+              style={{ backgroundColor: "#E05A2B" }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }
