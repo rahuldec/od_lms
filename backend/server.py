@@ -205,6 +205,11 @@ class TraineeUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     batch_id: Optional[str] = None
+    level_since_date: Optional[str] = None
+
+
+class LevelChangeIn(BaseModel):
+    date: Optional[str] = None
 
 
 class ProgressIn(BaseModel):
@@ -431,7 +436,7 @@ async def delete_trainee(trainee_id: str, _=Depends(require_admin)):
 
 
 @api.post("/admin/trainees/{trainee_id}/promote")
-async def promote_trainee(trainee_id: str, _=Depends(require_admin)):
+async def promote_trainee(trainee_id: str, body: LevelChangeIn = LevelChangeIn(), _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.get(f"{REST}/trainees?id=eq.{trainee_id}&select=*", headers=ADMIN_HEADERS)
         rows = r.json() if r.status_code == 200 else []
@@ -442,15 +447,21 @@ async def promote_trainee(trainee_id: str, _=Depends(require_admin)):
         if current >= 3:
             raise HTTPException(status_code=400, detail="Already at Level 3")
         next_level = current + 1
+        effective_date = body.date or datetime.now(timezone.utc).date().isoformat()
         history = t.get("history") or []
         if not isinstance(history, list):
             history = []
-        history.append({"type": "promotion", "from": current, "to": next_level, "at": datetime.now(timezone.utc).isoformat()})
-        today = datetime.now(timezone.utc).date().isoformat()
+        history.append({
+            "type": "promotion",
+            "from": current,
+            "to": next_level,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "effective_date": effective_date,
+        })
         r2 = await cx.patch(
             f"{REST}/trainees?id=eq.{trainee_id}",
             headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
-            json={"current_level": next_level, "history": history, "level_since_date": today},
+            json={"current_level": next_level, "history": history, "level_since_date": effective_date},
         )
     if r2.status_code not in (200, 204):
         raise HTTPException(status_code=400, detail=r2.text)
@@ -458,7 +469,7 @@ async def promote_trainee(trainee_id: str, _=Depends(require_admin)):
 
 
 @api.post("/admin/trainees/{trainee_id}/demote")
-async def demote_trainee(trainee_id: str, _=Depends(require_admin)):
+async def demote_trainee(trainee_id: str, body: LevelChangeIn = LevelChangeIn(), _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.get(f"{REST}/trainees?id=eq.{trainee_id}&select=*", headers=ADMIN_HEADERS)
         rows = r.json() if r.status_code == 200 else []
@@ -469,15 +480,21 @@ async def demote_trainee(trainee_id: str, _=Depends(require_admin)):
         if current <= 0:
             raise HTTPException(status_code=400, detail="Already at Level 0")
         next_level = current - 1
+        effective_date = body.date or datetime.now(timezone.utc).date().isoformat()
         history = t.get("history") or []
         if not isinstance(history, list):
             history = []
-        history.append({"type": "demotion", "from": current, "to": next_level, "at": datetime.now(timezone.utc).isoformat()})
-        today = datetime.now(timezone.utc).date().isoformat()
+        history.append({
+            "type": "demotion",
+            "from": current,
+            "to": next_level,
+            "at": datetime.now(timezone.utc).isoformat(),
+            "effective_date": effective_date,
+        })
         r2 = await cx.patch(
             f"{REST}/trainees?id=eq.{trainee_id}",
             headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
-            json={"current_level": next_level, "history": history, "level_since_date": today},
+            json={"current_level": next_level, "history": history, "level_since_date": effective_date},
         )
     if r2.status_code not in (200, 204):
         raise HTTPException(status_code=400, detail=r2.text)
