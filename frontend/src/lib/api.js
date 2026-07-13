@@ -101,16 +101,16 @@ export const api = {
     withAuthRetry((headers) =>
       axios.delete(`${BASE}/admin/trainees/${id}`, { headers }).then((r) => r.data)
     ),
-  promoteTrainee: (id) =>
+  promoteTrainee: (id, date) =>
     withAuthRetry((headers) =>
       axios
-        .post(`${BASE}/admin/trainees/${id}/promote`, {}, { headers })
+        .post(`${BASE}/admin/trainees/${id}/promote`, date ? { date } : {}, { headers })
         .then((r) => r.data)
     ),
-  demoteTrainee: (id) =>
+  demoteTrainee: (id, date) =>
     withAuthRetry((headers) =>
       axios
-        .post(`${BASE}/admin/trainees/${id}/demote`, {}, { headers })
+        .post(`${BASE}/admin/trainees/${id}/demote`, date ? { date } : {}, { headers })
         .then((r) => r.data)
     ),
   listBatches: () =>
