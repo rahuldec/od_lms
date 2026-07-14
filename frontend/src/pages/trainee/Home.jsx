@@ -194,9 +194,23 @@ export default function TraineeHome() {
     <AppShell navItems={navItems} subtitle="Trainee">
       <div className="mb-8">
         <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Welcome back</p>
-        <h1 className="text-4xl font-semibold mt-1 tracking-tight">
-          Hi, {trainee.name?.split(" ")[0]}.
-        </h1>
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
+          <h1 className="text-4xl font-semibold tracking-tight">
+            Hi, {trainee.name?.split(" ")[0]}.
+          </h1>
+          <span
+            data-testid="trainee-level-badge"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold"
+            style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}
+          >
+            Level {trainee.current_level ?? 0}
+          </span>
+        </div>
+        {trainee.level_since_date && (
+          <p className="text-xs text-neutral-400 mt-1">
+            Since {trainee.level_since_date}
+          </p>
+        )}
         <p className="text-neutral-500 mt-2 max-w-xl">
           Your Okie Dokie ERP training program - modules, video lessons and assignments, all in one place.
         </p>
