@@ -390,9 +390,10 @@ export default function AdminDashboard() {
   }, [batches]);
 
   const filteredTrainees = useMemo(() => {
-    if (selectedBatch === "all") return trainees;
-    if (selectedBatch === "none") return trainees.filter((t) => !t.batch_id);
-    return trainees.filter((t) => t.batch_id === selectedBatch);
+    const notExited = trainees.filter((t) => t.status !== "Exited");
+    if (selectedBatch === "all") return notExited;
+    if (selectedBatch === "none") return notExited.filter((t) => !t.batch_id);
+    return notExited.filter((t) => t.batch_id === selectedBatch);
   }, [trainees, selectedBatch]);
 
   const total = filteredTrainees.length;
@@ -584,7 +585,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick module assignment per batch */}
-      <BatchModulesPanel batches={batches} trainees={trainees} />
+      <BatchModulesPanel batches={batches} trainees={trainees.filter((t) => t.status !== "Exited")} />
 
       {/* Module-wise comparison of trainees */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
