@@ -819,7 +819,7 @@ export default function AdminDashboard() {
                               {latestPromotion && (
                                 <span className="inline-flex items-center gap-0.5 text-[10px] text-neutral-400 ml-auto">
                                   <TrendingUp className="h-2.5 w-2.5" />
-                                  {fmtDate(latestPromotion.at)}
+                                  {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
                                 </span>
                               )}
                             </div>
