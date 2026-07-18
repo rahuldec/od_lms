@@ -276,6 +276,22 @@ class ResourceLinkUpdate(BaseModel):
     description: Optional[str] = None
 
 
+class WebinarIn(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    drive_url: str
+    published: Optional[bool] = True
+    sort_order: Optional[int] = 0
+
+
+class WebinarUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    drive_url: Optional[str] = None
+    published: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
 class TrainingModuleIn(BaseModel):
     sr_no: Optional[int] = None
     module: str
@@ -892,6 +908,67 @@ async def delete_resource_link(link_id: str, _=Depends(require_admin)):
     async with httpx.AsyncClient(timeout=20) as cx:
         await cx.delete(f"{REST}/resource_links?id=eq.{link_id}", headers=ADMIN_HEADERS)
     return {"ok": True}
+
+
+# ---------- admin webinars ----------
+@api.get("/admin/webinars")
+async def list_webinars_admin(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(f"{REST}/webinars?select=*&order=sort_order.asc,created_at.desc", headers=ADMIN_HEADERS)
+    if r.status_code != 200:
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()
+
+
+@api.post("/admin/webinars")
+async def create_webinar(body: WebinarIn, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.post(
+            f"{REST}/webinars",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={
+                "title": body.title,
+                "description": body.description or "",
+                "drive_url": body.drive_url,
+                "published": body.published if body.published is not None else True,
+                "sort_order": body.sort_order or 0,
+            },
+        )
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0]
+
+
+@api.put("/admin/webinars/{webinar_id}")
+async def update_webinar(webinar_id: str, body: WebinarUpdate, _=Depends(require_admin)):
+    patch = {k: v for k, v in body.dict().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(f"{REST}/webinars?id=eq.{webinar_id}", headers={**ADMIN_HEADERS, "Prefer": "return=representation"}, json=patch)
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.delete("/admin/webinars/{webinar_id}")
+async def delete_webinar(webinar_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await cx.delete(f"{REST}/webinars?id=eq.{webinar_id}", headers=ADMIN_HEADERS)
+    return {"ok": True}
+
+
+@api.get("/webinars")
+async def list_webinars_public():
+    """Fully public - no auth. Powers the /webinar page, published only."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/webinars?published=eq.true&select=id,title,description,drive_url,sort_order,created_at&order=sort_order.asc,created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+    if r.status_code != 200:
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()
 
 
 # ---------- admin training modules ----------
