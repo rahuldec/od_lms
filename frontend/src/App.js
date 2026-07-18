@@ -13,8 +13,10 @@ import BatchDetail from "@/pages/admin/BatchDetail";
 import Resources from "@/pages/admin/Resources";
 import TrainingModules from "@/pages/admin/TrainingModules";
 import Results from "@/pages/admin/Results";
+import Webinars from "@/pages/admin/Webinars";
 import TraineeHome from "@/pages/trainee/Home";
 import PublicLearn from "@/pages/Learn";
+import PublicWebinar from "@/pages/Webinar";
 function RootRedirect() {
   const { session, role, loading } = useAuth();
   if (loading) return null;
@@ -36,6 +38,15 @@ export default function App() {
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/learn" element={<PublicLearn />} />
+          <Route path="/webinar" element={<PublicWebinar />} />
+          <Route
+            path="/admin/webinars"
+            element={
+              <Protected requireRole="admin">
+                <Webinars />
+              </Protected>
+            }
+          />
           <Route
             path="/admin"
             element={
