@@ -19,7 +19,20 @@ export const drivePreviewUrl = (url) => {
 
 // Parse rows from CSV → flat list of lessons grouped by modules.
 // CSV columns: Sr No, Module, Days, Sub Parts, Link, Assignment
-export const fetchSheetModules = async () => {
+//
+// Cached in memory: every page (Dashboard, Learn, TrainingModules,
+// TraineeDetail, BatchDetail, trainee Home) calls this on mount, and
+// without caching that meant a fresh live fetch to Google Sheets on
+// almost every page load in the app. Now the first call within the TTL
+// window fetches for real; every other call (same page reload, or a
+// different page mounting moments later) reuses the same result -
+// or, if a fetch is already in flight, waits on that same request
+// instead of firing a duplicate one.
+const SHEET_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+let sheetCache = { data: null, fetchedAt: 0 };
+let sheetInFlight = null;
+
+const fetchSheetModulesUncached = async () => {
   const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch sheet");
   const text = await res.text();
@@ -70,4 +83,26 @@ export const fetchSheetModules = async () => {
   });
 
   return modules.filter((m) => m.lessons.length > 0);
+};
+
+export const fetchSheetModules = async ({ force = false } = {}) => {
+  const isFresh = sheetCache.data && Date.now() - sheetCache.fetchedAt < SHEET_CACHE_TTL_MS;
+  if (isFresh && !force) return sheetCache.data;
+
+  // Multiple pages can mount within milliseconds of each other (e.g. a
+  // redirect straight into Dashboard). Without this, each would kick off
+  // its own fetch before any of them finish. Instead, everyone after the
+  // first awaits the same in-flight request.
+  if (sheetInFlight) return sheetInFlight;
+
+  sheetInFlight = fetchSheetModulesUncached()
+    .then((modules) => {
+      sheetCache = { data: modules, fetchedAt: Date.now() };
+      return modules;
+    })
+    .finally(() => {
+      sheetInFlight = null;
+    });
+
+  return sheetInFlight;
 };
