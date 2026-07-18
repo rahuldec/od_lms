@@ -21,10 +21,10 @@ export default function TrainingModules() {
   const [loading, setLoading] = useState(true);
   const [activeLesson, setActiveLesson] = useState(null);
 
-  const load = async () => {
+  const load = async (opts) => {
     setLoading(true);
     try {
-      const mods = await fetchSheetModules();
+      const mods = await fetchSheetModules(opts);
       setModules(mods);
     } catch (e) {
       toast.error("Could not load training content from the sheet");
@@ -34,8 +34,10 @@ export default function TrainingModules() {
   };
 
   useEffect(() => {
-    load();
+    load(); // cached is fine on mount
   }, []);
+
+  const handleRefreshClick = () => load({ force: true }); // button = bypass cache
 
   const openLesson = (lesson) => {
     if (lesson.kind === "assignment") {
@@ -69,7 +71,7 @@ export default function TrainingModules() {
             Live from your training sheet — every module, video and practice sheet.
           </p>
         </div>
-        <Button onClick={load} variant="outline" className="rounded-full h-11 px-5">
+        <Button onClick={handleRefreshClick} variant="outline" className="rounded-full h-11 px-5">
           <RefreshCw className="h-4 w-4 mr-1.5" /> Refresh
         </Button>
       </div>
