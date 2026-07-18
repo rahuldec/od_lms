@@ -13,6 +13,7 @@ const navItems = [
   { to: "/admin/resources", label: "Resources", testId: "nav-resources" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules" },
   { to: "/admin/webinars", label: "Webinars", testId: "nav-webinars" },
+  { to: "/admin/assignment-schedule", label: "Assignment Schedule", testId: "nav-assignment-schedule" },
   { to: "/admin/results", label: "Results", testId: "nav-results" },
 ];
 
