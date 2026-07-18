@@ -217,6 +217,26 @@ export const api = {
         .then((r) => r.data)
     ),
 
+  // Webinars
+  listWebinarsAdmin: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/webinars`, { headers }).then((r) => r.data)
+    ),
+  createWebinar: (body) =>
+    withAuthRetry((headers) =>
+      axios.post(`${BASE}/admin/webinars`, body, { headers }).then((r) => r.data)
+    ),
+  updateWebinar: (id, body) =>
+    withAuthRetry((headers) =>
+      axios.put(`${BASE}/admin/webinars/${id}`, body, { headers }).then((r) => r.data)
+    ),
+  deleteWebinar: (id) =>
+    withAuthRetry((headers) =>
+      axios.delete(`${BASE}/admin/webinars/${id}`, { headers }).then((r) => r.data)
+    ),
+  // Public - no auth needed
+  listWebinars: () => axios.get(`${BASE}/webinars`).then((r) => r.data),
+
   // Results
   listResultsAdmin: () =>
     withAuthRetry((headers) =>
