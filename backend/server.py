@@ -292,6 +292,22 @@ class WebinarUpdate(BaseModel):
     sort_order: Optional[int] = None
 
 
+class AssignmentScheduleIn(BaseModel):
+    batch_id: str
+    assignment_name: str
+    visible_from: str  # ISO datetime - when it appears to the batch
+    due_date: str  # ISO date - deadline
+    notes: Optional[str] = ""
+
+
+class AssignmentScheduleUpdate(BaseModel):
+    batch_id: Optional[str] = None
+    assignment_name: Optional[str] = None
+    visible_from: Optional[str] = None
+    due_date: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class TrainingModuleIn(BaseModel):
     sr_no: Optional[int] = None
     module: str
@@ -969,6 +985,65 @@ async def list_webinars_public():
     if r.status_code != 200:
         raise HTTPException(status_code=400, detail=r.text)
     return r.json()
+
+
+# ---------- admin assignment scheduling ----------
+@api.get("/admin/assignment-schedules")
+async def list_assignment_schedules(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/assignment_schedules?select=*&order=visible_from.asc",
+            headers=ADMIN_HEADERS,
+        )
+    if r.status_code != 200:
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()
+
+
+@api.post("/admin/assignment-schedules")
+async def create_assignment_schedule(body: AssignmentScheduleIn, _=Depends(require_admin)):
+    if body.assignment_name not in ZOHO_REPORTS:
+        raise HTTPException(status_code=400, detail=f"Unknown assignment: {body.assignment_name}. Valid: {list(ZOHO_REPORTS.keys())}")
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.post(
+            f"{REST}/assignment_schedules",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={
+                "batch_id": body.batch_id,
+                "assignment_name": body.assignment_name,
+                "visible_from": body.visible_from,
+                "due_date": body.due_date,
+                "notes": body.notes or "",
+            },
+        )
+    if r.status_code not in (200, 201):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0]
+
+
+@api.put("/admin/assignment-schedules/{schedule_id}")
+async def update_assignment_schedule(schedule_id: str, body: AssignmentScheduleUpdate, _=Depends(require_admin)):
+    patch = {k: v for k, v in body.dict().items() if v is not None}
+    if not patch:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    if "assignment_name" in patch and patch["assignment_name"] not in ZOHO_REPORTS:
+        raise HTTPException(status_code=400, detail=f"Unknown assignment: {patch['assignment_name']}. Valid: {list(ZOHO_REPORTS.keys())}")
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.patch(
+            f"{REST}/assignment_schedules?id=eq.{schedule_id}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json=patch,
+        )
+    if r.status_code not in (200, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+    return r.json()[0] if r.json() else {"ok": True}
+
+
+@api.delete("/admin/assignment-schedules/{schedule_id}")
+async def delete_assignment_schedule(schedule_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await cx.delete(f"{REST}/assignment_schedules?id=eq.{schedule_id}", headers=ADMIN_HEADERS)
+    return {"ok": True}
 
 
 # ---------- admin training modules ----------
