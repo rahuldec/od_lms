@@ -237,6 +237,28 @@ export const api = {
   // Public - no auth needed
   listWebinars: () => axios.get(`${BASE}/webinars`).then((r) => r.data),
 
+  // Assignment scheduling
+  getAssignmentsList: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/assignments-list`, { headers }).then((r) => r.data)
+    ),
+  listAssignmentSchedules: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/assignment-schedules`, { headers }).then((r) => r.data)
+    ),
+  createAssignmentSchedule: (body) =>
+    withAuthRetry((headers) =>
+      axios.post(`${BASE}/admin/assignment-schedules`, body, { headers }).then((r) => r.data)
+    ),
+  updateAssignmentSchedule: (id, body) =>
+    withAuthRetry((headers) =>
+      axios.put(`${BASE}/admin/assignment-schedules/${id}`, body, { headers }).then((r) => r.data)
+    ),
+  deleteAssignmentSchedule: (id) =>
+    withAuthRetry((headers) =>
+      axios.delete(`${BASE}/admin/assignment-schedules/${id}`, { headers }).then((r) => r.data)
+    ),
+
   // Results
   listResultsAdmin: () =>
     withAuthRetry((headers) =>
