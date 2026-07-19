@@ -35,6 +35,14 @@ logging.basicConfig(level=logging.INFO)
 ZOHO_REPORTS = {
     "SIS": "https://forms.zohopublic.in/odforms1/report/SIS/reportperma/4tMQi4s1xd13XlzrERR2J42hJWZbE6VznPPcwaz9xQ0",
     "Fee Module": "https://forms.zohopublic.in/odforms1/report/FeeModuleAssignment/reportperma/_x9CwE0qH6Xr5XGb55H_oStvU0M6uUjrZr9mLsNyHuA",
+    # TODO: replace with real Zoho report perma-links. Scheduling works fine
+    # as-is, but fetch_zoho_score() will fail for these until a real URL
+    # is in place - it's a live GET to whatever's here.
+    "Attendance Module": "PENDING_ZOHO_URL",
+    "Academic Module": "PENDING_ZOHO_URL",
+    "Admission Module": "PENDING_ZOHO_URL",
+    "HR Module": "PENDING_ZOHO_URL",
+    "Library Module": "PENDING_ZOHO_URL",
 }
 
 PASS_THRESHOLD = 9
@@ -132,6 +140,8 @@ async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[
     url = ZOHO_REPORTS.get(assignment_name)
     if not url:
         raise HTTPException(status_code=400, detail=f"Unknown assignment: {assignment_name}. Valid: {list(ZOHO_REPORTS.keys())}")
+    if url == "PENDING_ZOHO_URL":
+        raise HTTPException(status_code=400, detail=f"'{assignment_name}' has no Zoho report URL configured yet - update ZOHO_REPORTS in server.py")
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
