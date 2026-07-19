@@ -374,10 +374,11 @@ export default function AssignmentSchedule() {
                         key={ev.id}
                         onClick={() => openEdit(ev)}
                         title={`${ev.assignment_name} - ${batchName(ev.batch_id)}`}
-                        className="w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded-md truncate hover:opacity-80 transition-opacity"
+                        className="w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded-md truncate hover:opacity-80 hover:scale-[1.03] active:scale-95 transition-all duration-150"
                         style={{ backgroundColor: "#FFF3E0", color: "#B45309" }}
                       >
-                        {ev.assignment_name}
+                        <span className="font-medium">{ev.assignment_name}</span>
+                        <span className="opacity-70"> &middot; {batchName(ev.batch_id)}</span>
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
@@ -392,7 +393,7 @@ export default function AssignmentSchedule() {
       )}
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-lg rounded-2xl">
+        <DialogContent className="sm:max-w-lg rounded-2xl duration-300 data-[state=open]:zoom-in-90 data-[state=closed]:zoom-out-90 data-[state=open]:slide-in-from-bottom-2">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit schedule" : "Schedule assignment"}</DialogTitle>
             <DialogDescription>
