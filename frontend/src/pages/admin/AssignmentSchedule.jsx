@@ -445,11 +445,26 @@ export default function AssignmentSchedule() {
                 placeholder="Anything trainees or staff should know"
               />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} className="rounded-full">Cancel</Button>
-              <Button type="submit" disabled={saving} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
-                {saving ? "Saving..." : editing ? "Save changes" : "Schedule it"}
-              </Button>
+            <DialogFooter className={editing ? "sm:justify-between" : ""}>
+              {editing && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setModalOpen(false);
+                    setConfirmDelete(editing);
+                  }}
+                  className="rounded-full text-red-500 hover:text-red-600 hover:bg-red-50 mr-auto"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+                </Button>
+              )}
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} className="rounded-full">Cancel</Button>
+                <Button type="submit" disabled={saving} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
+                  {saving ? "Saving..." : editing ? "Save changes" : "Schedule it"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
