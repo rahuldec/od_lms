@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, CalendarClock } from "lucide-react";
+import { Plus, Pencil, Trash2, CalendarClock, List, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -67,6 +67,31 @@ function statusFor(schedule) {
   return { label: "Live", bg: "#E1F5EE", fg: "#085041" };
 }
 
+// "YYYY-MM-DD" in local time (not UTC) - used as the calendar cell key.
+const ymd = (d) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Builds a 6-week grid (42 cells) for the given month so every layout is
+// the same height - includes trailing days from the previous/next month
+// to fill the first and last week.
+function buildMonthGrid(monthDate) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = firstOfMonth.getDay(); // 0 = Sunday
+  const gridStart = new Date(year, month, 1 - startOffset);
+
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + i);
+    return { date, inMonth: date.getMonth() === month };
+  });
+}
+
 export default function AssignmentSchedule() {
   const [schedules, setSchedules] = useState([]);
   const [batches, setBatches] = useState([]);
@@ -78,6 +103,12 @@ export default function AssignmentSchedule() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const [view, setView] = useState("list"); // "list" | "calendar"
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
 
   const batchName = (id) => batches.find((b) => b.id === id)?.name || "Unknown batch";
 
@@ -105,6 +136,21 @@ export default function AssignmentSchedule() {
     () => [...schedules].sort((a, b) => new Date(a.visible_from) - new Date(b.visible_from)),
     [schedules]
   );
+
+  const monthGrid = useMemo(() => buildMonthGrid(month), [month]);
+
+  // Each schedule shows up on two days: the day it appears (orange dot)
+  // and the day it's due (red dot). Same-day schedules get both dots.
+  const eventsByDay = useMemo(() => {
+    const map = {};
+    for (const s of schedules) {
+      const appearsKey = ymd(new Date(s.visible_from));
+      const dueKey = ymd(new Date(s.due_date));
+      (map[appearsKey] ||= []).push({ ...s, eventType: "appears" });
+      (map[dueKey] ||= []).push({ ...s, eventType: "due" });
+    }
+    return map;
+  }, [schedules]);
 
   const openCreate = () => {
     setEditing(null);
@@ -177,14 +223,35 @@ export default function AssignmentSchedule() {
             Pick a batch and an assignment, set when it appears and when it's due.
           </p>
         </div>
-        <Button onClick={openCreate} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
-          <Plus className="h-4 w-4 mr-1.5" /> Schedule assignment
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-neutral-100 rounded-full p-1">
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                view === "list" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+            <button
+              onClick={() => setView("calendar")}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                view === "calendar" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+              }`}
+            >
+              <CalendarIcon className="h-3.5 w-3.5" /> Calendar
+            </button>
+          </div>
+          <Button onClick={openCreate} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
+            <Plus className="h-4 w-4 mr-1.5" /> Schedule assignment
+          </Button>
+        </div>
       </div>
 
       {loading ? (
         <p className="text-neutral-500 text-sm">Loading...</p>
-      ) : sorted.length === 0 ? (
+      ) : view === "list" ? (
+        sorted.length === 0 ? (
         <Card className="rounded-2xl border-neutral-200/80 p-10 text-center">
           <CalendarClock className="h-6 w-6 mx-auto text-neutral-300 mb-2" />
           <p className="text-neutral-500 text-sm">Nothing scheduled yet.</p>
@@ -232,6 +299,97 @@ export default function AssignmentSchedule() {
               );
             })}
           </ul>
+        </Card>
+        )
+      ) : (
+        <Card className="rounded-2xl border-neutral-200/80 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-semibold text-neutral-900">
+              {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon" variant="ghost"
+                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+                className="rounded-full h-8 w-8"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                size="sm" variant="ghost"
+                onClick={() => setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
+                className="rounded-full h-8 text-xs px-3"
+              >
+                Today
+              </Button>
+              <Button
+                size="icon" variant="ghost"
+                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                className="rounded-full h-8 w-8"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-px bg-neutral-100 rounded-xl overflow-hidden border border-neutral-100">
+            {WEEKDAY_LABELS.map((w) => (
+              <div key={w} className="bg-neutral-50 text-center text-[11px] font-medium text-neutral-500 py-2">
+                {w}
+              </div>
+            ))}
+            {monthGrid.map(({ date, inMonth }) => {
+              const key = ymd(date);
+              const dayEvents = eventsByDay[key] || [];
+              const isToday = key === ymd(new Date());
+              return (
+                <div
+                  key={key}
+                  className={`bg-white min-h-[92px] p-1.5 ${inMonth ? "" : "bg-neutral-50/60"}`}
+                >
+                  <span
+                    className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] ${
+                      isToday ? "text-white" : inMonth ? "text-neutral-700" : "text-neutral-300"
+                    }`}
+                    style={isToday ? { backgroundColor: "#E05A2B" } : {}}
+                  >
+                    {date.getDate()}
+                  </span>
+                  <div className="mt-1 space-y-1">
+                    {dayEvents.slice(0, 3).map((ev, i) => (
+                      <button
+                        key={`${ev.id}-${ev.eventType}-${i}`}
+                        onClick={() => openEdit(ev)}
+                        title={`${ev.assignment_name} - ${batchName(ev.batch_id)} (${ev.eventType === "due" ? "due" : "appears"})`}
+                        className="w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded-md truncate hover:opacity-80 transition-opacity"
+                        style={{
+                          backgroundColor: ev.eventType === "due" ? "#FEE2E2" : "#FFF3E0",
+                          color: ev.eventType === "due" ? "#B91C1C" : "#B45309",
+                        }}
+                      >
+                        {ev.eventType === "due" ? "Due: " : "Starts: "}
+                        {ev.assignment_name}
+                      </button>
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <p className="text-[10px] text-neutral-400 px-1.5">+{dayEvents.length - 3} more</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-4 mt-4 text-xs text-neutral-500">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#FFF3E0", border: "1px solid #B45309" }} />
+              Appears
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#FEE2E2", border: "1px solid #B91C1C" }} />
+              Due
+            </span>
+          </div>
         </Card>
       )}
 
