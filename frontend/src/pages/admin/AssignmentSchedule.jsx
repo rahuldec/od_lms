@@ -374,11 +374,11 @@ export default function AssignmentSchedule() {
                         key={ev.id}
                         onClick={() => openEdit(ev)}
                         title={`${ev.assignment_name} - ${batchName(ev.batch_id)}`}
-                        className="w-full text-left text-xs leading-snug px-2 py-1.5 rounded-lg truncate hover:opacity-80 hover:scale-[1.03] active:scale-95 transition-all duration-150"
+                        className="w-full text-left px-2 py-1.5 rounded-lg hover:opacity-80 hover:scale-[1.02] active:scale-95 transition-all duration-150"
                         style={{ backgroundColor: "#FFF3E0", color: "#B45309" }}
                       >
-                        <span className="font-medium">{ev.assignment_name}</span>
-                        <span className="opacity-70"> &middot; {batchName(ev.batch_id)}</span>
+                        <p className="text-xs font-medium leading-snug truncate">{ev.assignment_name}</p>
+                        <p className="text-[11px] leading-snug truncate opacity-70">{batchName(ev.batch_id)}</p>
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
