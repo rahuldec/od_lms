@@ -39,11 +39,11 @@ const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
-  { to: "/admin/resources", label: "Resources", testId: "nav-resources" },
-  { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules" },
-  { to: "/admin/webinars", label: "Webinars", testId: "nav-webinars" },
-  { to: "/admin/assignment-schedule", label: "Assignment Schedule", testId: "nav-assignment-schedule" },
-  { to: "/admin/results", label: "Results", testId: "nav-results" },
+  { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
+  { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
+  { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
+  { to: "/admin/webinars", label: "Webinars", testId: "nav-webinars", group: "Content" },
+  { to: "/admin/results", label: "Results", testId: "nav-results", group: "Content" },
 ];
 
 const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
