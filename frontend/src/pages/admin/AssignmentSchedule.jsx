@@ -46,7 +46,7 @@ const navItems = [
 
 const errMsg = (e) => e?.response?.data?.detail || e?.message || "Operation failed";
 
-const emptyForm = { batch_id: "", assignment_name: "", visible_from: "", due_date: "", notes: "" };
+const emptyForm = { batch_id: "", assignment_name: "", visible_from: "", notes: "" };
 
 // datetime-local input needs "YYYY-MM-DDTHH:mm"; Postgres gives back a full
 // ISO string with timezone, so trim it down for the input, and expand it
@@ -61,9 +61,7 @@ const toLocalInputValue = (iso) => {
 function statusFor(schedule) {
   const now = new Date();
   const visibleFrom = new Date(schedule.visible_from);
-  const dueDate = new Date(schedule.due_date);
   if (now < visibleFrom) return { label: "Scheduled", bg: "#FFF3E0", fg: "#B45309" };
-  if (now > dueDate) return { label: "Past due", bg: "#FEE2E2", fg: "#B91C1C" };
   return { label: "Live", bg: "#E1F5EE", fg: "#085041" };
 }
 
@@ -104,7 +102,7 @@ export default function AssignmentSchedule() {
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const [view, setView] = useState("list"); // "list" | "calendar"
+  const [view, setView] = useState("calendar"); // "calendar" | "list"
   const [month, setMonth] = useState(() => {
     const d = new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -139,22 +137,26 @@ export default function AssignmentSchedule() {
 
   const monthGrid = useMemo(() => buildMonthGrid(month), [month]);
 
-  // Each schedule shows up on two days: the day it appears (orange dot)
-  // and the day it's due (red dot). Same-day schedules get both dots.
   const eventsByDay = useMemo(() => {
     const map = {};
     for (const s of schedules) {
-      const appearsKey = ymd(new Date(s.visible_from));
-      const dueKey = ymd(new Date(s.due_date));
-      (map[appearsKey] ||= []).push({ ...s, eventType: "appears" });
-      (map[dueKey] ||= []).push({ ...s, eventType: "due" });
+      const key = ymd(new Date(s.visible_from));
+      (map[key] ||= []).push(s);
     }
     return map;
   }, [schedules]);
 
-  const openCreate = () => {
+  // `presetDate` lets the calendar's "+" button pre-fill which day this
+  // new schedule should appear on, defaulting to 9 AM that day.
+  const openCreate = (presetDate) => {
     setEditing(null);
-    setForm(emptyForm);
+    if (presetDate) {
+      const d = new Date(presetDate);
+      d.setHours(9, 0, 0, 0);
+      setForm({ ...emptyForm, visible_from: toLocalInputValue(d.toISOString()) });
+    } else {
+      setForm(emptyForm);
+    }
     setModalOpen(true);
   };
 
@@ -164,7 +166,6 @@ export default function AssignmentSchedule() {
       batch_id: s.batch_id,
       assignment_name: s.assignment_name,
       visible_from: toLocalInputValue(s.visible_from),
-      due_date: (s.due_date || "").slice(0, 10),
       notes: s.notes || "",
     });
     setModalOpen(true);
@@ -175,14 +176,17 @@ export default function AssignmentSchedule() {
     if (!form.batch_id) { toast.error("Pick a batch"); return; }
     if (!form.assignment_name) { toast.error("Pick an assignment"); return; }
     if (!form.visible_from) { toast.error("Set when it should appear"); return; }
-    if (!form.due_date) { toast.error("Set a due date"); return; }
     setSaving(true);
     try {
+      const visibleFromIso = new Date(form.visible_from).toISOString();
       const payload = {
         batch_id: form.batch_id,
         assignment_name: form.assignment_name,
-        visible_from: new Date(form.visible_from).toISOString(),
-        due_date: form.due_date,
+        visible_from: visibleFromIso,
+        // The backend column is still required (not null) - since there's
+        // no separate due date anymore, we just mirror the appears-on date
+        // so nothing breaks without a schema change.
+        due_date: visibleFromIso.slice(0, 10),
         notes: form.notes,
       };
       if (editing) {
@@ -220,19 +224,11 @@ export default function AssignmentSchedule() {
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Content</p>
           <h1 className="text-3xl font-semibold tracking-tight mt-1">Assignment Schedule</h1>
           <p className="text-neutral-500 mt-1 text-sm">
-            Pick a batch and an assignment, set when it appears and when it's due.
+            Pick a batch and an assignment, set when it appears.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-neutral-100 rounded-full p-1">
-            <button
-              onClick={() => setView("list")}
-              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
-                view === "list" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" /> List
-            </button>
             <button
               onClick={() => setView("calendar")}
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
@@ -241,8 +237,16 @@ export default function AssignmentSchedule() {
             >
               <CalendarIcon className="h-3.5 w-3.5" /> Calendar
             </button>
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${
+                view === "list" ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+              }`}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
           </div>
-          <Button onClick={openCreate} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
+          <Button onClick={() => openCreate()} className="rounded-full text-white" style={{ backgroundColor: "#E05A2B" }}>
             <Plus className="h-4 w-4 mr-1.5" /> Schedule assignment
           </Button>
         </div>
@@ -252,54 +256,54 @@ export default function AssignmentSchedule() {
         <p className="text-neutral-500 text-sm">Loading...</p>
       ) : view === "list" ? (
         sorted.length === 0 ? (
-        <Card className="rounded-2xl border-neutral-200/80 p-10 text-center">
-          <CalendarClock className="h-6 w-6 mx-auto text-neutral-300 mb-2" />
-          <p className="text-neutral-500 text-sm">Nothing scheduled yet.</p>
-        </Card>
-      ) : (
-        <Card className="rounded-2xl border-neutral-200/80 overflow-hidden">
-          <ul className="divide-y divide-neutral-100">
-            {sorted.map((s) => {
-              const status = statusFor(s);
-              return (
-                <li key={s.id} className="px-5 py-4 flex items-center gap-3.5 group">
-                  <div
-                    className="h-9 w-9 rounded-full grid place-items-center flex-shrink-0"
-                    style={{ backgroundColor: status.bg }}
-                  >
-                    <CalendarClock className="h-4 w-4" style={{ color: status.fg }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 truncate">
-                      {s.assignment_name} <span className="text-neutral-400 font-normal">&middot; {batchName(s.batch_id)}</span>
-                    </p>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Appears {new Date(s.visible_from).toLocaleString()} &middot; Due {new Date(s.due_date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <span
-                    className="text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: status.bg, color: status.fg }}
-                  >
-                    {status.label}
-                  </span>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(s)} className="rounded-full h-7 w-7">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="icon" variant="ghost"
-                      onClick={() => setConfirmDelete(s)}
-                      className="rounded-full h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+          <Card className="rounded-2xl border-neutral-200/80 p-10 text-center">
+            <CalendarClock className="h-6 w-6 mx-auto text-neutral-300 mb-2" />
+            <p className="text-neutral-500 text-sm">Nothing scheduled yet.</p>
+          </Card>
+        ) : (
+          <Card className="rounded-2xl border-neutral-200/80 overflow-hidden">
+            <ul className="divide-y divide-neutral-100">
+              {sorted.map((s) => {
+                const status = statusFor(s);
+                return (
+                  <li key={s.id} className="px-5 py-4 flex items-center gap-3.5 group">
+                    <div
+                      className="h-9 w-9 rounded-full grid place-items-center flex-shrink-0"
+                      style={{ backgroundColor: status.bg }}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
+                      <CalendarClock className="h-4 w-4" style={{ color: status.fg }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-neutral-900 truncate">
+                        {s.assignment_name} <span className="text-neutral-400 font-normal">&middot; {batchName(s.batch_id)}</span>
+                      </p>
+                      <p className="text-xs text-neutral-500 mt-0.5">
+                        Appears {new Date(s.visible_from).toLocaleString()}
+                      </p>
+                    </div>
+                    <span
+                      className="text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: status.bg, color: status.fg }}
+                    >
+                      {status.label}
+                    </span>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <Button size="icon" variant="ghost" onClick={() => openEdit(s)} className="rounded-full h-7 w-7">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon" variant="ghost"
+                        onClick={() => setConfirmDelete(s)}
+                        className="rounded-full h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
         )
       ) : (
         <Card className="rounded-2xl border-neutral-200/80 p-5">
@@ -345,29 +349,34 @@ export default function AssignmentSchedule() {
               return (
                 <div
                   key={key}
-                  className={`bg-white min-h-[92px] p-1.5 ${inMonth ? "" : "bg-neutral-50/60"}`}
+                  className={`bg-white min-h-[92px] p-1.5 group/cell relative ${inMonth ? "" : "bg-neutral-50/60"}`}
                 >
-                  <span
-                    className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] ${
-                      isToday ? "text-white" : inMonth ? "text-neutral-700" : "text-neutral-300"
-                    }`}
-                    style={isToday ? { backgroundColor: "#E05A2B" } : {}}
-                  >
-                    {date.getDate()}
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] ${
+                        isToday ? "text-white" : inMonth ? "text-neutral-700" : "text-neutral-300"
+                      }`}
+                      style={isToday ? { backgroundColor: "#E05A2B" } : {}}
+                    >
+                      {date.getDate()}
+                    </span>
+                    <button
+                      onClick={() => openCreate(date)}
+                      title="Schedule assignment on this day"
+                      className="h-5 w-5 rounded-full grid place-items-center text-neutral-400 opacity-0 group-hover/cell:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 transition-opacity flex-shrink-0"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                   <div className="mt-1 space-y-1">
-                    {dayEvents.slice(0, 3).map((ev, i) => (
+                    {dayEvents.slice(0, 3).map((ev) => (
                       <button
-                        key={`${ev.id}-${ev.eventType}-${i}`}
+                        key={ev.id}
                         onClick={() => openEdit(ev)}
-                        title={`${ev.assignment_name} - ${batchName(ev.batch_id)} (${ev.eventType === "due" ? "due" : "appears"})`}
+                        title={`${ev.assignment_name} - ${batchName(ev.batch_id)}`}
                         className="w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded-md truncate hover:opacity-80 transition-opacity"
-                        style={{
-                          backgroundColor: ev.eventType === "due" ? "#FEE2E2" : "#FFF3E0",
-                          color: ev.eventType === "due" ? "#B91C1C" : "#B45309",
-                        }}
+                        style={{ backgroundColor: "#FFF3E0", color: "#B45309" }}
                       >
-                        {ev.eventType === "due" ? "Due: " : "Starts: "}
                         {ev.assignment_name}
                       </button>
                     ))}
@@ -379,17 +388,6 @@ export default function AssignmentSchedule() {
               );
             })}
           </div>
-
-          <div className="flex items-center gap-4 mt-4 text-xs text-neutral-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#FFF3E0", border: "1px solid #B45309" }} />
-              Appears
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: "#FEE2E2", border: "1px solid #B91C1C" }} />
-              Due
-            </span>
-          </div>
         </Card>
       )}
 
@@ -398,7 +396,7 @@ export default function AssignmentSchedule() {
           <DialogHeader>
             <DialogTitle>{editing ? "Edit schedule" : "Schedule assignment"}</DialogTitle>
             <DialogDescription>
-              {editing ? "Update this assignment's timing." : "Pick a batch and assignment, then set the timing."}
+              {editing ? "Update this assignment's timing." : "Pick a batch and assignment, then set when it appears."}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="space-y-4">
@@ -428,25 +426,14 @@ export default function AssignmentSchedule() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-neutral-600">Appears on</Label>
-                <Input
-                  type="datetime-local"
-                  value={form.visible_from}
-                  onChange={(e) => setForm({ ...form, visible_from: e.target.value })}
-                  className="h-10 rounded-xl mt-1"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-neutral-600">Due date</Label>
-                <Input
-                  type="date"
-                  value={form.due_date}
-                  onChange={(e) => setForm({ ...form, due_date: e.target.value })}
-                  className="h-10 rounded-xl mt-1"
-                />
-              </div>
+            <div>
+              <Label className="text-xs text-neutral-600">Appears on</Label>
+              <Input
+                type="datetime-local"
+                value={form.visible_from}
+                onChange={(e) => setForm({ ...form, visible_from: e.target.value })}
+                className="h-10 rounded-xl mt-1"
+              />
             </div>
             <div>
               <Label className="text-xs text-neutral-600">Notes <span className="text-neutral-400">(optional)</span></Label>
