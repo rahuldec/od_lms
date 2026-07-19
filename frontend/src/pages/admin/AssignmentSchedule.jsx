@@ -306,39 +306,39 @@ export default function AssignmentSchedule() {
           </Card>
         )
       ) : (
-        <Card className="rounded-2xl border-neutral-200/80 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-neutral-900">
+        <Card className="rounded-3xl border-neutral-200/80 p-7">
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-2xl font-semibold tracking-tight text-neutral-900">
               {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
             </p>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               <Button
                 size="icon" variant="ghost"
                 onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-                className="rounded-full h-8 w-8"
+                className="rounded-full h-10 w-10"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-5 w-5" />
               </Button>
               <Button
                 size="sm" variant="ghost"
                 onClick={() => setMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}
-                className="rounded-full h-8 text-xs px-3"
+                className="rounded-full h-10 text-sm px-4"
               >
                 Today
               </Button>
               <Button
                 size="icon" variant="ghost"
                 onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-                className="rounded-full h-8 w-8"
+                className="rounded-full h-10 w-10"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-5 w-5" />
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-neutral-100 rounded-xl overflow-hidden border border-neutral-100">
+          <div className="grid grid-cols-7 gap-px bg-neutral-100 rounded-2xl overflow-hidden border border-neutral-100">
             {WEEKDAY_LABELS.map((w) => (
-              <div key={w} className="bg-neutral-50 text-center text-[11px] font-medium text-neutral-500 py-2">
+              <div key={w} className="bg-neutral-50 text-center text-xs font-semibold uppercase tracking-wide text-neutral-500 py-3.5">
                 {w}
               </div>
             ))}
@@ -349,11 +349,11 @@ export default function AssignmentSchedule() {
               return (
                 <div
                   key={key}
-                  className={`bg-white min-h-[92px] p-1.5 group/cell relative ${inMonth ? "" : "bg-neutral-50/60"}`}
+                  className={`bg-white min-h-[150px] p-2.5 group/cell relative ${inMonth ? "" : "bg-neutral-50/60"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className={`inline-flex items-center justify-center h-5 w-5 rounded-full text-[11px] ${
+                      className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-medium ${
                         isToday ? "text-white" : inMonth ? "text-neutral-700" : "text-neutral-300"
                       }`}
                       style={isToday ? { backgroundColor: "#E05A2B" } : {}}
@@ -363,18 +363,18 @@ export default function AssignmentSchedule() {
                     <button
                       onClick={() => openCreate(date)}
                       title="Schedule assignment on this day"
-                      className="h-5 w-5 rounded-full grid place-items-center text-neutral-400 opacity-0 group-hover/cell:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 transition-opacity flex-shrink-0"
+                      className="h-7 w-7 rounded-full grid place-items-center text-neutral-400 opacity-0 group-hover/cell:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 transition-opacity flex-shrink-0"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Plus className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="mt-1 space-y-1">
+                  <div className="mt-2 space-y-1.5">
                     {dayEvents.slice(0, 3).map((ev) => (
                       <button
                         key={ev.id}
                         onClick={() => openEdit(ev)}
                         title={`${ev.assignment_name} - ${batchName(ev.batch_id)}`}
-                        className="w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded-md truncate hover:opacity-80 hover:scale-[1.03] active:scale-95 transition-all duration-150"
+                        className="w-full text-left text-xs leading-snug px-2 py-1.5 rounded-lg truncate hover:opacity-80 hover:scale-[1.03] active:scale-95 transition-all duration-150"
                         style={{ backgroundColor: "#FFF3E0", color: "#B45309" }}
                       >
                         <span className="font-medium">{ev.assignment_name}</span>
@@ -382,7 +382,7 @@ export default function AssignmentSchedule() {
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
-                      <p className="text-[10px] text-neutral-400 px-1.5">+{dayEvents.length - 3} more</p>
+                      <p className="text-xs text-neutral-400 px-2">+{dayEvents.length - 3} more</p>
                     )}
                   </div>
                 </div>
