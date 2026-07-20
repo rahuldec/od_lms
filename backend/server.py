@@ -11,6 +11,8 @@ import os
 import logging
 import httpx
 import re
+import csv
+import io
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -40,7 +42,7 @@ ZOHO_REPORTS = {
     # is in place - it's a live GET to whatever's here.
     "Attendance Module": "PENDING_ZOHO_URL",
     "Academic Module": "PENDING_ZOHO_URL",
-    "Admission Module": "PENDING_ZOHO_URL",
+    "Admission Module": "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVLCtO6rf5tG-E6AuD-zQrkdS4wRBMVyXPqdgHLzSrCunJgPvMHHZFpCGaWf11BAt_EikIxhDx2boc/pub?gid=0&single=true&output=csv",
     "HR Module": "PENDING_ZOHO_URL",
     "Library Module": "PENDING_ZOHO_URL",
 }
@@ -156,29 +158,37 @@ async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[
             logger.warning(f"Zoho report fetch failed: status {r.status_code}")
             return None
 
-        html = r.text
-        th_matches = re.findall(r'<th[^>]*>(.*?)</th>', html, re.IGNORECASE | re.DOTALL)
-        headers_clean = [re.sub(r'<[^>]+>', '', h).strip() for h in th_matches]
+        body_text = r.text
+        content_type = r.headers.get("content-type", "").lower()
+        looks_like_html = "html" in content_type or body_text.lstrip().startswith("<")
+
+        if looks_like_html:
+            rows = _extract_rows_from_html(body_text)
+        else:
+            rows = _extract_rows_from_csv(body_text)
+
+        if not rows:
+            logger.warning(f"Could not parse any rows from report source for '{assignment_name}'")
+            return None
+
+        headers_clean, data_rows = rows[0], rows[1:]
 
         name_idx = None
         score_idx = None
         for i, h in enumerate(headers_clean):
-            if h.lower() == "name":
+            if h.strip().lower() == "name":
                 name_idx = i
             if "overall score" in h.lower() or "score" in h.lower():
                 score_idx = i
 
         if name_idx is None or score_idx is None:
-            logger.warning("Could not find Name/Score columns in Zoho report headers")
+            logger.warning(f"Could not find Name/Score columns in report headers for '{assignment_name}'")
             return None
 
-        tr_matches = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.IGNORECASE | re.DOTALL)
-        for row in tr_matches:
-            td_matches = re.findall(r'<td[^>]*>(.*?)</td>', row, re.IGNORECASE | re.DOTALL)
-            cells = [re.sub(r'<[^>]+>', '', td).strip() for td in td_matches]
+        target_name = trainee_name.strip().lower()
+        for cells in data_rows:
             if len(cells) > max(name_idx, score_idx):
                 cell_name = cells[name_idx].strip().lower()
-                target_name = trainee_name.strip().lower()
                 if cell_name == target_name or cell_name.startswith(target_name.split()[0].lower()):
                     raw_score = cells[score_idx].strip()
                     try:
@@ -192,6 +202,27 @@ async def fetch_zoho_score(assignment_name: str, trainee_name: str) -> Optional[
     except Exception as e:
         logger.error(f"Zoho fetch error: {e}")
         return None
+
+
+def _extract_rows_from_html(html: str) -> List[List[str]]:
+    """Parse a Zoho-style HTML report table into a list of rows (header row first)."""
+    rows: List[List[str]] = []
+    th_matches = re.findall(r'<th[^>]*>(.*?)</th>', html, re.IGNORECASE | re.DOTALL)
+    if th_matches:
+        rows.append([re.sub(r'<[^>]+>', '', h).strip() for h in th_matches])
+
+    tr_matches = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.IGNORECASE | re.DOTALL)
+    for row in tr_matches:
+        td_matches = re.findall(r'<td[^>]*>(.*?)</td>', row, re.IGNORECASE | re.DOTALL)
+        if td_matches:
+            rows.append([re.sub(r'<[^>]+>', '', td).strip() for td in td_matches])
+    return rows
+
+
+def _extract_rows_from_csv(text: str) -> List[List[str]]:
+    """Parse a CSV report (e.g. a published Google Sheet) into a list of rows (header row first)."""
+    reader = csv.reader(io.StringIO(text))
+    return [row for row in reader if row]
 
 
 # ---------- models ----------
