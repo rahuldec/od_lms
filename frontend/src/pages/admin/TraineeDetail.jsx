@@ -51,6 +51,10 @@ const ASSIGNMENTS = [
     name: "Attendance",
     csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPHkFJjJ8CF7lXGPPNS1dAWpQwAVJ_EyIx-_afkvkSFZ0ggkowqwvuFkDOCzTlJfRx04Kf86RlOTo7/pub?output=csv",
   },
+  {
+    name: "Admission Module",
+    csvUrl: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVLCtO6rf5tG-E6AuD-zQrkdS4wRBMVyXPqdgHLzSrCunJgPvMHHZFpCGaWf11BAt_EikIxhDx2boc/pub?gid=0&single=true&output=csv",
+  },
 ];
 
 // Case-insensitive lookup of the first candidate column name that actually

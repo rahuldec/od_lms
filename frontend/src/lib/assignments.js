@@ -111,6 +111,34 @@ export const ASSIGNMENTS = [
       "Can we schedule time table wise attendance in school?",
     ],
   },
+  {
+    id: "admission",
+    name: "Admission Module",
+    csvUrl:
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVLCtO6rf5tG-E6AuD-zQrkdS4wRBMVyXPqdgHLzSrCunJgPvMHHZFpCGaWf11BAt_EikIxhDx2boc/pub?gid=0&single=true&output=csv",
+    scoreCol: "Overall Score",
+    linkCol: "Link",
+    nameCol: "Name",
+    totalMarks: 15,
+    passThreshold: 9,
+    questions: [
+      "What do you understand by Transaction Receipt setup?",
+      "What is a source and where is it created?",
+      "Need to check the leads with Engaged Status having follow up as incomplete, how can the use check those leads?",
+      "Can we Update Stage of any Application using Excel?",
+      "User wants to send all applications of College Dunia to a single Counsellor for a specific course, explain the process.",
+      "Is it required to set Transaction mapping in Stages? If yes, then why? If not, then why not?",
+      "Is it necessary to set Positive and Negative Labels for Tags in Admission?",
+      "There is a Tag named as \"REJECTED\" but while selecting it, it is asking for follow up. Why so?",
+      "We have  a Call Received in the Admission Leads logs Page, but the same is not visible what could be the possible reason.",
+      "How is Token Money different from other heads of Admission? Also, what happens to the amount collected under the Token Money?",
+      "Can a Counsellor transfer his Application to another Counsellor? If yes, then how?",
+      "A counsellor added a follow-up for 16 Jul, but cannot find the application in his window. What could be the reason, and how would you resolve or explain it?",
+      "Can we add an Application with the same mobile number in the Admission Module?",
+      "Can we add multiple Transaction Heads in one Admission Stage?",
+      "User wants to collect zero amount in Transaction but he is not able to do so, as system is giving error please select a valid amount. Explain Reason and Solution."
+    ],
+  },
 ];
 
 // Case-insensitive lookup of the first candidate column name that actually
