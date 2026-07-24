@@ -339,6 +339,7 @@ class AssignmentScheduleIn(BaseModel):
     visible_from: str  # ISO datetime - when it appears to the batch
     due_date: str  # ISO date - deadline
     notes: Optional[str] = ""
+    host_name: Optional[str] = None
 
 
 class AssignmentScheduleUpdate(BaseModel):
@@ -347,6 +348,7 @@ class AssignmentScheduleUpdate(BaseModel):
     visible_from: Optional[str] = None
     due_date: Optional[str] = None
     notes: Optional[str] = None
+    host_name: Optional[str] = None
 
 
 class TrainingModuleIn(BaseModel):
@@ -1055,6 +1057,7 @@ async def create_assignment_schedule(body: AssignmentScheduleIn, _=Depends(requi
                 "visible_from": body.visible_from,
                 "due_date": body.due_date,
                 "notes": body.notes or "",
+                "host_name": body.host_name,
             },
         )
     if r.status_code not in (200, 201):

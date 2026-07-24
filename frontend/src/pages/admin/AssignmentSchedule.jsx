@@ -46,7 +46,7 @@ const navItems = [
 
 const errMsg = (e) => e?.response?.data?.detail || e?.message || "Operation failed";
 
-const emptyForm = { batch_id: "", assignment_name: "", visible_from: "", notes: "" };
+const emptyForm = { batch_id: "", assignment_name: "", visible_from: "", notes: "", host_name: "" };
 
 // datetime-local input needs "YYYY-MM-DDTHH:mm"; Postgres gives back a full
 // ISO string with timezone, so trim it down for the input, and expand it
@@ -167,6 +167,7 @@ export default function AssignmentSchedule() {
       assignment_name: s.assignment_name,
       visible_from: toLocalInputValue(s.visible_from),
       notes: s.notes || "",
+      host_name: s.host_name || "",
     });
     setModalOpen(true);
   };
@@ -188,6 +189,7 @@ export default function AssignmentSchedule() {
         // so nothing breaks without a schema change.
         due_date: visibleFromIso.slice(0, 10),
         notes: form.notes,
+        host_name: form.host_name || null,
       };
       if (editing) {
         await api.updateAssignmentSchedule(editing.id, payload);
@@ -276,6 +278,7 @@ export default function AssignmentSchedule() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-neutral-900 truncate">
                         {s.assignment_name} <span className="text-neutral-400 font-normal">&middot; {batchName(s.batch_id)}</span>
+                        {s.host_name && <span className="text-neutral-400 font-normal"> &middot; Host: {s.host_name}</span>}
                       </p>
                       <p className="text-xs text-neutral-500 mt-0.5">
                         Appears {new Date(s.visible_from).toLocaleString()}
@@ -379,6 +382,12 @@ export default function AssignmentSchedule() {
                       >
                         <p className="text-xs font-medium leading-snug truncate">{ev.assignment_name}</p>
                         <p className="text-[11px] leading-snug truncate opacity-70">{batchName(ev.batch_id)}</p>
+                        {ev.host_name && (
+                          <p className="text-[10px] leading-snug truncate opacity-70 font-medium mt-0.5">Host: {ev.host_name}</p>
+                        )}
+                        {ev.notes && (
+                          <p className="text-[10px] leading-snug truncate opacity-70 italic mt-0.5">{ev.notes}</p>
+                        )}
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
@@ -443,6 +452,15 @@ export default function AssignmentSchedule() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 className="h-10 rounded-xl mt-1"
                 placeholder="Anything trainees or staff should know"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-neutral-600">Host Name <span className="text-neutral-400">(optional)</span></Label>
+              <Input
+                value={form.host_name}
+                onChange={(e) => setForm({ ...form, host_name: e.target.value })}
+                className="h-10 rounded-xl mt-1"
+                placeholder="Name of the host"
               />
             </div>
             <DialogFooter className={editing ? "sm:justify-between" : ""}>
