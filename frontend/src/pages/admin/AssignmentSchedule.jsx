@@ -352,12 +352,12 @@ export default function AssignmentSchedule() {
               return (
                 <div
                   key={key}
-                  className={`bg-white min-h-[150px] p-2.5 group/cell relative ${inMonth ? "" : "bg-neutral-50/60"}`}
+                  className={`bg-white min-h-[180px] p-3 group/cell relative ${inMonth ? "" : "bg-neutral-50/60"}`}
                 >
                   <div className="flex items-center justify-between">
                     <span
-                      className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-sm font-medium ${
-                        isToday ? "text-white" : inMonth ? "text-neutral-700" : "text-neutral-300"
+                      className={`inline-flex items-center justify-center h-8 w-8 rounded-full text-sm font-medium ${
+                        isToday ? "text-white shadow-md" : inMonth ? "text-neutral-700" : "text-neutral-300"
                       }`}
                       style={isToday ? { backgroundColor: "#E05A2B" } : {}}
                     >
@@ -366,32 +366,34 @@ export default function AssignmentSchedule() {
                     <button
                       onClick={() => openCreate(date)}
                       title="Schedule assignment on this day"
-                      className="h-7 w-7 rounded-full grid place-items-center text-neutral-400 opacity-0 group-hover/cell:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 transition-opacity flex-shrink-0"
+                      className="h-8 w-8 rounded-full grid place-items-center text-neutral-400 opacity-0 group-hover/cell:opacity-100 hover:bg-neutral-100 hover:text-neutral-700 transition-opacity flex-shrink-0"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
                   </div>
-                  <div className="mt-2 space-y-1.5">
+                  <div className="mt-3 space-y-2">
                     {dayEvents.slice(0, 3).map((ev) => (
                       <button
                         key={ev.id}
                         onClick={() => openEdit(ev)}
                         title={`${ev.assignment_name} - ${batchName(ev.batch_id)}`}
-                        className="w-full text-left px-2 py-1.5 rounded-lg hover:opacity-80 hover:scale-[1.02] active:scale-95 transition-all duration-150"
-                        style={{ backgroundColor: "#FFF3E0", color: "#B45309" }}
+                        className="w-full text-left px-3 py-2.5 rounded-xl hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all duration-150 border shadow-sm"
+                        style={{ backgroundColor: "#FFF8ED", borderColor: "#FDE6C8", color: "#9A4000" }}
                       >
-                        <p className="text-xs font-medium leading-snug truncate">{ev.assignment_name}</p>
-                        <p className="text-[11px] leading-snug truncate opacity-70">{batchName(ev.batch_id)}</p>
+                        <p className="text-sm font-semibold leading-snug truncate">{ev.assignment_name}</p>
+                        <p className="text-xs leading-snug truncate opacity-80 mt-0.5">{batchName(ev.batch_id)}</p>
                         {ev.host_name && (
-                          <p className="text-[10px] leading-snug truncate opacity-70 font-medium mt-0.5">Host: {ev.host_name}</p>
+                          <p className="text-xs leading-snug truncate opacity-90 font-medium mt-1.5 flex items-center gap-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-orange-400"></span> {ev.host_name}
+                          </p>
                         )}
                         {ev.notes && (
-                          <p className="text-[10px] leading-snug truncate opacity-70 italic mt-0.5">{ev.notes}</p>
+                          <p className="text-xs leading-relaxed opacity-75 italic mt-1 line-clamp-2">{ev.notes}</p>
                         )}
                       </button>
                     ))}
                     {dayEvents.length > 3 && (
-                      <p className="text-xs text-neutral-400 px-2">+{dayEvents.length - 3} more</p>
+                      <p className="text-xs font-medium text-neutral-400 px-2 py-1 bg-neutral-100 rounded-md w-fit">+{dayEvents.length - 3} more</p>
                     )}
                   </div>
                 </div>
