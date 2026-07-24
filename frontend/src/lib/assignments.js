@@ -153,7 +153,12 @@ const resolveColumn = (row, candidates) => {
   return null;
 };
 
-export const fetchAllAssignmentResults = async () => {
+const CACHE_TTL_MS = 5 * 60 * 1000;
+let cacheData = null;
+let cacheFetchedAt = 0;
+let inFlightRequest = null;
+
+const fetchAllAssignmentResultsUncached = async () => {
   const results = {};
   await Promise.all(
     ASSIGNMENTS.map(async (assignment) => {
@@ -196,4 +201,22 @@ export const fetchAllAssignmentResults = async () => {
     })
   );
   return results;
+};
+
+export const fetchAllAssignmentResults = async ({ force = false } = {}) => {
+  const isFresh = cacheData && Date.now() - cacheFetchedAt < CACHE_TTL_MS;
+  if (isFresh && !force) return cacheData;
+  if (inFlightRequest) return inFlightRequest;
+
+  inFlightRequest = fetchAllAssignmentResultsUncached()
+    .then((results) => {
+      cacheData = results;
+      cacheFetchedAt = Date.now();
+      return results;
+    })
+    .finally(() => {
+      inFlightRequest = null;
+    });
+
+  return inFlightRequest;
 };

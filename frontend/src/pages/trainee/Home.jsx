@@ -110,13 +110,16 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const mods = await fetchSheetModules();
+        const [mods, allResults, publishedResults, _] = await Promise.all([
+          fetchSheetModules(),
+          fetchAllAssignmentResults().catch(() => ({})),
+          api.listResults().catch(() => []),
+          reloadProgress(),
+        ]);
+        
         setModules(mods);
-        await reloadProgress();
-        const allResults = await fetchAllAssignmentResults().catch(() => ({}));
         const key = (trainee.name || "").trim().toLowerCase();
         setAssignments(allResults[key] || []);
-        const publishedResults = await api.listResults().catch(() => []);
         setResults(Array.isArray(publishedResults) ? publishedResults : []);
       } catch (e) {
         toast.error("Could not load training content");
