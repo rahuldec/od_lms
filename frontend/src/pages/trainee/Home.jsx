@@ -211,6 +211,11 @@ export default function TraineeHome() {
             Since {trainee.level_since_date}
           </p>
         )}
+        {trainee.join_date && (
+          <p className="text-sm font-medium text-neutral-500 mt-2">
+            Day {Math.max(0, Math.floor((new Date() - new Date(trainee.join_date)) / (1000 * 60 * 60 * 24)))} of your journey
+          </p>
+        )}
         <p className="text-neutral-500 mt-2 max-w-xl">
           Your Okie Dokie ERP training program - modules, video lessons and assignments, all in one place.
         </p>
