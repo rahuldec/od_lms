@@ -12,6 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, CalendarClock, List, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, CalendarClock, List, Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, X } from "lucide-react";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -46,7 +49,7 @@ const navItems = [
 
 const errMsg = (e) => e?.response?.data?.detail || e?.message || "Operation failed";
 
-const emptyForm = { batch_id: "", assignment_name: "", visible_from: "", notes: "", host_name: "" };
+const emptyForm = { batch_id: "", batch_ids: [], assignment_name: "", visible_from: "", notes: "", host_name: "" };
 
 // datetime-local input needs "YYYY-MM-DDTHH:mm"; Postgres gives back a full
 // ISO string with timezone, so trim it down for the input, and expand it
@@ -164,6 +167,7 @@ export default function AssignmentSchedule() {
     setEditing(s);
     setForm({
       batch_id: s.batch_id,
+      batch_ids: [],
       assignment_name: s.assignment_name,
       visible_from: toLocalInputValue(s.visible_from),
       notes: s.notes || "",
@@ -174,14 +178,14 @@ export default function AssignmentSchedule() {
 
   const save = async (e) => {
     e?.preventDefault?.();
-    if (!form.batch_id) { toast.error("Pick a batch"); return; }
+    if (!editing && form.batch_ids.length === 0) { toast.error("Pick at least one batch"); return; }
+    if (editing && !form.batch_id) { toast.error("Pick a batch"); return; }
     if (!form.assignment_name) { toast.error("Pick an assignment"); return; }
     if (!form.visible_from) { toast.error("Set when it should appear"); return; }
     setSaving(true);
     try {
       const visibleFromIso = new Date(form.visible_from).toISOString();
-      const payload = {
-        batch_id: form.batch_id,
+      const base = {
         assignment_name: form.assignment_name,
         visible_from: visibleFromIso,
         // The backend column is still required (not null) - since there's
@@ -192,11 +196,13 @@ export default function AssignmentSchedule() {
         host_name: form.host_name || null,
       };
       if (editing) {
-        await api.updateAssignmentSchedule(editing.id, payload);
+        await api.updateAssignmentSchedule(editing.id, { ...base, batch_id: form.batch_id });
         toast.success("Schedule updated");
       } else {
-        await api.createAssignmentSchedule(payload);
-        toast.success("Assignment scheduled");
+        // One schedule row per selected batch - the backend only accepts a
+        // single batch_id per row, so fan out the create call.
+        await Promise.all(form.batch_ids.map((batchId) => api.createAssignmentSchedule({ ...base, batch_id: batchId })));
+        toast.success(form.batch_ids.length > 1 ? `Scheduled for ${form.batch_ids.length} batches` : "Assignment scheduled");
       }
       setModalOpen(false);
       await load();
@@ -414,16 +420,78 @@ export default function AssignmentSchedule() {
           <form onSubmit={save} className="space-y-4">
             <div>
               <Label className="text-xs text-neutral-600">Batch</Label>
-              <Select value={form.batch_id} onValueChange={(v) => setForm({ ...form, batch_id: v })}>
-                <SelectTrigger className="h-10 rounded-xl mt-1">
-                  <SelectValue placeholder="Select a batch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {batches.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+              {editing ? (
+                <Select value={form.batch_id} onValueChange={(v) => setForm({ ...form, batch_id: v })}>
+                  <SelectTrigger className="h-10 rounded-xl mt-1">
+                    <SelectValue placeholder="Select a batch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {batches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="w-full h-10 rounded-xl mt-1 border border-input bg-transparent px-3 flex items-center justify-between text-sm"
+                    >
+                      <span className={form.batch_ids.length ? "text-neutral-900" : "text-neutral-400"}>
+                        {form.batch_ids.length === 0
+                          ? "Select batches"
+                          : form.batch_ids.length <= 2
+                          ? batches.filter((b) => form.batch_ids.includes(b.id)).map((b) => b.name).join(", ")
+                          : `${form.batch_ids.length} batches selected`}
+                      </span>
+                      <ChevronDown className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-1.5 rounded-xl" align="start">
+                    {batches.map((b) => {
+                      const checked = form.batch_ids.includes(b.id);
+                      return (
+                        <label
+                          key={b.id}
+                          className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-neutral-50 cursor-pointer text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(v) =>
+                              setForm((f) => ({
+                                ...f,
+                                batch_ids: v ? [...f.batch_ids, b.id] : f.batch_ids.filter((id) => id !== b.id),
+                              }))
+                            }
+                          />
+                          {b.name}
+                        </label>
+                      );
+                    })}
+                  </PopoverContent>
+                </Popover>
+              )}
+              {!editing && form.batch_ids.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {batches.filter((b) => form.batch_ids.includes(b.id)).map((b) => (
+                    <Badge
+                      key={b.id}
+                      variant="secondary"
+                      className="rounded-full font-normal gap-1 pr-1.5"
+                    >
+                      {b.name}
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, batch_ids: f.batch_ids.filter((id) => id !== b.id) }))}
+                        className="hover:bg-neutral-300/60 rounded-full p-0.5"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </Badge>
                   ))}
-                </SelectContent>
-              </Select>
+                </div>
+              )}
             </div>
             <div>
               <Label className="text-xs text-neutral-600">Assignment</Label>
