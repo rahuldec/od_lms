@@ -303,8 +303,8 @@ export default function TraineeHome() {
                       )}
                     </p>
                     <p className="text-xs text-neutral-500 mt-0.5">
-                      {isLive ? "Available since" : "Available from"}{" "}
-                      {visibleFrom.toLocaleString()}
+                      Due on{" "}
+                      {visibleFrom.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
                     </p>
                     {s.notes && (
                       <p className="text-xs text-neutral-400 italic mt-0.5 truncate">{s.notes}</p>
