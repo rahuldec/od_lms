@@ -276,51 +276,59 @@ export default function TraineeHome() {
         )}
       </Card>
 
-      {schedules.length > 0 && (
-        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+      {schedules.filter((s) => new Date(s.visible_from) >= new Date()).length > 0 && (
+        <div className="mb-10">
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Upcoming Schedule</p>
-          <ul className="divide-y divide-neutral-100">
-            {schedules.map((s) => {
-              const now = new Date();
+          <div className="flex flex-col gap-4">
+            {schedules.filter((s) => new Date(s.visible_from) >= new Date()).map((s) => {
               const visibleFrom = new Date(s.visible_from);
-              const isLive = now >= visibleFrom;
-              const statusBg = isLive ? "#E1F5EE" : "#FFF3E0";
-              const statusFg = isLive ? "#085041" : "#B45309";
-              const statusLabel = isLive ? "Live" : "Scheduled";
+              const day = visibleFrom.toLocaleDateString("en-GB", { day: "numeric" });
+              const month = visibleFrom.toLocaleDateString("en-GB", { month: "long" });
               return (
-                <li key={s.id} className="flex items-center gap-3.5 py-4 first:pt-0 last:pb-0">
+                <div
+                  key={s.id}
+                  className="rounded-2xl overflow-hidden flex"
+                  style={{ background: "linear-gradient(135deg, #FFF8F0 0%, #FFF0DC 100%)", border: "1.5px solid #FDDCB0" }}
+                >
+                  {/* Date block */}
                   <div
-                    className="h-9 w-9 rounded-full grid place-items-center flex-shrink-0"
-                    style={{ backgroundColor: statusBg }}
+                    className="flex flex-col items-center justify-center px-7 py-6 flex-shrink-0"
+                    style={{ background: "linear-gradient(160deg, #E05A2B 0%, #C94820 100%)", minWidth: "100px" }}
                   >
-                    <CalendarClock className="h-4 w-4" style={{ color: statusFg }} />
+                    <span className="text-4xl font-bold text-white leading-none tabular-nums">{day}</span>
+                    <span className="text-sm font-semibold text-orange-100 mt-1 uppercase tracking-widest">{month}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-neutral-900 truncate">
-                      {s.assignment_name}
-                      {s.host_name && (
-                        <span className="text-neutral-400 font-normal"> &middot; {s.host_name}</span>
-                      )}
-                    </p>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                      Due on{" "}
-                      {visibleFrom.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
-                    </p>
-                    {s.notes && (
-                      <p className="text-xs text-neutral-400 italic mt-0.5 truncate">{s.notes}</p>
-                    )}
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 px-6 py-5 flex flex-col justify-center">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-lg font-bold text-neutral-900 leading-snug">
+                          {s.assignment_name}
+                        </p>
+                        {s.host_name && (
+                          <p className="text-sm text-neutral-500 mt-1 flex items-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-orange-400 flex-shrink-0" />
+                            {s.host_name}
+                          </p>
+                        )}
+                        {s.notes && (
+                          <p className="text-sm text-neutral-500 italic mt-2 line-clamp-2">{s.notes}</p>
+                        )}
+                      </div>
+                      <span
+                        className="text-xs font-semibold px-3 py-1.5 rounded-full flex-shrink-0 mt-0.5 uppercase tracking-wide"
+                        style={{ backgroundColor: "#FEE5C8", color: "#C94820" }}
+                      >
+                        Upcoming
+                      </span>
+                    </div>
                   </div>
-                  <span
-                    className="text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: statusBg, color: statusFg }}
-                  >
-                    {statusLabel}
-                  </span>
-                </li>
+                </div>
               );
             })}
-          </ul>
-        </Card>
+          </div>
+        </div>
       )}
 
       {results.length > 0 && (
