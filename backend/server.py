@@ -1262,6 +1262,75 @@ async def list_published_results(ctx=Depends(require_user)):
     return r.json()
 
 
+
+# ---------- admin activity feed ----------
+@api.get("/admin/activity-feed")
+async def admin_activity_feed(_=Depends(require_admin)):
+    """
+    Returns up to 50 recent events merged from:
+      - lesson_progress (watched=true) → "watch" events
+      - trainees.history JSONB         → "promotion" / "demotion" events
+    Sorted newest-first.
+    """
+    async with httpx.AsyncClient(timeout=20) as cx:
+        # Fetch all trainees (need id → name mapping + history)
+        rt = await cx.get(
+            f"{REST}/trainees?select=id,name,history&order=created_at.desc",
+            headers=ADMIN_HEADERS,
+        )
+        trainees_raw = rt.json() if rt.status_code == 200 else []
+
+        # Fetch the most recent watch events across all trainees
+        rp = await cx.get(
+            f"{REST}/lesson_progress?watched=eq.true&select=trainee_id,lesson_id,updated_at"
+            f"&order=updated_at.desc&limit=200",
+            headers=ADMIN_HEADERS,
+        )
+        progress_raw = rp.json() if rp.status_code == 200 else []
+
+    # Build trainee lookup
+    trainee_by_id = {t["id"]: t for t in trainees_raw}
+
+    events = []
+
+    # --- Watch events ---
+    for p in progress_raw:
+        trainee = trainee_by_id.get(p.get("trainee_id"))
+        if not trainee:
+            continue
+        events.append({
+            "type": "watch",
+            "trainee_name": trainee["name"],
+            "trainee_id": trainee["id"],
+            "detail": p.get("lesson_id"),   # frontend resolves title from sheet
+            "level": None,
+            "at": p.get("updated_at"),
+        })
+
+    # --- History events (promotion / demotion) ---
+    for t in trainees_raw:
+        history = t.get("history") or []
+        if not isinstance(history, list):
+            continue
+        for h in history:
+            h_type = h.get("type")
+            if h_type not in ("promotion", "demotion"):
+                continue
+            events.append({
+                "type": h_type,
+                "trainee_name": t["name"],
+                "trainee_id": t["id"],
+                "detail": None,
+                "level": h.get("level"),
+                "at": h.get("at"),
+            })
+
+    # Sort newest first, drop any rows without a timestamp, cap at 50
+    events = [e for e in events if e.get("at")]
+    events.sort(key=lambda e: e["at"], reverse=True)
+    return events[:50]
+
+
 # ---------- trainee progress ----------
 @api.get("/trainee/progress")
 async def my_progress(ctx=Depends(require_user)):

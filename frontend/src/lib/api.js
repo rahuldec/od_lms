@@ -180,6 +180,10 @@ export const api = {
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/schedules`, { headers }).then((r) => r.data)
     ),
+  listActivityFeed: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/activity-feed`, { headers }).then((r) => r.data)
+    ),
 
 
   // Resources

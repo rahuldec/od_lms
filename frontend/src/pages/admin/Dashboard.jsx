@@ -6,7 +6,7 @@ import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -59,6 +59,20 @@ const fmtDate = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const relativeTime = (iso) => {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return "yesterday";
+  if (days < 7) return `${days} days ago`;
+  return fmtDate(iso);
 };
 
 const daysSince = (iso) => {
@@ -363,20 +377,27 @@ export default function AdminDashboard() {
   const [expandedLevel, setExpandedLevel] = useState(null);
   const [activeAssignment, setActiveAssignment] = useState(null);
   const [results, setResults] = useState([]);
+  const [activityFeed, setActivityFeed] = useState([]);
+  const [sheetModules, setSheetModules] = useState([]);
+  const [feedExpanded, setFeedExpanded] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [data, aResults, batchData, resultsData] = await Promise.all([
+        const [data, aResults, batchData, resultsData, feedData, modsData] = await Promise.all([
           api.listTrainees(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listBatches().catch(() => []),
           api.listResultsAdmin().catch(() => []),
+          api.listActivityFeed().catch(() => []),
+          fetchSheetModules().catch(() => []),
         ]);
         setTrainees(Array.isArray(data) ? data : []);
         setAssignmentResults(aResults || {});
         setBatches(Array.isArray(batchData) ? batchData : []);
         setResults(Array.isArray(resultsData) ? resultsData.filter((r) => r.published).slice(0, 3) : []);
+        setActivityFeed(Array.isArray(feedData) ? feedData : []);
+        setSheetModules(Array.isArray(modsData) ? modsData : []);
       } catch (e) {
         toast.error("Could not load trainees");
       } finally {
@@ -384,6 +405,17 @@ export default function AdminDashboard() {
       }
     })();
   }, []);
+
+  // Build lesson_id → title map from sheet modules
+  const lessonTitleById = useMemo(() => {
+    const map = {};
+    sheetModules.forEach((mod) => {
+      (mod.lessons || []).forEach((l) => {
+        map[l.id] = l.title;
+      });
+    });
+    return map;
+  }, [sheetModules]);
 
   const batchNameById = useMemo(() => {
     const map = {};
@@ -538,6 +570,88 @@ export default function AdminDashboard() {
         <Stat testId="stat-onhold" icon={PauseCircle} label="On hold" value={loading ? "-" : onHold} />
         <Stat testId="stat-promotions" icon={TrendingUp} label="Promotions this month" value={loading ? "-" : promotionsThisMonth} />
       </div>
+
+      {/* ---- Activity Feed ---- */}
+      {(loading || activityFeed.length > 0) && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-neutral-400" />
+              <h2 className="text-xl font-semibold">Activity feed</h2>
+            </div>
+            <span className="text-xs text-neutral-400">{activityFeed.length} recent events</span>
+          </div>
+
+          {loading ? (
+            <p className="text-sm text-neutral-400">Loading…</p>
+          ) : activityFeed.length === 0 ? (
+            <p className="text-sm text-neutral-400">No activity yet.</p>
+          ) : (
+            <>
+              <ul className="divide-y divide-neutral-50">
+                {(feedExpanded ? activityFeed : activityFeed.slice(0, 20)).map((ev, i) => {
+                  const isWatch = ev.type === "watch";
+                  const isPromo = ev.type === "promotion";
+                  const isDemote = ev.type === "demotion";
+
+                  const iconBg = isWatch ? "#E1F5EE" : isPromo ? "#FFF0E8" : "#F1F5F9";
+                  const iconColor = isWatch ? "#085041" : isPromo ? "#E05A2B" : "#64748b";
+                  const Icon = isWatch ? Play : isPromo ? ArrowUp : ArrowDown;
+
+                  const lessonTitle = isWatch
+                    ? (lessonTitleById[ev.detail] || ev.detail || "a lesson")
+                    : null;
+
+                  return (
+                    <li key={i} className="flex items-center gap-3.5 py-3.5 first:pt-0 last:pb-0">
+                      <div
+                        className="h-8 w-8 rounded-full grid place-items-center flex-shrink-0"
+                        style={{ backgroundColor: iconBg }}
+                      >
+                        <Icon className="h-3.5 w-3.5" style={{ color: iconColor }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-neutral-800">
+                          <Link
+                            to={`/admin/trainees/${ev.trainee_id}`}
+                            className="font-semibold hover:underline"
+                          >
+                            {ev.trainee_name}
+                          </Link>
+                          {isWatch && (
+                            <span className="text-neutral-500 font-normal"> watched <span className="font-medium text-neutral-700">{lessonTitle}</span></span>
+                          )}
+                          {isPromo && (
+                            <span className="text-neutral-500 font-normal"> promoted to <span className="font-semibold" style={{ color: "#E05A2B" }}>Level {ev.level}</span></span>
+                          )}
+                          {isDemote && (
+                            <span className="text-neutral-500 font-normal"> demoted to <span className="font-semibold text-slate-500">Level {ev.level}</span></span>
+                          )}
+                        </p>
+                      </div>
+                      <span className="text-xs text-neutral-400 flex-shrink-0 tabular-nums">
+                        {relativeTime(ev.at)}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {activityFeed.length > 20 && (
+                <button
+                  onClick={() => setFeedExpanded((v) => !v)}
+                  className="mt-4 w-full text-xs font-medium text-neutral-400 hover:text-neutral-600 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  {feedExpanded ? (
+                    <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
+                  ) : (
+                    <><ChevronDown className="h-3.5 w-3.5" /> Show {activityFeed.length - 20} more</>
+                  )}
+                </button>
+              )}
+            </>
+          )}
+        </Card>
+      )}
 
       {results.length > 0 && (
         <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
