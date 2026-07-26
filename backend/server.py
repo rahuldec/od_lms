@@ -1030,6 +1030,33 @@ async def list_webinars_public():
     return r.json()
 
 
+# ---------- trainee assignment schedule ----------
+@api.get("/trainee/schedules")
+async def trainee_schedules(ctx=Depends(require_user)):
+    user = ctx["user"]
+    role = ctx["role"]
+    if role != "trainee":
+        raise HTTPException(status_code=403, detail="Trainees only")
+    async with httpx.AsyncClient(timeout=15) as cx:
+        # Look up trainee row to get their batch_id
+        r = await cx.get(
+            f"{REST}/trainees?auth_user_id=eq.{user['id']}&select=batch_id",
+            headers=ADMIN_HEADERS,
+        )
+        rows = r.json() if r.status_code == 200 else []
+        if not rows or not rows[0].get("batch_id"):
+            return []
+        batch_id = rows[0]["batch_id"]
+        # Return all schedules for this batch ordered by visible_from
+        rs = await cx.get(
+            f"{REST}/assignment_schedules?batch_id=eq.{batch_id}&order=visible_from.asc&select=*",
+            headers=ADMIN_HEADERS,
+        )
+    if rs.status_code != 200:
+        raise HTTPException(status_code=400, detail=rs.text)
+    return rs.json()
+
+
 # ---------- admin assignment scheduling ----------
 @api.get("/admin/assignment-schedules")
 async def list_assignment_schedules(_=Depends(require_admin)):

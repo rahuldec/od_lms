@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Loader2,
   X,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -98,6 +99,7 @@ export default function TraineeHome() {
   const [loading, setLoading] = useState(true);
   const [activeLesson, setActiveLesson] = useState(null);
   const [results, setResults] = useState([]);
+  const [schedules, setSchedules] = useState([]);
 
   const reloadProgress = async () => {
     const res = await api.myProgress();
@@ -110,10 +112,11 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const [mods, allResults, publishedResults, _] = await Promise.all([
+        const [mods, allResults, publishedResults, mySchedules, _] = await Promise.all([
           fetchSheetModules(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listResults().catch(() => []),
+          api.listMySchedules().catch(() => []),
           reloadProgress(),
         ]);
         
@@ -121,6 +124,7 @@ export default function TraineeHome() {
         const key = (trainee.name || "").trim().toLowerCase();
         setAssignments(allResults[key] || []);
         setResults(Array.isArray(publishedResults) ? publishedResults : []);
+        setSchedules(Array.isArray(mySchedules) ? mySchedules : []);
       } catch (e) {
         toast.error("Could not load training content");
       } finally {
@@ -271,6 +275,53 @@ export default function TraineeHome() {
           <p className="text-sm text-neutral-400">No assignments attempted yet.</p>
         )}
       </Card>
+
+      {schedules.length > 0 && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Upcoming Schedule</p>
+          <ul className="divide-y divide-neutral-100">
+            {schedules.map((s) => {
+              const now = new Date();
+              const visibleFrom = new Date(s.visible_from);
+              const isLive = now >= visibleFrom;
+              const statusBg = isLive ? "#E1F5EE" : "#FFF3E0";
+              const statusFg = isLive ? "#085041" : "#B45309";
+              const statusLabel = isLive ? "Live" : "Scheduled";
+              return (
+                <li key={s.id} className="flex items-center gap-3.5 py-4 first:pt-0 last:pb-0">
+                  <div
+                    className="h-9 w-9 rounded-full grid place-items-center flex-shrink-0"
+                    style={{ backgroundColor: statusBg }}
+                  >
+                    <CalendarClock className="h-4 w-4" style={{ color: statusFg }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-neutral-900 truncate">
+                      {s.assignment_name}
+                      {s.host_name && (
+                        <span className="text-neutral-400 font-normal"> &middot; {s.host_name}</span>
+                      )}
+                    </p>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      {isLive ? "Available since" : "Available from"}{" "}
+                      {visibleFrom.toLocaleString()}
+                    </p>
+                    {s.notes && (
+                      <p className="text-xs text-neutral-400 italic mt-0.5 truncate">{s.notes}</p>
+                    )}
+                  </div>
+                  <span
+                    className="text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: statusBg, color: statusFg }}
+                  >
+                    {statusLabel}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       {results.length > 0 && (
         <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">

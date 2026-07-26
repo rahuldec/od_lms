@@ -176,6 +176,11 @@ export const api = {
     withAuthRetry((headers) =>
       axios.post(`${BASE}/trainee/progress`, body, { headers }).then((r) => r.data)
     ),
+  listMySchedules: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/trainee/schedules`, { headers }).then((r) => r.data)
+    ),
+
 
   // Resources
   listResourceCategories: () =>
