@@ -1269,6 +1269,7 @@ async def admin_activity_feed(_=Depends(require_admin)):
     """
     Returns up to 50 recent events merged from:
       - lesson_progress (watched=true) → "watch" events
+      - login_events                   → "login" events
       - trainees.history JSONB         → "promotion" / "demotion" events
     Sorted newest-first.
     """
@@ -1288,6 +1289,14 @@ async def admin_activity_feed(_=Depends(require_admin)):
         )
         progress_raw = rp.json() if rp.status_code == 200 else []
 
+        # Fetch the most recent login events across all trainees
+        rl = await cx.get(
+            f"{REST}/login_events?select=trainee_id,created_at"
+            f"&order=created_at.desc&limit=200",
+            headers=ADMIN_HEADERS,
+        )
+        logins_raw = rl.json() if rl.status_code == 200 else []
+
     # Build trainee lookup
     trainee_by_id = {t["id"]: t for t in trainees_raw}
 
@@ -1305,6 +1314,20 @@ async def admin_activity_feed(_=Depends(require_admin)):
             "detail": p.get("lesson_id"),   # frontend resolves title from sheet
             "level": None,
             "at": p.get("updated_at"),
+        })
+
+    # --- Login events ---
+    for l in logins_raw:
+        trainee = trainee_by_id.get(l.get("trainee_id"))
+        if not trainee:
+            continue
+        events.append({
+            "type": "login",
+            "trainee_name": trainee["name"],
+            "trainee_id": trainee["id"],
+            "detail": None,
+            "level": None,
+            "at": l.get("created_at"),
         })
 
     # --- History events (promotion / demotion) ---
