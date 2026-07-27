@@ -6,7 +6,7 @@ import { fetchSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -593,10 +593,11 @@ export default function AdminDashboard() {
                   const isWatch = ev.type === "watch";
                   const isPromo = ev.type === "promotion";
                   const isDemote = ev.type === "demotion";
+                  const isLogin = ev.type === "login";
 
-                  const iconBg = isWatch ? "#E1F5EE" : isPromo ? "#FFF0E8" : "#F1F5F9";
-                  const iconColor = isWatch ? "#085041" : isPromo ? "#E05A2B" : "#64748b";
-                  const Icon = isWatch ? Play : isPromo ? ArrowUp : ArrowDown;
+                  const iconBg = isWatch ? "#E1F5EE" : isPromo ? "#FFF0E8" : isLogin ? "#EAF1FE" : "#F1F5F9";
+                  const iconColor = isWatch ? "#085041" : isPromo ? "#E05A2B" : isLogin ? "#2563EB" : "#64748b";
+                  const Icon = isWatch ? Play : isPromo ? ArrowUp : isLogin ? LogIn : ArrowDown;
 
                   const lessonTitle = isWatch
                     ? (lessonTitleById[ev.detail] || ev.detail || "a lesson")
@@ -626,6 +627,9 @@ export default function AdminDashboard() {
                           )}
                           {isDemote && (
                             <span className="text-neutral-500 font-normal"> demoted to <span className="font-semibold text-slate-500">Level {ev.level}</span></span>
+                          )}
+                          {isLogin && (
+                            <span className="text-neutral-500 font-normal"> logged in</span>
                           )}
                         </p>
                       </div>
