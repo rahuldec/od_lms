@@ -9,6 +9,7 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import Trainees from "@/pages/admin/Trainees";
 import TraineeDetail from "@/pages/admin/TraineeDetail";
 import Batches from "@/pages/admin/Batches";
+import Clients from "@/pages/admin/Clients";
 import BatchDetail from "@/pages/admin/BatchDetail";
 import Resources from "@/pages/admin/Resources";
 import TrainingModules from "@/pages/admin/TrainingModules";
@@ -93,6 +94,14 @@ export default function App() {
             element={
               <Protected requireRole="admin">
                 <BatchDetail />
+              </Protected>
+            }
+          />
+          <Route
+            path="/admin/clients"
+            element={
+              <Protected requireRole="admin">
+                <Clients />
               </Protected>
             }
           />
