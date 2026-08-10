@@ -168,6 +168,39 @@ export const api = {
         .then((r) => r.data)
     ),
 
+  // Trainee <-> Client assignment. The client list itself comes from the
+  // sheet (lib/clients.js) - these only read/write the mapping.
+  listClientAssignments: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/client-assignments`, { headers }).then((r) => r.data)
+    ),
+  getTraineeClients: (traineeId) =>
+    withAuthRetry((headers) =>
+      axios
+        .get(`${BASE}/admin/trainees/${traineeId}/clients`, { headers })
+        .then((r) => r.data)
+    ),
+  setTraineeClients: (traineeId, clientNames) =>
+    withAuthRetry((headers) =>
+      axios
+        .post(
+          `${BASE}/admin/trainees/${traineeId}/clients`,
+          { client_names: clientNames },
+          { headers }
+        )
+        .then((r) => r.data)
+    ),
+  setClientTrainees: (clientName, traineeIds) =>
+    withAuthRetry((headers) =>
+      axios
+        .post(
+          `${BASE}/admin/client-assignments`,
+          { client_name: clientName, trainee_ids: traineeIds },
+          { headers }
+        )
+        .then((r) => r.data)
+    ),
+
   myProgress: () =>
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/progress`, { headers }).then((r) => r.data)
