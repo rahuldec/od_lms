@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchSheetModules } from "@/lib/sheet";
+import { fetchClients, groupAssignmentsByTrainee } from "@/lib/clients";
 import AppShell from "@/components/AppShell";
+import ClientAssignDialog from "@/components/ClientAssignDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -39,6 +41,7 @@ const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
+  { to: "/admin/clients", label: "Clients", testId: "nav-clients" },
   { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
@@ -380,17 +383,24 @@ export default function AdminDashboard() {
   const [activityFeed, setActivityFeed] = useState([]);
   const [sheetModules, setSheetModules] = useState([]);
   const [feedExpanded, setFeedExpanded] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [clientAssignments, setClientAssignments] = useState([]);
+  const [assignFor, setAssignFor] = useState(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [data, aResults, batchData, resultsData, feedData, modsData] = await Promise.all([
+        const [data, aResults, batchData, resultsData, feedData, modsData, clientData, clientAssignData] = await Promise.all([
           api.listTrainees(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listBatches().catch(() => []),
           api.listResultsAdmin().catch(() => []),
           api.listActivityFeed().catch(() => []),
           fetchSheetModules().catch(() => []),
+          // Both are non-fatal: a sheet outage or a missing table should degrade
+          // the clients strip to empty, not take the whole dashboard down.
+          fetchClients().catch(() => []),
+          api.listClientAssignments().catch(() => []),
         ]);
         setTrainees(Array.isArray(data) ? data : []);
         setAssignmentResults(aResults || {});
@@ -398,6 +408,8 @@ export default function AdminDashboard() {
         setResults(Array.isArray(resultsData) ? resultsData.filter((r) => r.published).slice(0, 3) : []);
         setActivityFeed(Array.isArray(feedData) ? feedData : []);
         setSheetModules(Array.isArray(modsData) ? modsData : []);
+        setClients(Array.isArray(clientData) ? clientData : []);
+        setClientAssignments(Array.isArray(clientAssignData) ? clientAssignData : []);
       } catch (e) {
         toast.error("Could not load trainees");
       } finally {
@@ -422,6 +434,31 @@ export default function AdminDashboard() {
     batches.forEach((b) => (map[b.id] = b.name));
     return map;
   }, [batches]);
+
+  // clientsByTrainee is keyed by trainee id; ownersByClient is the inverse,
+  // keyed by lowercased client name -> trainee names, so the assign dialog can
+  // warn when a client is already on someone else's book.
+  const clientsByTrainee = useMemo(
+    () => groupAssignmentsByTrainee(clientAssignments),
+    [clientAssignments]
+  );
+
+  const traineeNameById = useMemo(
+    () => Object.fromEntries(trainees.map((t) => [t.id, t.name])),
+    [trainees]
+  );
+
+  const ownersByClient = useMemo(() => {
+    const map = {};
+    clientAssignments.forEach((a) => {
+      if (!a?.client_name) return;
+      const key = a.client_name.trim().toLowerCase();
+      if (!map[key]) map[key] = [];
+      const name = traineeNameById[a.trainee_id];
+      if (name) map[key].push(name);
+    });
+    return map;
+  }, [clientAssignments, traineeNameById]);
 
   const filteredTrainees = useMemo(() => {
     const notExited = trainees.filter((t) => t.status !== "Exited");
@@ -820,20 +857,30 @@ export default function AdminDashboard() {
       </Card>
 
       <Card className="rounded-2xl border-neutral-200/80 p-7">
-        <div className="flex items-baseline justify-between mb-6">
+        <div className="flex items-baseline justify-between mb-6 gap-4 flex-wrap">
           <div>
             <h2 className="text-xl font-semibold">Level distribution</h2>
             <p className="text-sm text-neutral-500 mt-1">
-              Click a level to see trainees, assignment scores and promotion history.
+              Click a level to see trainees, their clients, assignment scores and promotion history.
             </p>
           </div>
-          <span className="text-sm text-neutral-400">{total} total</span>
+          <div className="flex items-center gap-3 text-sm text-neutral-400">
+            <span>{total} trainees</span>
+            <span className="text-neutral-200">|</span>
+            <Link to="/admin/clients" className="font-semibold" style={{ color: "#E05A2B" }}>
+              Manage clients &rarr;
+            </Link>
+          </div>
         </div>
 
         <div className="space-y-4">
           {levelGroups.map(({ level, trainees: lvlTrainees }) => {
             const pct = total ? Math.round((lvlTrainees.length / total) * 100) : 0;
             const isExpanded = expandedLevel === level;
+            const lvlClientCount = lvlTrainees.reduce(
+              (acc, t) => acc + (clientsByTrainee[t.id]?.length || 0),
+              0
+            );
             return (
               <div key={level} className="border border-neutral-100 rounded-2xl overflow-hidden">
                 <button
@@ -851,6 +898,9 @@ export default function AdminDashboard() {
                       <span className="text-sm font-medium text-neutral-900">Level {level}</span>
                       <span className="text-xs text-neutral-500 tabular-nums">
                         {lvlTrainees.length} trainees - {pct}%
+                        {lvlClientCount > 0 && (
+                          <span className="text-neutral-400"> - {lvlClientCount} clients</span>
+                        )}
                       </span>
                     </div>
                     <div className="h-1.5 bg-neutral-100 rounded-full overflow-hidden">
@@ -876,6 +926,7 @@ export default function AdminDashboard() {
                         const assignments = getAssignments(t.name);
                         const days = daysSince(t.join_date);
                         const latestPromotion = promotions[promotions.length - 1];
+                        const myClients = clientsByTrainee[t.id] || [];
                         return (
                           <div
                             key={t.id}
@@ -944,6 +995,63 @@ export default function AdminDashboard() {
                               )}
                             </div>
 
+                            {/* Client book. Shown for every trainee, empty or
+                                not - an empty strip with an Assign affordance
+                                is the point, since unassigned trainees are
+                                exactly the ones worth spotting here. */}
+                            <div className="relative mb-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] uppercase tracking-wider text-neutral-400 inline-flex items-center gap-1">
+                                  <Briefcase className="h-2.5 w-2.5" />
+                                  Clients
+                                  {myClients.length > 0 && (
+                                    <span className="tabular-nums">· {myClients.length}</span>
+                                  )}
+                                </span>
+                                <button
+                                  onClick={() => setAssignFor(t)}
+                                  data-testid={`assign-clients-${t.id}`}
+                                  className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5"
+                                  style={{ color: "#E05A2B" }}
+                                >
+                                  {myClients.length > 0 ? (
+                                    "Manage"
+                                  ) : (
+                                    <>
+                                      <Plus className="h-2.5 w-2.5" />
+                                      Assign
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              {myClients.length === 0 ? (
+                                <p className="text-[11px] text-neutral-300">
+                                  No clients assigned
+                                </p>
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  {myClients.slice(0, 4).map((name) => (
+                                    <span
+                                      key={name}
+                                      title={name}
+                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200 max-w-[130px] truncate"
+                                    >
+                                      {name}
+                                    </span>
+                                  ))}
+                                  {myClients.length > 4 && (
+                                    <button
+                                      onClick={() => setAssignFor(t)}
+                                      title={myClients.slice(4).join(", ")}
+                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-neutral-400 hover:text-neutral-600"
+                                    >
+                                      +{myClients.length - 4} more
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
                             {assignments.length > 0 ? (
                               <div className="flex flex-col gap-1.5">
                                 {assignments.map((a) => {
@@ -993,6 +1101,28 @@ export default function AdminDashboard() {
       </Card>
 
       <AssignmentModal assignment={activeAssignment} onClose={() => setActiveAssignment(null)} />
+
+      {assignFor && (
+        <ClientAssignDialog
+          trainee={assignFor}
+          clients={clients}
+          assignedNames={clientsByTrainee[assignFor.id] || []}
+          ownersByClient={ownersByClient}
+          onClose={() => setAssignFor(null)}
+          onSaved={(names) =>
+            // Patch in place rather than re-fetching the whole assignment list -
+            // the dashboard already holds every other row unchanged.
+            setClientAssignments((prev) => [
+              ...prev.filter((a) => a.trainee_id !== assignFor.id),
+              ...names.map((n) => ({
+                id: `${assignFor.id}-${n}`,
+                trainee_id: assignFor.id,
+                client_name: n,
+              })),
+            ])
+          }
+        />
+      )}
     </AppShell>
   );
 }
