@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchSheetModules } from "@/lib/sheet";
+import { fetchClients } from "@/lib/clients";
 import AppShell from "@/components/AppShell";
+import ClientAssignDialog from "@/components/ClientAssignDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Plus } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 
@@ -13,6 +15,7 @@ const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
   { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
   { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
+  { to: "/admin/clients", label: "Clients", testId: "nav-clients" },
   { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
@@ -100,17 +103,24 @@ export default function TraineeDetail() {
   const [assignmentResults, setAssignmentResults] = useState({});
   const [assignmentsLoading, setAssignmentsLoading] = useState(true);
   const [expandedAssignment, setExpandedAssignment] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [myClients, setMyClients] = useState([]);
+  const [assignOpen, setAssignOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [tRes, mods] = await Promise.all([
+        const [tRes, mods, clientList, myClientRows] = await Promise.all([
           api.getTrainee(id),
           fetchSheetModules().catch(() => []),
+          fetchClients().catch(() => []),
+          api.getTraineeClients(id).catch(() => []),
         ]);
         setTrainee(tRes.trainee || null);
         setProgress(tRes.progress || []);
         setModules(mods || []);
+        setClients(clientList || []);
+        setMyClients((myClientRows || []).map((r) => r.client_name));
 
         // Fetch all assignment CSVs in parallel
         if (tRes.trainee?.name) {
@@ -214,6 +224,37 @@ export default function TraineeDetail() {
 
         {/* Right column */}
         <div className="flex flex-col gap-6">
+          {/* Client book */}
+          <Card className="rounded-2xl border-neutral-200/80 p-7">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 inline-flex items-center gap-1.5">
+                <Briefcase className="h-3 w-3" />
+                Clients
+              </p>
+              <button
+                onClick={() => setAssignOpen(true)}
+                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5"
+                style={{ color: "#E05A2B" }}
+              >
+                {myClients.length > 0 ? "Manage" : <><Plus className="h-3 w-3" />Assign</>}
+              </button>
+            </div>
+            <p className="text-4xl font-semibold mt-2 tabular-nums">{myClients.length}</p>
+            <p className="text-sm text-neutral-500 mt-1">assigned</p>
+            {myClients.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-1.5">
+                {myClients.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+
           {/* Video Progress */}
           <Card className="rounded-2xl border-neutral-200/80 p-7">
             <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Progress</p>
@@ -353,6 +394,16 @@ export default function TraineeDetail() {
           ))}
         </div>
       </Card>
+    
+      {assignOpen && (
+        <ClientAssignDialog
+          trainee={trainee}
+          clients={clients}
+          assignedNames={myClients}
+          onClose={() => setAssignOpen(false)}
+          onSaved={setMyClients}
+        />
+      )}
     </AppShell>
   );
 }
