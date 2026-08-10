@@ -279,6 +279,15 @@ class BatchModulesIn(BaseModel):
     module_names: List[str]
 
 
+class TraineeClientsIn(BaseModel):
+    client_names: List[str] = []
+
+
+class ClientTraineesIn(BaseModel):
+    client_name: str
+    trainee_ids: List[str] = []
+
+
 class AssignBatchIn(BaseModel):
     batch_id: Optional[str] = None
 
@@ -875,6 +884,119 @@ async def batch_analytics(batch_id: str, _=Depends(require_admin)):
         "assignments": ra.json() if ra.status_code == 200 else [],
         "lesson_progress": rl.json() if rl.status_code == 200 else [],
     }
+
+
+# ---------- trainee <-> client assignments ----------
+# The client list itself is not stored in Supabase - it is read live from the
+# "CS Team Plan" sheet by the frontend. These endpoints only persist the
+# mapping, keyed by client name exactly as it appears in that sheet.
+#
+# Two symmetric "replace the whole set" endpoints, because the two admin
+# surfaces need opposite directions: the dashboard/trainee view edits
+# "which clients does this trainee have", the Clients page edits "which
+# trainees does this client have".
+
+TCA = "trainee_client_assignments"
+
+
+def _pgrst_value(value: str) -> str:
+    """Double-quote a PostgREST filter value.
+
+    Client names come straight from the sheet and routinely contain characters
+    PostgREST treats as reserved - commas ("Little Angel, Karnal"), ampersands
+    ("Cecil City & Cantt"), periods. Unquoted, those either truncate the filter
+    or match nothing, which would silently leave stale rows active.
+    """
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+async def _replace_assignments(cx, filter_params: Dict[str, str], rows: List[Dict[str, Any]]):
+    """Deactivate everything matching filter_params, then upsert rows as active."""
+    now = datetime.now(timezone.utc).isoformat()
+    await cx.patch(
+        f"{REST}/{TCA}",
+        headers=ADMIN_HEADERS,
+        params=filter_params,
+        json={"is_active": False, "updated_at": now},
+    )
+    if not rows:
+        return
+    r = await cx.post(
+        f"{REST}/{TCA}",
+        headers={**ADMIN_HEADERS, "Prefer": "resolution=merge-duplicates"},
+        params={"on_conflict": "trainee_id,client_name"},
+        json=[{**row, "is_active": True, "updated_at": now} for row in rows],
+    )
+    if r.status_code not in (200, 201, 204):
+        raise HTTPException(status_code=400, detail=r.text)
+
+
+@api.get("/admin/client-assignments")
+async def list_client_assignments(_=Depends(require_admin)):
+    """Every active trainee<->client pair, for the dashboard to group in one call."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TCA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "is_active": "eq.true",
+                "select": "id,trainee_id,client_name,assigned_at",
+                "order": "client_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.get("/admin/trainees/{trainee_id}/clients")
+async def get_trainee_clients(trainee_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TCA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{trainee_id}",
+                "is_active": "eq.true",
+                "select": "id,trainee_id,client_name,assigned_at",
+                "order": "client_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/trainees/{trainee_id}/clients")
+async def set_trainee_clients(trainee_id: str, body: TraineeClientsIn, _=Depends(require_admin)):
+    """Replace the full set of clients assigned to one trainee."""
+    names = [n.strip() for n in body.client_names if n and n.strip()]
+    seen, unique_names = set(), []
+    for n in names:
+        if n.lower() not in seen:
+            seen.add(n.lower())
+            unique_names.append(n)
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await _replace_assignments(
+            cx,
+            {"trainee_id": f"eq.{trainee_id}"},
+            [{"trainee_id": trainee_id, "client_name": n} for n in unique_names],
+        )
+    return {"ok": True, "trainee_id": trainee_id, "client_names": unique_names}
+
+
+@api.post("/admin/client-assignments")
+async def set_client_trainees(body: ClientTraineesIn, _=Depends(require_admin)):
+    """Replace the full set of trainees assigned to one client."""
+    client_name = (body.client_name or "").strip()
+    if not client_name:
+        raise HTTPException(status_code=400, detail="client_name is required")
+    trainee_ids = list(dict.fromkeys([t for t in body.trainee_ids if t]))
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await _replace_assignments(
+            cx,
+            {"client_name": f"eq.{_pgrst_value(client_name)}"},
+            [{"trainee_id": tid, "client_name": client_name} for tid in trainee_ids],
+        )
+    return {"ok": True, "client_name": client_name, "trainee_ids": trainee_ids}
 
 
 # ---------- admin resources ----------
