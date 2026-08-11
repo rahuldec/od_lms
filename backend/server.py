@@ -913,22 +913,32 @@ def _pgrst_value(value: str) -> str:
 async def _replace_assignments(cx, filter_params: Dict[str, str], rows: List[Dict[str, Any]]):
     """Deactivate everything matching filter_params, then upsert rows as active."""
     now = datetime.now(timezone.utc).isoformat()
-    await cx.patch(
-        f"{REST}/{TCA}",
+    query = "&".join(f"{k}={v}" for k, v in filter_params.items())
+    rd = await cx.patch(
+        f"{REST}/{TCA}?{query}",
         headers=ADMIN_HEADERS,
-        params=filter_params,
         json={"is_active": False, "updated_at": now},
     )
+    if rd.status_code not in (200, 201, 204):
+        logger.error("client assignment deactivate failed: %s %s", rd.status_code, rd.text)
+        raise HTTPException(status_code=400, detail=f"deactivate failed: {rd.text}")
+
     if not rows:
         return
+
+    # on_conflict goes in the URL, matching set_batch_modules - keeping the two
+    # upserts identical means anything that works there works here.
     r = await cx.post(
-        f"{REST}/{TCA}",
+        f"{REST}/{TCA}?on_conflict=trainee_id,client_name",
         headers={**ADMIN_HEADERS, "Prefer": "resolution=merge-duplicates"},
-        params={"on_conflict": "trainee_id,client_name"},
         json=[{**row, "is_active": True, "updated_at": now} for row in rows],
     )
     if r.status_code not in (200, 201, 204):
-        raise HTTPException(status_code=400, detail=r.text)
+        # Surface PostgREST's own message rather than a bare 400 - a missing
+        # table, a schema-cache miss and a constraint violation all look
+        # identical from the browser otherwise.
+        logger.error("client assignment upsert failed: %s %s", r.status_code, r.text)
+        raise HTTPException(status_code=400, detail=f"upsert failed: {r.text}")
 
 
 @api.get("/admin/client-assignments")
