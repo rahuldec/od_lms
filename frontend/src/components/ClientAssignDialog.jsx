@@ -95,7 +95,16 @@ export default function ClientAssignDialog({
       onSaved?.(names);
       onClose();
     } catch (e) {
-      toast.error("Could not save client assignment");
+      // Show what the server actually said. A 404 means the backend hasn't
+      // picked up the new endpoints yet; anything else is usually PostgREST
+      // reporting a missing table or a constraint problem.
+      const status = e?.response?.status;
+      const detail = e?.response?.data?.detail;
+      toast.error(
+        status === 404
+          ? "Save endpoint not found - the backend needs redeploying"
+          : `Could not save: ${detail || e?.message || "unknown error"}`
+      );
     } finally {
       setSaving(false);
     }
