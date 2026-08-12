@@ -147,25 +147,31 @@ export const fetchClients = async ({ force = false } = {}) => {
 // --- Shaping helpers shared by the dashboard and the Clients page ----------
 
 /** [{trainee_id, client_name}] -> { [traineeId]: [clientName, ...] } */
+/** [{trainee_id, client_name, handling_mode}] -> { [traineeId]: [{client_name, handling_mode}, ...] } */
 export const groupAssignmentsByTrainee = (assignments) => {
   const map = {};
   (assignments || []).forEach((a) => {
     if (!a?.trainee_id || !a?.client_name) return;
     if (!map[a.trainee_id]) map[a.trainee_id] = [];
-    map[a.trainee_id].push(a.client_name);
+    map[a.trainee_id].push({
+      client_name: a.client_name,
+      handling_mode: a.handling_mode || "solo",
+    });
   });
-  Object.values(map).forEach((list) => list.sort((a, b) => a.localeCompare(b)));
+  Object.values(map).forEach((list) =>
+    list.sort((a, b) => a.client_name.localeCompare(b.client_name))
+  );
   return map;
 };
 
-/** [{trainee_id, client_name}] -> { [clientNameLower]: [traineeId, ...] } */
+/** [{trainee_id, client_name, handling_mode}] -> { [clientNameLower]: [{trainee_id, handling_mode}, ...] } */
 export const groupAssignmentsByClient = (assignments) => {
   const map = {};
   (assignments || []).forEach((a) => {
     if (!a?.trainee_id || !a?.client_name) return;
     const key = a.client_name.trim().toLowerCase();
     if (!map[key]) map[key] = [];
-    map[key].push(a.trainee_id);
+    map[key].push({ trainee_id: a.trainee_id, handling_mode: a.handling_mode || "solo" });
   });
   return map;
 };

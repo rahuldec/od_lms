@@ -3,6 +3,7 @@
 # IDE and editors
 .idea/
 .vscode/
+.claude/
 
 # Environment files (contain secrets — never commit)
 .env

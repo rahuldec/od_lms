@@ -279,8 +279,13 @@ class BatchModulesIn(BaseModel):
     module_names: List[str]
 
 
+class TraineeClientAssignmentIn(BaseModel):
+    client_name: str
+    handling_mode: Optional[str] = "solo"  # "solo" | "assisted"
+
+
 class TraineeClientsIn(BaseModel):
-    client_names: List[str] = []
+    assignments: List[TraineeClientAssignmentIn] = []
 
 
 class ClientTraineesIn(BaseModel):
@@ -897,6 +902,7 @@ async def batch_analytics(batch_id: str, _=Depends(require_admin)):
 # trainees does this client have".
 
 TCA = "trainee_client_assignments"
+HANDLING_MODES = {"solo", "assisted"}
 
 
 def _pgrst_value(value: str) -> str:
@@ -950,7 +956,7 @@ async def list_client_assignments(_=Depends(require_admin)):
             headers=ADMIN_HEADERS,
             params={
                 "is_active": "eq.true",
-                "select": "id,trainee_id,client_name,assigned_at",
+                "select": "id,trainee_id,client_name,handling_mode,assigned_at",
                 "order": "client_name.asc",
             },
         )
@@ -966,7 +972,7 @@ async def get_trainee_clients(trainee_id: str, _=Depends(require_admin)):
             params={
                 "trainee_id": f"eq.{trainee_id}",
                 "is_active": "eq.true",
-                "select": "id,trainee_id,client_name,assigned_at",
+                "select": "id,trainee_id,client_name,handling_mode,assigned_at",
                 "order": "client_name.asc",
             },
         )
@@ -976,20 +982,23 @@ async def get_trainee_clients(trainee_id: str, _=Depends(require_admin)):
 @api.post("/admin/trainees/{trainee_id}/clients")
 async def set_trainee_clients(trainee_id: str, body: TraineeClientsIn, _=Depends(require_admin)):
     """Replace the full set of clients assigned to one trainee."""
-    names = [n.strip() for n in body.client_names if n and n.strip()]
-    seen, unique_names = set(), []
-    for n in names:
-        if n.lower() not in seen:
-            seen.add(n.lower())
-            unique_names.append(n)
+    seen, rows = set(), []
+    for a in body.assignments:
+        name = (a.client_name or "").strip()
+        if not name or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        mode = a.handling_mode if a.handling_mode in HANDLING_MODES else "solo"
+        rows.append({"trainee_id": trainee_id, "client_name": name, "handling_mode": mode})
 
     async with httpx.AsyncClient(timeout=20) as cx:
-        await _replace_assignments(
-            cx,
-            {"trainee_id": f"eq.{trainee_id}"},
-            [{"trainee_id": trainee_id, "client_name": n} for n in unique_names],
-        )
-    return {"ok": True, "trainee_id": trainee_id, "client_names": unique_names}
+        await _replace_assignments(cx, {"trainee_id": f"eq.{trainee_id}"}, rows)
+    return {
+        "ok": True,
+        "trainee_id": trainee_id,
+        "client_names": [r["client_name"] for r in rows],
+        "assignments": rows,
+    }
 
 
 @api.post("/admin/client-assignments")
@@ -1001,10 +1010,34 @@ async def set_client_trainees(body: ClientTraineesIn, _=Depends(require_admin)):
     trainee_ids = list(dict.fromkeys([t for t in body.trainee_ids if t]))
 
     async with httpx.AsyncClient(timeout=20) as cx:
+        # This endpoint only edits *who* holds the client, not how - so an
+        # existing trainee's solo/assisted mode is preserved rather than
+        # silently reset to "solo" on every save from the Clients page.
+        existing = await cx.get(
+            f"{REST}/{TCA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "client_name": f"eq.{_pgrst_value(client_name)}",
+                "is_active": "eq.true",
+                "select": "trainee_id,handling_mode",
+            },
+        )
+        modes = {
+            row["trainee_id"]: row.get("handling_mode") or "solo"
+            for row in (existing.json() if existing.status_code == 200 else [])
+        }
+
         await _replace_assignments(
             cx,
             {"client_name": f"eq.{_pgrst_value(client_name)}"},
-            [{"trainee_id": tid, "client_name": client_name} for tid in trainee_ids],
+            [
+                {
+                    "trainee_id": tid,
+                    "client_name": client_name,
+                    "handling_mode": modes.get(tid, "solo"),
+                }
+                for tid in trainee_ids
+            ],
         )
     return {"ok": True, "client_name": client_name, "trainee_ids": trainee_ids}
 

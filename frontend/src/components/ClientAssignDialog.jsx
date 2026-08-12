@@ -13,6 +13,11 @@ const FILTERS = [
   { key: "owner", label: "All RMs" },
 ];
 
+const MODES = [
+  { key: "solo", label: "Solo" },
+  { key: "assisted", label: "Assisted" },
+];
+
 /**
  * Assign clients to one trainee.
  *
@@ -24,29 +29,33 @@ const FILTERS = [
  * Props:
  *   trainee          the trainee being edited
  *   clients          full client list from the sheet
- *   assignedNames    client names currently assigned to this trainee
+ *   assigned         [{client_name, handling_mode}] currently assigned to this trainee
  *   ownersByClient   { [clientNameLower]: [traineeName] } - other trainees who
  *                    already hold a client, shown so double-booking is a
  *                    visible choice rather than an accident
- *   onSaved(names)   called with the saved set
+ *   onSaved(assignments)   called with the saved [{client_name, handling_mode}] set
  *   onClose
  */
 export default function ClientAssignDialog({
   trainee,
   clients,
-  assignedNames = [],
+  assigned = [],
   ownersByClient = {},
   onSaved,
   onClose,
 }) {
-  const [selected, setSelected] = useState(() => new Set(assignedNames));
+  const [selected, setSelected] = useState(() => new Set(assigned.map((a) => a.client_name)));
+  const [modes, setModes] = useState(() =>
+    Object.fromEntries(assigned.map((a) => [a.client_name, a.handling_mode || "solo"]))
+  );
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState({ segment: "", category: "", owner: "" });
   const [onlySelected, setOnlySelected] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setSelected(new Set(assignedNames));
+    setSelected(new Set(assigned.map((a) => a.client_name)));
+    setModes(Object.fromEntries(assigned.map((a) => [a.client_name, a.handling_mode || "solo"])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trainee?.id]);
 
@@ -71,28 +80,40 @@ export default function ClientAssignDialog({
   const toggle = (name) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(name) ? next.delete(name) : next.add(name);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+        setModes((m) => (m[name] ? m : { ...m, [name]: "solo" }));
+      }
       return next;
     });
 
+  const setMode = (name, mode) => setModes((m) => ({ ...m, [name]: mode }));
+
   const dirty = useMemo(() => {
-    const before = new Set(assignedNames);
+    const before = new Map(assigned.map((a) => [a.client_name, a.handling_mode || "solo"]));
     if (before.size !== selected.size) return true;
-    for (const n of selected) if (!before.has(n)) return true;
+    for (const n of selected) {
+      if (!before.has(n) || before.get(n) !== (modes[n] || "solo")) return true;
+    }
     return false;
-  }, [assignedNames, selected]);
+  }, [assigned, selected, modes]);
 
   const save = async () => {
     setSaving(true);
-    const names = Array.from(selected);
+    const assignments = Array.from(selected).map((client_name) => ({
+      client_name,
+      handling_mode: modes[client_name] || "solo",
+    }));
     try {
-      await api.setTraineeClients(trainee.id, names);
+      await api.setTraineeClients(trainee.id, assignments);
       toast.success(
-        names.length
-          ? `${names.length} client${names.length === 1 ? "" : "s"} assigned to ${trainee.name}`
+        assignments.length
+          ? `${assignments.length} client${assignments.length === 1 ? "" : "s"} assigned to ${trainee.name}`
           : `Cleared all clients for ${trainee.name}`
       );
-      onSaved?.(names);
+      onSaved?.(assignments);
       onClose();
     } catch (e) {
       // Show what the server actually said. A 404 means the backend hasn't
@@ -191,32 +212,51 @@ export default function ClientAssignDialog({
                 const others = (ownersByClient[c.id] || []).filter(
                   (n) => n !== trainee?.name
                 );
+                const mode = modes[c.name] || "solo";
                 return (
                   <li key={c.id}>
-                    <button
-                      onClick={() => toggle(c.name)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-50 rounded-lg text-left transition-colors"
-                    >
-                      <span
-                        className="h-4 w-4 rounded border grid place-items-center flex-shrink-0"
-                        style={
-                          isOn
-                            ? { backgroundColor: ORANGE, borderColor: ORANGE }
-                            : { borderColor: "#d4d4d4" }
-                        }
+                    <div className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-50 rounded-lg transition-colors">
+                      <button
+                        onClick={() => toggle(c.name)}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
                       >
-                        {isOn && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="text-sm font-medium text-neutral-800 block truncate">
-                          {c.name}
+                        <span
+                          className="h-4 w-4 rounded border grid place-items-center flex-shrink-0"
+                          style={
+                            isOn
+                              ? { backgroundColor: ORANGE, borderColor: ORANGE }
+                              : { borderColor: "#d4d4d4" }
+                          }
+                        >
+                          {isOn && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
                         </span>
-                        <span className="text-xs text-neutral-400">
-                          {[c.segment, c.category, c.owner && `RM ${c.owner}`]
-                            .filter(Boolean)
-                            .join(" · ") || "—"}
+                        <span className="min-w-0 flex-1">
+                          <span className="text-sm font-medium text-neutral-800 block truncate">
+                            {c.name}
+                          </span>
+                          <span className="text-xs text-neutral-400">
+                            {[c.segment, c.category, c.owner && `RM ${c.owner}`]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </span>
                         </span>
-                      </span>
+                      </button>
+                      {isOn && (
+                        <div className="flex-shrink-0 inline-flex rounded-full border border-neutral-200 p-0.5">
+                          {MODES.map((m) => (
+                            <button
+                              key={m.key}
+                              onClick={() => setMode(c.name, m.key)}
+                              className={`text-[11px] font-medium px-2 py-0.5 rounded-full transition-colors ${
+                                mode === m.key ? "text-white" : "text-neutral-500 hover:text-neutral-700"
+                              }`}
+                              style={mode === m.key ? { backgroundColor: ORANGE } : undefined}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {others.length > 0 && (
                         <Badge
                           variant="secondary"
@@ -225,7 +265,7 @@ export default function ClientAssignDialog({
                           also {others.join(", ")}
                         </Badge>
                       )}
-                    </button>
+                    </div>
                   </li>
                 );
               })}

@@ -121,7 +121,12 @@ export default function TraineeDetail() {
         setProgress(tRes.progress || []);
         setModules(mods || []);
         setClients(clientList || []);
-        setMyClients((myClientRows || []).map((r) => r.client_name));
+        setMyClients(
+          (myClientRows || []).map((r) => ({
+            client_name: r.client_name,
+            handling_mode: r.handling_mode || "solo",
+          }))
+        );
 
         // Fetch all assignment CSVs in parallel
         if (tRes.trainee?.name) {
@@ -245,12 +250,18 @@ export default function TraineeDetail() {
             <p className="text-sm text-neutral-500 mt-1">assigned</p>
             {myClients.length > 0 && (
               <div className="mt-5 flex flex-wrap gap-1.5">
-                {myClients.map((name) => (
+                {myClients.map((c) => (
                   <span
-                    key={name}
-                    className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
+                    key={c.client_name}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
                   >
-                    {name}
+                    {c.client_name}
+                    <span
+                      className="text-[9px] uppercase tracking-wide"
+                      style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                    >
+                      {c.handling_mode === "assisted" ? "assisted" : "solo"}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -415,7 +426,7 @@ export default function TraineeDetail() {
         <ClientAssignDialog
           trainee={trainee}
           clients={clients}
-          assignedNames={myClients}
+          assigned={myClients}
           onClose={() => setAssignOpen(false)}
           onSaved={setMyClients}
         />

@@ -209,7 +209,7 @@ export default function Clients() {
       if (assignedFilter === "assigned" && owners.length === 0) return false;
       if (assignedFilter === "unassigned" && owners.length > 0) return false;
       if (q) {
-        const ownerNames = owners.map((id) => traineeById[id]?.name || "").join(" ");
+        const ownerNames = owners.map((o) => traineeById[o.trainee_id]?.name || "").join(" ");
         const hay = `${c.name} ${c.owner} ${ownerNames}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
@@ -535,14 +535,17 @@ export default function Clients() {
                           <span className="text-neutral-300">Unassigned</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
-                            {owners.map((id) => (
+                            {owners.map((o) => (
                               <Badge
-                                key={id}
+                                key={o.trainee_id}
                                 variant="secondary"
-                                className="rounded-full font-medium text-[11px]"
+                                className="rounded-full font-medium text-[11px] gap-1"
                                 style={{ backgroundColor: "#FFF0E8", color: ORANGE }}
                               >
-                                {traineeById[id]?.name || "Unknown"}
+                                {traineeById[o.trainee_id]?.name || "Unknown"}
+                                <span className="opacity-60 text-[9px] uppercase">
+                                  {o.handling_mode === "assisted" ? "assisted" : "solo"}
+                                </span>
                               </Badge>
                             ))}
                           </div>
@@ -553,7 +556,7 @@ export default function Clients() {
                           <RowPicker
                             client={c}
                             trainees={trainees}
-                            assignedIds={owners}
+                            assignedIds={owners.map((o) => o.trainee_id)}
                             onSaved={applyLocal}
                           />
                         </div>

@@ -1030,19 +1030,25 @@ export default function AdminDashboard() {
                                 </p>
                               ) : (
                                 <div className="flex flex-wrap gap-1">
-                                  {myClients.slice(0, 4).map((name) => (
+                                  {myClients.slice(0, 4).map((c) => (
                                     <span
-                                      key={name}
-                                      title={name}
-                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200 max-w-[130px] truncate"
+                                      key={c.client_name}
+                                      title={`${c.client_name} · ${c.handling_mode === "assisted" ? "assisted" : "solo"}`}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200 max-w-[150px] truncate"
                                     >
-                                      {name}
+                                      {c.client_name}
+                                      <span
+                                        className="text-[8px] uppercase tracking-wide flex-shrink-0"
+                                        style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                                      >
+                                        {c.handling_mode === "assisted" ? "assisted" : "solo"}
+                                      </span>
                                     </span>
                                   ))}
                                   {myClients.length > 4 && (
                                     <button
                                       onClick={() => setAssignFor(t)}
-                                      title={myClients.slice(4).join(", ")}
+                                      title={myClients.slice(4).map((c) => c.client_name).join(", ")}
                                       className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-neutral-400 hover:text-neutral-600"
                                     >
                                       +{myClients.length - 4} more
@@ -1106,18 +1112,19 @@ export default function AdminDashboard() {
         <ClientAssignDialog
           trainee={assignFor}
           clients={clients}
-          assignedNames={clientsByTrainee[assignFor.id] || []}
+          assigned={clientsByTrainee[assignFor.id] || []}
           ownersByClient={ownersByClient}
           onClose={() => setAssignFor(null)}
-          onSaved={(names) =>
+          onSaved={(assignments) =>
             // Patch in place rather than re-fetching the whole assignment list -
             // the dashboard already holds every other row unchanged.
             setClientAssignments((prev) => [
               ...prev.filter((a) => a.trainee_id !== assignFor.id),
-              ...names.map((n) => ({
-                id: `${assignFor.id}-${n}`,
+              ...assignments.map((a) => ({
+                id: `${assignFor.id}-${a.client_name}`,
                 trainee_id: assignFor.id,
-                client_name: n,
+                client_name: a.client_name,
+                handling_mode: a.handling_mode,
               })),
             ])
           }

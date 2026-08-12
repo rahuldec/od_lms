@@ -180,12 +180,13 @@ export const api = {
         .get(`${BASE}/admin/trainees/${traineeId}/clients`, { headers })
         .then((r) => r.data)
     ),
-  setTraineeClients: (traineeId, clientNames) =>
+  // assignments: [{ client_name, handling_mode }]
+  setTraineeClients: (traineeId, assignments) =>
     withAuthRetry((headers) =>
       axios
         .post(
           `${BASE}/admin/trainees/${traineeId}/clients`,
-          { client_names: clientNames },
+          { assignments },
           { headers }
         )
         .then((r) => r.data)
