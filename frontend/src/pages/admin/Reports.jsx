@@ -1,0 +1,469 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
+import { fetchAllAssignmentResults } from "@/lib/assignments";
+import { fetchSheetModules } from "@/lib/sheet";
+import { getLevelPeriods, toDateOnly, daysBetween } from "@/lib/levelHistory";
+import AppShell from "@/components/AppShell";
+import { Card } from "@/components/ui/card";
+import {
+  Download,
+  X,
+  Briefcase,
+  Layers,
+  MapPin,
+  Play,
+  AlertTriangle,
+} from "lucide-react";
+
+const ORANGE = "#E05A2B";
+
+const navItems = [
+  { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
+  { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
+  { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
+  { to: "/admin/clients", label: "Clients", testId: "nav-clients" },
+  { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
+  { to: "/admin/reports", label: "Reports", testId: "nav-reports" },
+  { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
+  { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
+  { to: "/admin/webinars", label: "Webinars", testId: "nav-webinars", group: "Content" },
+  { to: "/admin/results", label: "Results", testId: "nav-results", group: "Content" },
+];
+
+const fmtDate = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+/** [{trainee_id, ...}] -> { [traineeId]: [{...}] } */
+const groupByTrainee = (rows) => {
+  const map = {};
+  (rows || []).forEach((r) => {
+    if (!r?.trainee_id) return;
+    if (!map[r.trainee_id]) map[r.trainee_id] = [];
+    map[r.trainee_id].push(r);
+  });
+  return map;
+};
+
+export default function Reports() {
+  const [trainees, setTrainees] = useState([]);
+  const [clientAssignments, setClientAssignments] = useState([]);
+  const [projectAssignments, setProjectAssignments] = useState([]);
+  const [clientVisits, setClientVisits] = useState([]);
+  const [progressRows, setProgressRows] = useState([]);
+  const [assignmentResults, setAssignmentResults] = useState({});
+  const [sheetModules, setSheetModules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detailFor, setDetailFor] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [
+          traineeData,
+          clientData,
+          projectData,
+          visitData,
+          progressData,
+          assignmentData,
+          moduleData,
+        ] = await Promise.all([
+          api.listTrainees(),
+          api.listClientAssignments().catch(() => []),
+          api.listProjectAssignments().catch(() => []),
+          api.listClientVisits().catch(() => []),
+          api.listAllProgress().catch(() => []),
+          fetchAllAssignmentResults().catch(() => ({})),
+          fetchSheetModules().catch(() => []),
+        ]);
+        setTrainees(Array.isArray(traineeData) ? traineeData : []);
+        setClientAssignments(Array.isArray(clientData) ? clientData : []);
+        setProjectAssignments(Array.isArray(projectData) ? projectData : []);
+        setClientVisits(Array.isArray(visitData) ? visitData : []);
+        setProgressRows(Array.isArray(progressData) ? progressData : []);
+        setAssignmentResults(assignmentData || {});
+        setSheetModules(Array.isArray(moduleData) ? moduleData : []);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const lessonTitleById = useMemo(() => {
+    const map = {};
+    sheetModules.forEach((mod) => {
+      (mod.lessons || []).forEach((l) => {
+        map[l.id] = l.title;
+      });
+    });
+    return map;
+  }, [sheetModules]);
+
+  const progressByTrainee = useMemo(() => groupByTrainee(progressRows), [progressRows]);
+  const clientsByTrainee = useMemo(() => groupByTrainee(clientAssignments), [clientAssignments]);
+  const projectsByTrainee = useMemo(() => groupByTrainee(projectAssignments), [projectAssignments]);
+  const visitsByTrainee = useMemo(() => groupByTrainee(clientVisits), [clientVisits]);
+
+  // One row per trainee who has reached Level 1 at some point, built from
+  // level history rather than current_level - a trainee now at Level 2 was
+  // still promoted to Level 1 on the way there, and that's the milestone
+  // this report measures from.
+  const { rows, notYetCount } = useMemo(() => {
+    const today = todayStr();
+    let notYet = 0;
+    const built = trainees
+      .map((t) => {
+        const periods = getLevelPeriods(t, today);
+        const l1Period = periods.find((p) => p.level === 1);
+        if (!l1Period) {
+          notYet += 1;
+          return null;
+        }
+        const l1Date = l1Period.start;
+
+        const lessonRows = (progressByTrainee[t.id] || [])
+          .filter((p) => p.watched && toDateOnly(p.updated_at) >= l1Date)
+          .map((p) => ({ ...p, title: lessonTitleById[p.lesson_id] || p.lesson_id }))
+          .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+
+        const clientRows = (clientsByTrainee[t.id] || [])
+          .filter((c) => toDateOnly(c.assigned_at) >= l1Date)
+          .sort((a, b) => (a.assigned_at < b.assigned_at ? 1 : -1));
+
+        const projectRows = (projectsByTrainee[t.id] || [])
+          .filter((p) => toDateOnly(p.assigned_at) >= l1Date)
+          .sort((a, b) => (a.assigned_at < b.assigned_at ? 1 : -1));
+
+        const visitRows = (visitsByTrainee[t.id] || []).filter((v) => v.visit_count > 0);
+        const totalVisits = visitRows.reduce((sum, v) => sum + (v.visit_count || 0), 0);
+
+        const assignments = assignmentResults[t.name.trim().toLowerCase()] || [];
+        const passedCount = assignments.filter((a) => a.passed).length;
+
+        return {
+          trainee: t,
+          l1Date,
+          daysSinceL1: daysBetween(l1Date, today),
+          lessonRows,
+          clientRows,
+          projectRows,
+          visitRows,
+          totalVisits,
+          assignments,
+          passedCount,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.daysSinceL1 - a.daysSinceL1);
+    return { rows: built, notYetCount: notYet };
+  }, [
+    trainees,
+    progressByTrainee,
+    clientsByTrainee,
+    projectsByTrainee,
+    visitsByTrainee,
+    assignmentResults,
+    lessonTitleById,
+  ]);
+
+  const exportPdf = () => window.print();
+
+  return (
+    <AppShell navItems={navItems} subtitle="Admin">
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap no-print">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Reports</p>
+          <h1 className="text-4xl font-semibold mt-1 tracking-tight">Since Level 1</h1>
+          <p className="text-neutral-500 mt-2 max-w-2xl">
+            What each trainee has done since the day they were promoted to Level 1 - lessons
+            watched, clients and projects picked up, and visits logged. Trainees still at Level 0
+            aren't shown{notYetCount > 0 ? ` (${notYetCount} of them)` : ""}.
+          </p>
+        </div>
+        <button
+          onClick={exportPdf}
+          disabled={loading}
+          className="text-sm inline-flex items-center gap-2 rounded-full px-4 py-2 text-white font-medium disabled:opacity-50 flex-shrink-0"
+          style={{ backgroundColor: ORANGE }}
+        >
+          <Download className="h-3.5 w-3.5" />
+          Export PDF
+        </button>
+      </div>
+
+      <Card className="rounded-2xl border-amber-200 bg-amber-50/60 p-4 mb-6 no-print">
+        <div className="flex gap-3">
+          <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-900">
+            Assignment scores come from a live sheet with no reliable submission date, so the
+            "Assignments" figures are current totals, not filtered to since Level 1. Visit counts
+            are a running total with no per-visit date, so they can't be split by date either.
+          </p>
+        </div>
+      </Card>
+
+      <div id={detailFor ? undefined : "printable-report"}>
+        <Card className="rounded-2xl border-neutral-200/80 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-neutral-400 border-b border-neutral-100">
+                  <th className="py-2.5 pl-5 pr-4 font-medium">Trainee</th>
+                  <th className="py-2.5 pr-4 font-medium">Joined</th>
+                  <th className="py-2.5 pr-4 font-medium">Promoted to L1</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Days since</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Lessons watched</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Assignments</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Clients</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Projects</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Visits</th>
+                  <th className="py-2.5 pr-5 font-medium text-right no-print">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="py-8 text-center text-neutral-400">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-8 text-center text-neutral-400">
+                      No trainee has reached Level 1 yet.
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((r) => (
+                    <tr
+                      key={r.trainee.id}
+                      className="hover:bg-neutral-50/60 cursor-pointer"
+                      onClick={() => setDetailFor(r)}
+                    >
+                      <td className="py-2.5 pl-5 pr-4 font-medium text-neutral-800">
+                        {r.trainee.name}
+                      </td>
+                      <td className="py-2.5 pr-4 text-neutral-500">{fmtDate(r.trainee.join_date)}</td>
+                      <td className="py-2.5 pr-4 text-neutral-500">{fmtDate(r.l1Date)}</td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.daysSinceL1}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.lessonRows.length}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.passedCount}/{r.assignments.length}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.clientRows.length}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.projectRows.length}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.totalVisits}
+                      </td>
+                      <td className="py-2.5 pr-5 text-right no-print">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailFor(r);
+                          }}
+                          className="text-xs font-semibold hover:underline"
+                          style={{ color: ORANGE }}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+
+      {detailFor && (
+        <ReportDetailModal report={detailFor} onClose={() => setDetailFor(null)} />
+      )}
+    </AppShell>
+  );
+}
+
+function ReportDetailModal({ report, onClose }) {
+  const { trainee, l1Date, daysSinceL1, lessonRows, clientRows, projectRows, visitRows, assignments, passedCount } = report;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-neutral-900/70 backdrop-blur-sm flex items-center justify-center p-4 no-print"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-4 flex items-center justify-between border-b border-neutral-100 flex-shrink-0 no-print">
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-wider mb-0.5">
+              Since Level 1 report
+            </p>
+            <p className="font-semibold text-lg">{trainee.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="text-sm inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-white font-medium"
+              style={{ backgroundColor: ORANGE }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="h-8 w-8 rounded-full hover:bg-neutral-100 grid place-items-center"
+            >
+              <X className="h-4 w-4 text-neutral-500" />
+            </button>
+          </div>
+        </div>
+
+        <div id="printable-report" className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+          <div>
+            <h2 className="text-2xl font-semibold">{trainee.name}</h2>
+            <p className="text-sm text-neutral-500 mt-1">
+              Joined {fmtDate(trainee.join_date)} · Promoted to Level 1 on {fmtDate(l1Date)} ·{" "}
+              {daysSinceL1} days since
+            </p>
+          </div>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
+              <Play className="h-3 w-3" />
+              Lessons watched since L1 · {lessonRows.length}
+            </h3>
+            {lessonRows.length === 0 ? (
+              <p className="text-sm text-neutral-400">None yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
+                {lessonRows.map((l) => (
+                  <li key={l.lesson_id} className="px-3 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-neutral-700 truncate">{l.title}</span>
+                    <span className="text-xs text-neutral-400 flex-shrink-0 tabular-nums">
+                      {fmtDate(l.updated_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2">
+              Assignment scores (current) · {passedCount}/{assignments.length} passed
+            </h3>
+            {assignments.length === 0 ? (
+              <p className="text-sm text-neutral-400">No assignments recorded yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
+                {assignments.map((a) => (
+                  <li key={a.id} className="px-3 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-neutral-700">{a.name}</span>
+                    <span
+                      className="text-sm font-medium tabular-nums"
+                      style={{ color: a.passed ? "#16a34a" : "#dc2626" }}
+                    >
+                      {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
+              <Briefcase className="h-3 w-3" />
+              Clients handled since L1 · {clientRows.length}
+            </h3>
+            {clientRows.length === 0 ? (
+              <p className="text-sm text-neutral-400">None yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
+                {clientRows.map((c) => (
+                  <li key={c.client_name} className="px-3 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-neutral-700 truncate">
+                      {c.client_name}
+                      {c.handling_mode === "assisted" && (
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: ORANGE }}>
+                          assisted
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-neutral-400 flex-shrink-0 tabular-nums">
+                      {fmtDate(c.assigned_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
+              <Layers className="h-3 w-3" />
+              Projects handled since L1 · {projectRows.length}
+            </h3>
+            {projectRows.length === 0 ? (
+              <p className="text-sm text-neutral-400">None yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
+                {projectRows.map((p) => (
+                  <li key={p.project_name} className="px-3 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-neutral-700 truncate">
+                      {p.project_name}
+                      {p.handling_mode === "assisted" && (
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: ORANGE }}>
+                          assisted
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-neutral-400 flex-shrink-0 tabular-nums">
+                      {fmtDate(p.assigned_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
+              <MapPin className="h-3 w-3" />
+              Client visits (all-time total)
+            </h3>
+            {visitRows.length === 0 ? (
+              <p className="text-sm text-neutral-400">No visits logged.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
+                {visitRows.map((v) => (
+                  <li key={v.client_name} className="px-3 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-neutral-700 truncate">{v.client_name}</span>
+                    <span className="text-sm font-medium tabular-nums text-neutral-600">
+                      {v.visit_count}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1612,6 +1612,21 @@ async def list_published_results(ctx=Depends(require_user)):
 
 
 
+# ---------- admin reports ----------
+@api.get("/admin/reports/progress")
+async def report_progress(_=Depends(require_admin)):
+    """Every lesson_progress row across every trainee, in one call - used by
+    the Reports page to compute lessons watched since each trainee's Level 1
+    promotion date without an N+1 fetch per trainee."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/lesson_progress",
+            headers=ADMIN_HEADERS,
+            params={"select": "trainee_id,lesson_id,watched,updated_at"},
+        )
+    return r.json() if r.status_code == 200 else []
+
+
 # ---------- admin activity feed ----------
 @api.get("/admin/activity-feed")
 async def admin_activity_feed(_=Depends(require_admin)):

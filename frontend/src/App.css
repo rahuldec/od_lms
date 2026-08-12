@@ -14,3 +14,25 @@ textarea,
 select {
     font-family: inherit;
 }
+
+/* Used by the admin Reports page's "Export PDF" button - print only the
+   element with id="printable-report" (via window.print()), everything else
+   in the app chrome (nav, sidebars, other page content) is hidden. */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #printable-report,
+    #printable-report * {
+        visibility: visible;
+    }
+    #printable-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+    .no-print {
+        display: none !important;
+    }
+}

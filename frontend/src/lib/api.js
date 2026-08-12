@@ -276,6 +276,12 @@ export const api = {
     withAuthRetry((headers) =>
       axios.get(`${BASE}/admin/activity-feed`, { headers }).then((r) => r.data)
     ),
+  // Every lesson_progress row across every trainee - used by the Reports
+  // page to avoid an N+1 fetch per trainee.
+  listAllProgress: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/reports/progress`, { headers }).then((r) => r.data)
+    ),
 
 
   // Resources

@@ -5,9 +5,9 @@
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const toDateOnly = (value) => (value ? String(value).slice(0, 10) : null);
+export const toDateOnly = (value) => (value ? String(value).slice(0, 10) : null);
 
-const daysBetween = (startStr, endStr) => {
+export const daysBetween = (startStr, endStr) => {
   const start = new Date(`${startStr}T00:00:00Z`);
   const end = new Date(`${endStr}T00:00:00Z`);
   return Math.max(0, Math.round((end - start) / MS_PER_DAY));

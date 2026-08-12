@@ -141,6 +141,15 @@ export const ASSIGNMENTS = [
   },
 ];
 
+// Google Forms responses always add a "Timestamp" column by default, so this
+// is present on most of these sheets even though it's not declared per
+// assignment above. Read opportunistically - the Reports page uses it to
+// tell whether a score was submitted before or after a trainee's Level 1
+// promotion; if a sheet doesn't have any of these columns, submittedAt is
+// just null and that assignment is left out of "since" filtering rather
+// than guessed at.
+const DATE_COL_CANDIDATES = ["Timestamp", "Date", "Submitted At", "Submission Date"];
+
 // Case-insensitive lookup of the first candidate column name that actually
 // exists in a parsed CSV row. Falls back to null if none match.
 const resolveColumn = (row, candidates) => {
@@ -185,6 +194,9 @@ const fetchAllAssignmentResultsUncached = async () => {
             answer: (row[q] || "").trim(),
           }));
 
+          const dateCol = resolveColumn(row, DATE_COL_CANDIDATES);
+          const submittedAt = dateCol ? row[dateCol] || null : null;
+
           results[name].push({
             id: assignment.id,
             name: assignment.name,
@@ -192,6 +204,7 @@ const fetchAllAssignmentResultsUncached = async () => {
             total: assignment.totalMarks,
             passed: score >= assignment.passThreshold,
             link: row[assignment.linkCol] || null,
+            submittedAt,
             qa,
           });
         });
