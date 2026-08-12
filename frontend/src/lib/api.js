@@ -206,6 +206,10 @@ export const api = {
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/progress`, { headers }).then((r) => r.data)
     ),
+  myClients: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/trainee/clients`, { headers }).then((r) => r.data)
+    ),
   upsertProgress: (body) =>
     withAuthRetry((headers) =>
       axios.post(`${BASE}/trainee/progress`, body, { headers }).then((r) => r.data)

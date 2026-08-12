@@ -1540,6 +1540,29 @@ async def my_progress(ctx=Depends(require_user)):
     }
 
 
+@api.get("/trainee/clients")
+async def my_clients(ctx=Depends(require_user)):
+    if ctx["role"] != "trainee":
+        raise HTTPException(status_code=403, detail="Trainee only")
+    user = ctx["user"]
+    async with httpx.AsyncClient(timeout=20) as cx:
+        rt = await cx.get(f"{REST}/trainees?auth_user_id=eq.{user['id']}&select=id", headers=ADMIN_HEADERS)
+        rows = rt.json() if rt.status_code == 200 else []
+        if not rows:
+            return []
+        r = await cx.get(
+            f"{REST}/{TCA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{rows[0]['id']}",
+                "is_active": "eq.true",
+                "select": "client_name,handling_mode,assigned_at",
+                "order": "client_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
 @api.post("/trainee/progress")
 async def upsert_progress(body: ProgressIn, ctx=Depends(require_user)):
     if ctx["role"] != "trainee":

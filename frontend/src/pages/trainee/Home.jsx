@@ -7,6 +7,7 @@ import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  Briefcase,
   CheckCircle2,
   Circle,
   FileText,
@@ -100,6 +101,7 @@ export default function TraineeHome() {
   const [activeLesson, setActiveLesson] = useState(null);
   const [results, setResults] = useState([]);
   const [schedules, setSchedules] = useState([]);
+  const [clients, setClients] = useState([]);
 
   const reloadProgress = async () => {
     const res = await api.myProgress();
@@ -112,19 +114,21 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const [mods, allResults, publishedResults, mySchedules, _] = await Promise.all([
+        const [mods, allResults, publishedResults, mySchedules, myClients, _] = await Promise.all([
           fetchSheetModules(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listResults().catch(() => []),
           api.listMySchedules().catch(() => []),
+          api.myClients().catch(() => []),
           reloadProgress(),
         ]);
-        
+
         setModules(mods);
         const key = (trainee.name || "").trim().toLowerCase();
         setAssignments(allResults[key] || []);
         setResults(Array.isArray(publishedResults) ? publishedResults : []);
         setSchedules(Array.isArray(mySchedules) ? mySchedules : []);
+        setClients(Array.isArray(myClients) ? myClients : []);
       } catch (e) {
         toast.error("Could not load training content");
       } finally {
@@ -246,6 +250,31 @@ export default function TraineeHome() {
           />
         </div>
       </Card>
+
+      {clients.length > 0 && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4 inline-flex items-center gap-1.5">
+            <Briefcase className="h-3 w-3" />
+            Clients · {clients.length}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {clients.map((c) => (
+              <span
+                key={c.client_name}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-neutral-50 text-neutral-700 ring-1 ring-neutral-200"
+              >
+                {c.client_name}
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                >
+                  {c.handling_mode === "assisted" ? "assisted" : "solo"}
+                </span>
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
         <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Assignment scores</p>
