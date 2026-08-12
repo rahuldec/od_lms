@@ -5,14 +5,17 @@ import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchSheetModules } from "@/lib/sheet";
 import { fetchClients, groupAssignmentsByTrainee } from "@/lib/clients";
 import { groupProjectAssignmentsByTrainee } from "@/lib/projects";
+import { groupSprintAssignmentsByTrainee } from "@/lib/sprints";
 import { daysAtCurrentLevel } from "@/lib/levelHistory";
 import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
 import ProjectAssignDialog from "@/components/ProjectAssignDialog";
+import SprintAssignDialog from "@/components/SprintAssignDialog";
 import VisitLogDialog from "@/components/VisitLogDialog";
+import RemarksDialog from "@/components/RemarksDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Plus } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -244,10 +247,13 @@ function TraineeCard({
   batchNameById,
   myClients,
   myProjects,
+  mySprints,
   visitRows,
   onAssignClients,
   onAssignProjects,
+  onAssignSprints,
   onLogVisits,
+  onEditRemarks,
   onOpenAssignment,
 }) {
   const [scoresOpen, setScoresOpen] = useState(false);
@@ -331,10 +337,11 @@ function TraineeCard({
         )}
       </div>
 
-      {/* Clients / Projects / Visits sit side by side rather than stacked -
-          three short lists read better across than piled one under another,
-          especially now the text inside them is bigger. */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+      {/* Clients / Projects / Sprints / Visits sit side by side rather than
+          stacked - short lists read better across than piled one under
+          another, especially now the text inside them is bigger. Cards are
+          full-width now specifically to give this row room to breathe. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
       <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
@@ -433,6 +440,61 @@ function TraineeCard({
         )}
       </div>
 
+      <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+            <Rocket className="h-3 w-3 flex-shrink-0" />
+            Sprints
+          </span>
+          <button
+            onClick={onAssignSprints}
+            data-testid={`assign-sprints-${t.id}`}
+            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+            style={{ color: ORANGE }}
+          >
+            {mySprints.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
+          </button>
+        </div>
+        {mySprints.length > 0 && (
+          <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+            {mySprints.length} assigned
+            {assistedCount(mySprints) > 0 && (
+              <span style={{ color: ORANGE }}> · {assistedCount(mySprints)} assisted</span>
+            )}
+          </p>
+        )}
+        {mySprints.length === 0 ? (
+          <p className="text-sm text-neutral-300 mt-1.5">No sprints assigned</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5 min-w-0">
+            {mySprints.map((s) => (
+              <span
+                key={s.sprint_name}
+                title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
+                  s.handling_mode === "assisted"
+                    ? "bg-orange-50 text-orange-700 ring-orange-200"
+                    : "bg-white text-neutral-600 ring-neutral-200"
+                }`}
+              >
+                <span className="min-w-0 break-words">{s.sprint_name}</span>
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
+                  style={{ color: s.sprint_type === "major" ? "#2563eb" : "#a3a3a3" }}
+                >
+                  {s.sprint_type}
+                </span>
+                {s.handling_mode === "assisted" && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
+                    assisted
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Visits. A visit can be logged for any client from the sheet, not
           only ones formally assigned to this trainee, so this reads from
           visitRows directly rather than cross-referencing myClients. */}
@@ -479,6 +541,28 @@ function TraineeCard({
           </div>
         );
       })()}
+      </div>
+
+      {/* Remarks. Backed by trainees.notes - general free-text notes, not
+          tied to any specific client/project/sprint. */}
+      <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+            <MessageSquare className="h-3 w-3 flex-shrink-0" />
+            Remarks
+          </span>
+          <button
+            onClick={onEditRemarks}
+            data-testid={`edit-remarks-${t.id}`}
+            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+            style={{ color: ORANGE }}
+          >
+            {t.notes ? "Edit" : (<><Plus className="h-3 w-3" />Add</>)}
+          </button>
+        </div>
+        <p className={`text-sm mt-1.5 whitespace-pre-wrap break-words ${t.notes ? "text-neutral-600" : "text-neutral-300"}`}>
+          {t.notes || "No remarks yet"}
+        </p>
       </div>
 
       {/* Assignment scores. Collapsed to a one-line summary by default - five
@@ -720,8 +804,11 @@ export default function AdminDashboard() {
   const [assignFor, setAssignFor] = useState(null);
   const [projectAssignments, setProjectAssignments] = useState([]);
   const [projectAssignFor, setProjectAssignFor] = useState(null);
+  const [sprintAssignments, setSprintAssignments] = useState([]);
+  const [sprintAssignFor, setSprintAssignFor] = useState(null);
   const [clientVisits, setClientVisits] = useState([]);
   const [visitDialogFor, setVisitDialogFor] = useState(null);
+  const [remarksFor, setRemarksFor] = useState(null);
 
   // Collapsible sections below load nothing until first expanded - the
   // heaviest calls here (assignment scores, activity feed, batch modules)
@@ -778,6 +865,7 @@ export default function AdminDashboard() {
           clientData,
           clientAssignData,
           projectAssignData,
+          sprintAssignData,
           visitData,
         ] = await Promise.all([
           api.listTrainees(),
@@ -788,6 +876,7 @@ export default function AdminDashboard() {
           fetchClients().catch(() => []),
           api.listClientAssignments().catch(() => []),
           api.listProjectAssignments().catch(() => []),
+          api.listSprintAssignments().catch(() => []),
           api.listClientVisits().catch(() => []),
         ]);
         setTrainees(Array.isArray(data) ? data : []);
@@ -796,6 +885,7 @@ export default function AdminDashboard() {
         setClients(Array.isArray(clientData) ? clientData : []);
         setClientAssignments(Array.isArray(clientAssignData) ? clientAssignData : []);
         setProjectAssignments(Array.isArray(projectAssignData) ? projectAssignData : []);
+        setSprintAssignments(Array.isArray(sprintAssignData) ? sprintAssignData : []);
         setClientVisits(Array.isArray(visitData) ? visitData : []);
       } catch (e) {
         toast.error("Could not load trainees");
@@ -850,6 +940,11 @@ export default function AdminDashboard() {
   const projectsByTrainee = useMemo(
     () => groupProjectAssignmentsByTrainee(projectAssignments),
     [projectAssignments]
+  );
+
+  const sprintsByTrainee = useMemo(
+    () => groupSprintAssignmentsByTrainee(sprintAssignments),
+    [sprintAssignments]
   );
 
   // visitsByTrainee is keyed by trainee id -> [{client_name, visit_count}].
@@ -1383,7 +1478,7 @@ export default function AdminDashboard() {
 
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 p-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                       {lvlTrainees.map((t) => (
                         <TraineeCard
                           key={t.id}
@@ -1393,10 +1488,13 @@ export default function AdminDashboard() {
                           batchNameById={batchNameById}
                           myClients={clientsByTrainee[t.id] || []}
                           myProjects={projectsByTrainee[t.id] || []}
+                          mySprints={sprintsByTrainee[t.id] || []}
                           visitRows={visitsByTrainee[t.id] || []}
                           onAssignClients={() => setAssignFor(t)}
                           onAssignProjects={() => setProjectAssignFor(t)}
+                          onAssignSprints={() => setSprintAssignFor(t)}
                           onLogVisits={() => setVisitDialogFor(t)}
+                          onEditRemarks={() => setRemarksFor(t)}
                           onOpenAssignment={setActiveAssignment}
                         />
                       ))}
@@ -1459,6 +1557,26 @@ export default function AdminDashboard() {
         />
       )}
 
+      {sprintAssignFor && (
+        <SprintAssignDialog
+          trainee={sprintAssignFor}
+          assigned={sprintsByTrainee[sprintAssignFor.id] || []}
+          onClose={() => setSprintAssignFor(null)}
+          onSaved={(assignments) =>
+            setSprintAssignments((prev) => [
+              ...prev.filter((a) => a.trainee_id !== sprintAssignFor.id),
+              ...assignments.map((a) => ({
+                id: `${sprintAssignFor.id}-${a.sprint_name}`,
+                trainee_id: sprintAssignFor.id,
+                sprint_name: a.sprint_name,
+                sprint_type: a.sprint_type,
+                handling_mode: a.handling_mode,
+              })),
+            ])
+          }
+        />
+      )}
+
       {visitDialogFor && (
         <VisitLogDialog
           trainee={visitDialogFor}
@@ -1480,6 +1598,16 @@ export default function AdminDashboard() {
                 })),
               ];
             })
+          }
+        />
+      )}
+
+      {remarksFor && (
+        <RemarksDialog
+          trainee={remarksFor}
+          onClose={() => setRemarksFor(null)}
+          onSaved={(notes) =>
+            setTrainees((prev) => prev.map((t) => (t.id === remarksFor.id ? { ...t, notes } : t)))
           }
         />
       )}

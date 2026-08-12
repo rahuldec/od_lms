@@ -311,6 +311,20 @@ class ClientVisitIn(BaseModel):
     visit_count: int = 0
 
 
+class SprintIn(BaseModel):
+    name: str
+
+
+class TraineeSprintAssignmentIn(BaseModel):
+    sprint_name: str
+    sprint_type: Optional[str] = "minor"  # "major" | "minor"
+    handling_mode: Optional[str] = "solo"  # "solo" | "assisted"
+
+
+class TraineeSprintsIn(BaseModel):
+    assignments: List[TraineeSprintAssignmentIn] = []
+
+
 class AssignBatchIn(BaseModel):
     batch_id: Optional[str] = None
 
@@ -921,6 +935,7 @@ async def batch_analytics(batch_id: str, _=Depends(require_admin)):
 
 TCA = "trainee_client_assignments"
 HANDLING_MODES = {"solo", "assisted"}
+SPRINT_TYPES = {"major", "minor"}
 
 
 def _pgrst_value(value: str) -> str:
@@ -1224,6 +1239,116 @@ async def set_client_visit(trainee_id: str, body: ClientVisitIn, _=Depends(requi
         logger.error("visit set failed: %s %s", r.status_code, r.text)
         raise HTTPException(status_code=400, detail=f"visit update failed: {r.text}")
     return {"trainee_id": trainee_id, "client_name": client_name, "visit_count": visit_count}
+
+
+# ---------- trainee <-> sprint assignments ----------
+# Same shape as projects (in-app catalog, no external sheet) plus a
+# major/minor type per assignment.
+
+SPRINTS = "sprints"
+TSA = "trainee_sprint_assignments"
+
+
+@api.get("/admin/sprints")
+async def list_sprints(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{SPRINTS}",
+            headers=ADMIN_HEADERS,
+            params={"select": "id,name", "order": "name.asc"},
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/sprints")
+async def create_sprint(body: SprintIn, _=Depends(require_admin)):
+    """Add a sprint to the catalog. Idempotent on name, same as create_project."""
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        existing = await cx.get(
+            f"{REST}/{SPRINTS}",
+            headers=ADMIN_HEADERS,
+            params={"name": f"eq.{_pgrst_value(name)}", "select": "id,name"},
+        )
+        rows = existing.json() if existing.status_code == 200 else []
+        if rows:
+            return rows[0]
+
+        r = await cx.post(
+            f"{REST}/{SPRINTS}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"name": name},
+        )
+    if r.status_code not in (200, 201):
+        logger.error("sprint create failed: %s %s", r.status_code, r.text)
+        raise HTTPException(status_code=400, detail=f"create failed: {r.text}")
+    created = r.json()
+    return created[0] if isinstance(created, list) else created
+
+
+@api.get("/admin/sprint-assignments")
+async def list_sprint_assignments(_=Depends(require_admin)):
+    """Every active trainee<->sprint pair, for the dashboard to group in one call."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TSA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "is_active": "eq.true",
+                "select": "id,trainee_id,sprint_name,sprint_type,handling_mode,assigned_at",
+                "order": "sprint_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.get("/admin/trainees/{trainee_id}/sprints")
+async def get_trainee_sprints(trainee_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TSA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{trainee_id}",
+                "is_active": "eq.true",
+                "select": "id,trainee_id,sprint_name,sprint_type,handling_mode,assigned_at",
+                "order": "sprint_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/trainees/{trainee_id}/sprints")
+async def set_trainee_sprints(trainee_id: str, body: TraineeSprintsIn, _=Depends(require_admin)):
+    """Replace the full set of sprints assigned to one trainee."""
+    seen, rows = set(), []
+    for a in body.assignments:
+        name = (a.sprint_name or "").strip()
+        if not name or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        mode = a.handling_mode if a.handling_mode in HANDLING_MODES else "solo"
+        sprint_type = a.sprint_type if a.sprint_type in SPRINT_TYPES else "minor"
+        rows.append({
+            "trainee_id": trainee_id,
+            "sprint_name": name,
+            "sprint_type": sprint_type,
+            "handling_mode": mode,
+        })
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await _replace_assignments(
+            cx, TSA, "trainee_id,sprint_name", {"trainee_id": f"eq.{trainee_id}"}, rows
+        )
+    return {
+        "ok": True,
+        "trainee_id": trainee_id,
+        "sprint_names": [r["sprint_name"] for r in rows],
+        "assignments": rows,
+    }
 
 
 # ---------- admin resources ----------
@@ -1780,6 +1905,29 @@ async def my_projects(ctx=Depends(require_user)):
                 "is_active": "eq.true",
                 "select": "project_name,handling_mode,assigned_at",
                 "order": "project_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.get("/trainee/sprints")
+async def my_sprints(ctx=Depends(require_user)):
+    if ctx["role"] != "trainee":
+        raise HTTPException(status_code=403, detail="Trainee only")
+    user = ctx["user"]
+    async with httpx.AsyncClient(timeout=20) as cx:
+        rt = await cx.get(f"{REST}/trainees?auth_user_id=eq.{user['id']}&select=id", headers=ADMIN_HEADERS)
+        rows = rt.json() if rt.status_code == 200 else []
+        if not rows:
+            return []
+        r = await cx.get(
+            f"{REST}/{TSA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{rows[0]['id']}",
+                "is_active": "eq.true",
+                "select": "sprint_name,sprint_type,handling_mode,assigned_at",
+                "order": "sprint_name.asc",
             },
         )
     return r.json() if r.status_code == 200 else []

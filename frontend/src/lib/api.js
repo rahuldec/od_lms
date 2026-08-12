@@ -252,6 +252,38 @@ export const api = {
         .then((r) => r.data)
     ),
 
+  // Sprints catalog + trainee <-> sprint assignment. Same shape as projects,
+  // plus a major/minor sprint_type per assignment.
+  listSprints: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/sprints`, { headers }).then((r) => r.data)
+    ),
+  createSprint: (name) =>
+    withAuthRetry((headers) =>
+      axios.post(`${BASE}/admin/sprints`, { name }, { headers }).then((r) => r.data)
+    ),
+  listSprintAssignments: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/sprint-assignments`, { headers }).then((r) => r.data)
+    ),
+  getTraineeSprints: (traineeId) =>
+    withAuthRetry((headers) =>
+      axios
+        .get(`${BASE}/admin/trainees/${traineeId}/sprints`, { headers })
+        .then((r) => r.data)
+    ),
+  // assignments: [{ sprint_name, sprint_type, handling_mode }]
+  setTraineeSprints: (traineeId, assignments) =>
+    withAuthRetry((headers) =>
+      axios
+        .post(
+          `${BASE}/admin/trainees/${traineeId}/sprints`,
+          { assignments },
+          { headers }
+        )
+        .then((r) => r.data)
+    ),
+
   myProgress: () =>
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/progress`, { headers }).then((r) => r.data)
@@ -263,6 +295,10 @@ export const api = {
   myProjects: () =>
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/projects`, { headers }).then((r) => r.data)
+    ),
+  mySprints: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/trainee/sprints`, { headers }).then((r) => r.data)
     ),
   upsertProgress: (body) =>
     withAuthRetry((headers) =>
