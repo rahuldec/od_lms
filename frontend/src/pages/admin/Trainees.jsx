@@ -49,6 +49,7 @@ import {
 import { daysAtLevel } from "@/lib/levelHistory";
 
 const STATUSES = ["Active", "On Hold", "Exited"];
+const DEPARTMENTS = ["CS", "QA"];
 
 const statusBadge = (s) => {
   const map = {
@@ -59,12 +60,21 @@ const statusBadge = (s) => {
   return map[s] || "bg-neutral-100 text-neutral-600 ring-neutral-200";
 };
 
+const departmentBadge = (d) => {
+  const map = {
+    CS: "bg-blue-50 text-blue-700 ring-blue-200",
+    QA: "bg-purple-50 text-purple-700 ring-purple-200",
+  };
+  return map[d] || "bg-neutral-100 text-neutral-400 ring-neutral-200";
+};
+
 const emptyForm = {
   name: "",
   phone: "",
   join_date: "",
   manager: "",
   status: "Active",
+  department: "CS",
   notes: "",
   username: "",
   password: "",
@@ -94,6 +104,7 @@ export default function Trainees() {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -124,15 +135,17 @@ export default function Trainees() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (t) =>
+    return list.filter((t) => {
+      if (deptFilter !== "all" && t.department !== deptFilter) return false;
+      if (!q) return true;
+      return (
         t.name?.toLowerCase().includes(q) ||
         t.username?.toLowerCase().includes(q) ||
         t.manager?.toLowerCase().includes(q) ||
         t.phone?.toLowerCase().includes(q)
-    );
-  }, [list, search]);
+      );
+    });
+  }, [list, search, deptFilter]);
 
   const rows = useMemo(() => {
     const withDays = filtered.map((t) => ({ ...t, daysAtL0: daysAtLevel(t, 0) }));
@@ -165,6 +178,7 @@ export default function Trainees() {
       join_date: t.join_date || "",
       manager: t.manager || "",
       status: t.status || "Active",
+      department: t.department || "CS",
       notes: t.notes || "",
       username: t.username || "",
       password: "",
@@ -189,6 +203,7 @@ export default function Trainees() {
           join_date: form.join_date || null,
           manager: form.manager,
           status: form.status,
+          department: form.department,
           notes: form.notes,
           batch_id: form.batch_id || null,
           level_since_date: form.level_since_date || null,
@@ -206,6 +221,7 @@ export default function Trainees() {
           join_date: form.join_date || null,
           manager: form.manager,
           status: form.status,
+          department: form.department,
           notes: form.notes,
           username: form.username.trim().toLowerCase(),
           password: form.password,
@@ -289,7 +305,7 @@ export default function Trainees() {
 
       <Card className="rounded-2xl border-neutral-200/80 overflow-hidden">
         <div className="px-5 py-4 border-b border-neutral-100 flex items-center gap-3">
-          <Search className="h-4 w-4 text-neutral-400" />
+          <Search className="h-4 w-4 text-neutral-400 flex-shrink-0" />
           <input
             data-testid="trainee-search"
             placeholder="Search by name, username, phone, manager"
@@ -297,6 +313,17 @@ export default function Trainees() {
             onChange={(e) => setSearch(e.target.value)}
             className="bg-transparent flex-1 outline-none text-sm placeholder:text-neutral-400"
           />
+          <select
+            data-testid="department-filter"
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            className="text-sm border border-neutral-200 rounded-full px-3 py-1.5 bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-orange-200 flex-shrink-0"
+          >
+            <option value="all">All departments</option>
+            {DEPARTMENTS.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -304,6 +331,7 @@ export default function Trainees() {
               <tr className="text-left text-xs uppercase tracking-wider text-neutral-500 border-b border-neutral-100">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Username</th>
+                <th className="px-5 py-3 font-medium">Department</th>
                 <th className="px-5 py-3 font-medium">Batch</th>
                 <th className="px-5 py-3 font-medium">Manager</th>
                 <th className="px-5 py-3 font-medium">Joined</th>
@@ -332,11 +360,11 @@ export default function Trainees() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-neutral-400">Loading...</td>
+                  <td colSpan={10} className="px-5 py-12 text-center text-neutral-400">Loading...</td>
                 </tr>
               ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-12 text-center text-neutral-400">
+                  <td colSpan={10} className="px-5 py-12 text-center text-neutral-400">
                     No trainees yet. Click "Add trainee" to get started.
                   </td>
                 </tr>
@@ -353,6 +381,11 @@ export default function Trainees() {
                       </Link>
                     </td>
                     <td className="px-5 py-4 text-neutral-600">{t.username}</td>
+                    <td className="px-5 py-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ring-1 ${departmentBadge(t.department)}`}>
+                        {t.department || "—"}
+                      </span>
+                    </td>
                     <td className="px-5 py-4 text-neutral-600">
                       {t.batch_id ? (
                         <Link
@@ -508,6 +541,19 @@ export default function Trainees() {
                   <SelectContent>
                     {STATUSES.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-neutral-600">Department</Label>
+                <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+                  <SelectTrigger data-testid="form-department" className="h-10 rounded-xl mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((d) => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

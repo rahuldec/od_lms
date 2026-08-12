@@ -357,6 +357,17 @@ function TraineeCard({
             {batchNameById[t.batch_id]}
           </span>
         )}
+        {t.department && (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
+              t.department === "QA"
+                ? "bg-purple-50 text-purple-700 ring-purple-200"
+                : "bg-blue-50 text-blue-700 ring-blue-200"
+            }`}
+          >
+            {t.department}
+          </span>
+        )}
         {latestPromotion && (
           <span className="inline-flex items-center gap-0.5 text-xs text-neutral-400 ml-auto">
             <TrendingUp className="h-3 w-3" />
@@ -834,6 +845,7 @@ export default function AdminDashboard() {
   const [trainees, setTrainees] = useState([]);
   const [batches, setBatches] = useState([]);
   const [selectedBatch, setSelectedBatch] = useState("all");
+  const [selectedDept, setSelectedDept] = useState("all");
   const [assignmentResults, setAssignmentResults] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedLevel, setExpandedLevel] = useState(null);
@@ -1004,11 +1016,12 @@ export default function AdminDashboard() {
   }, [clientVisits]);
 
   const filteredTrainees = useMemo(() => {
-    const notExited = trainees.filter((t) => t.status !== "Exited");
-    if (selectedBatch === "all") return notExited;
-    if (selectedBatch === "none") return notExited.filter((t) => !t.batch_id);
-    return notExited.filter((t) => t.batch_id === selectedBatch);
-  }, [trainees, selectedBatch]);
+    let list = trainees.filter((t) => t.status !== "Exited");
+    if (selectedBatch === "none") list = list.filter((t) => !t.batch_id);
+    else if (selectedBatch !== "all") list = list.filter((t) => t.batch_id === selectedBatch);
+    if (selectedDept !== "all") list = list.filter((t) => t.department === selectedDept);
+    return list;
+  }, [trainees, selectedBatch, selectedDept]);
 
   const total = filteredTrainees.length;
   const active = filteredTrainees.filter((t) => t.status === "Active").length;
@@ -1294,8 +1307,16 @@ export default function AdminDashboard() {
         </Card>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-neutral-500">Filter by batch</p>
+      <div className="flex items-center justify-end gap-2 mb-4">
+        <select
+          value={selectedDept}
+          onChange={(e) => setSelectedDept(e.target.value)}
+          className="text-sm border border-neutral-200 rounded-full px-4 py-1.5 bg-white text-neutral-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
+        >
+          <option value="all">All departments</option>
+          <option value="CS">CS</option>
+          <option value="QA">QA</option>
+        </select>
         <select
           value={selectedBatch}
           onChange={(e) => setSelectedBatch(e.target.value)}

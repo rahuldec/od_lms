@@ -229,10 +229,14 @@ export default function TraineeDetail() {
               Level {trainee.current_level ?? 0}
             </Badge>
           </div>
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
             <div>
               <p className="text-xs uppercase tracking-wider text-neutral-500">Status</p>
               <p className="mt-1 font-medium">{trainee.status || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-neutral-500">Department</p>
+              <p className="mt-1 font-medium">{trainee.department || "—"}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-neutral-500">Manager</p>

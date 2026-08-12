@@ -236,6 +236,7 @@ class TraineeIn(BaseModel):
     username: str
     password: str
     batch_id: Optional[str] = None
+    department: Optional[str] = None  # "CS" | "QA"
 
 
 class TraineeUpdate(BaseModel):
@@ -247,6 +248,7 @@ class TraineeUpdate(BaseModel):
     notes: Optional[str] = None
     batch_id: Optional[str] = None
     level_since_date: Optional[str] = None
+    department: Optional[str] = None  # "CS" | "QA"
 
 
 class LevelChangeIn(BaseModel):
@@ -508,6 +510,7 @@ async def create_trainee(body: TraineeIn, _=Depends(require_admin)):
             "auth_user_id": auth_user_id,
             "current_level": 0,
             "batch_id": body.batch_id or None,
+            "department": body.department if body.department in ("CS", "QA") else None,
             "history": [{"type": "joined", "level": 0, "at": datetime.now(timezone.utc).isoformat()}],
         }
         r2 = await cx.post(f"{REST}/trainees", headers={**ADMIN_HEADERS, "Prefer": "return=representation"}, json=payload)
@@ -527,6 +530,8 @@ async def update_trainee(trainee_id: str, body: TraineeUpdate, _=Depends(require
         raise HTTPException(status_code=400, detail="No fields to update")
     if "join_date" in patch and not patch["join_date"]:
         patch["join_date"] = None
+    if "department" in patch and patch["department"] not in ("CS", "QA"):
+        raise HTTPException(status_code=400, detail="department must be CS or QA")
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.patch(
             f"{REST}/trainees?id=eq.{trainee_id}",
