@@ -7,9 +7,10 @@ import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Plus } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Plus, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
+import { daysAtLevel } from "@/lib/levelHistory";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -154,6 +155,7 @@ export default function TraineeDetail() {
 
   const watchedCount = useMemo(() => progress.filter((p) => p.watched).length, [progress]);
   const totalSeconds = useMemo(() => progress.reduce((acc, p) => acc + (p.watch_seconds || 0), 0), [progress]);
+  const daysAtL0 = useMemo(() => daysAtLevel(trainee, 0), [trainee]);
 
   if (loading) {
     return (
@@ -253,6 +255,20 @@ export default function TraineeDetail() {
                 ))}
               </div>
             )}
+          </Card>
+
+          {/* Days at Level 0 */}
+          <Card className="rounded-2xl border-neutral-200/80 p-7" data-testid="days-at-level0-card">
+            <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 inline-flex items-center gap-1.5">
+              <Hourglass className="h-3 w-3" />
+              Days at Level 0
+            </p>
+            <p className="text-4xl font-semibold mt-2 tabular-nums">{daysAtL0}</p>
+            <p className="text-sm text-neutral-500 mt-1">
+              {(trainee.current_level ?? 0) === 0
+                ? "still at Level 0"
+                : "total across time spent at Level 0"}
+            </p>
           </Card>
 
           {/* Video Progress */}
