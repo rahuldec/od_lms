@@ -244,7 +244,7 @@ function TraineeCard({
   batchNameById,
   myClients,
   myProjects,
-  visits,
+  visitRows,
   onAssignClients,
   onAssignProjects,
   onLogVisits,
@@ -335,19 +335,11 @@ function TraineeCard({
           three short lists read better across than piled one under another,
           especially now the text inside them is bigger. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-      <div className="relative rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-            <Briefcase className="h-3 w-3" />
-            Clients
-            {myClients.length > 0 && (
-              <span className="tabular-nums normal-case font-medium text-neutral-400">
-                · {myClients.length}
-                {assistedCount(myClients) > 0 && (
-                  <span style={{ color: ORANGE }}> ({assistedCount(myClients)} assisted)</span>
-                )}
-              </span>
-            )}
+      <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+        <div className="flex items-center justify-between gap-2 mb-0.5">
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold min-w-0">
+            <Briefcase className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">Clients</span>
           </span>
           <button
             onClick={onAssignClients}
@@ -358,10 +350,18 @@ function TraineeCard({
             {myClients.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
+        {myClients.length > 0 && (
+          <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+            {myClients.length} assigned
+            {assistedCount(myClients) > 0 && (
+              <span style={{ color: ORANGE }}> · {assistedCount(myClients)} assisted</span>
+            )}
+          </p>
+        )}
         {myClients.length === 0 ? (
-          <p className="text-sm text-neutral-300">No clients assigned</p>
+          <p className="text-sm text-neutral-300 mt-1.5">No clients assigned</p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 min-w-0">
             {myClients.map((c) => (
               <span
                 key={c.client_name}
@@ -384,19 +384,11 @@ function TraineeCard({
         )}
       </div>
 
-      <div className="relative rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-            <Layers className="h-3 w-3" />
-            Projects
-            {myProjects.length > 0 && (
-              <span className="tabular-nums normal-case font-medium text-neutral-400">
-                · {myProjects.length}
-                {assistedCount(myProjects) > 0 && (
-                  <span style={{ color: ORANGE }}> ({assistedCount(myProjects)} assisted)</span>
-                )}
-              </span>
-            )}
+      <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+        <div className="flex items-center justify-between gap-2 mb-0.5">
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold min-w-0">
+            <Layers className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">Projects</span>
           </span>
           <button
             onClick={onAssignProjects}
@@ -407,10 +399,18 @@ function TraineeCard({
             {myProjects.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
+        {myProjects.length > 0 && (
+          <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+            {myProjects.length} assigned
+            {assistedCount(myProjects) > 0 && (
+              <span style={{ color: ORANGE }}> · {assistedCount(myProjects)} assisted</span>
+            )}
+          </p>
+        )}
         {myProjects.length === 0 ? (
-          <p className="text-sm text-neutral-300">No projects assigned</p>
+          <p className="text-sm text-neutral-300 mt-1.5">No projects assigned</p>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 min-w-0">
             {myProjects.map((p) => (
               <span
                 key={p.project_name}
@@ -433,41 +433,38 @@ function TraineeCard({
         )}
       </div>
 
-      {/* Visits. Only lists clients with a logged count (rather than every
-          assigned client at 0) so an untouched book doesn't look identical
-          to the Clients section above it. */}
+      {/* Visits. A visit can be logged for any client from the sheet, not
+          only ones formally assigned to this trainee, so this reads from
+          visitRows directly rather than cross-referencing myClients. */}
       {(() => {
-        const visited = myClients
-          .map((c) => ({ ...c, count: visits[c.client_name.trim().toLowerCase()] || 0 }))
-          .filter((c) => c.count > 0);
+        const visited = visitRows
+          .filter((v) => v.visit_count > 0)
+          .map((v) => ({ client_name: v.client_name, count: v.visit_count }));
         return (
-          <div className="relative rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-                <MapPin className="h-3 w-3" />
-                Visits
-                {visited.length > 0 && (
-                  <span className="tabular-nums normal-case font-medium text-neutral-400">
-                    · {visited.reduce((sum, c) => sum + c.count, 0)}
-                  </span>
-                )}
+          <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold min-w-0">
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">Visits</span>
               </span>
               <button
                 onClick={onLogVisits}
                 data-testid={`log-visits-${t.id}`}
                 className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
                 style={{ color: ORANGE }}
-                disabled={myClients.length === 0}
               >
                 {visited.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Log</>)}
               </button>
             </div>
-            {myClients.length === 0 ? (
-              <p className="text-sm text-neutral-300">Assign a client first</p>
-            ) : visited.length === 0 ? (
-              <p className="text-sm text-neutral-300">No visits logged</p>
+            {visited.length > 0 && (
+              <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+                {visited.reduce((sum, c) => sum + c.count, 0)} total
+              </p>
+            )}
+            {visited.length === 0 ? (
+              <p className="text-sm text-neutral-300 mt-1.5">No visits logged</p>
             ) : (
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 min-w-0">
                 {visited.map((c) => (
                   <span
                     key={c.client_name}
@@ -855,14 +852,15 @@ export default function AdminDashboard() {
     [projectAssignments]
   );
 
-  // visitsByTrainee is keyed by trainee id, then by lowercased client name,
-  // for O(1) lookup from each client badge in TraineeCard.
+  // visitsByTrainee is keyed by trainee id -> [{client_name, visit_count}].
+  // Not filtered through myClients, since a visit can be logged for any
+  // client from the sheet, not only ones formally assigned to the trainee.
   const visitsByTrainee = useMemo(() => {
     const map = {};
     clientVisits.forEach((v) => {
       if (!v?.trainee_id || !v?.client_name) return;
-      if (!map[v.trainee_id]) map[v.trainee_id] = {};
-      map[v.trainee_id][v.client_name.trim().toLowerCase()] = v.visit_count || 0;
+      if (!map[v.trainee_id]) map[v.trainee_id] = [];
+      map[v.trainee_id].push({ client_name: v.client_name, visit_count: v.visit_count || 0 });
     });
     return map;
   }, [clientVisits]);
@@ -1395,7 +1393,7 @@ export default function AdminDashboard() {
                           batchNameById={batchNameById}
                           myClients={clientsByTrainee[t.id] || []}
                           myProjects={projectsByTrainee[t.id] || []}
-                          visits={visitsByTrainee[t.id] || {}}
+                          visitRows={visitsByTrainee[t.id] || []}
                           onAssignClients={() => setAssignFor(t)}
                           onAssignProjects={() => setProjectAssignFor(t)}
                           onLogVisits={() => setVisitDialogFor(t)}
@@ -1464,8 +1462,8 @@ export default function AdminDashboard() {
       {visitDialogFor && (
         <VisitLogDialog
           trainee={visitDialogFor}
-          clients={clientsByTrainee[visitDialogFor.id] || []}
-          visits={visitsByTrainee[visitDialogFor.id] || {}}
+          allClients={clients}
+          visits={visitsByTrainee[visitDialogFor.id] || []}
           onClose={() => setVisitDialogFor(null)}
           onSaved={(saved) =>
             setClientVisits((prev) => {
