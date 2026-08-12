@@ -336,10 +336,10 @@ function TraineeCard({
           especially now the text inside them is bigger. */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
       <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-        <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
             <Briefcase className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">Clients</span>
+            Clients
           </span>
           <button
             onClick={onAssignClients}
@@ -366,13 +366,13 @@ function TraineeCard({
               <span
                 key={c.client_name}
                 title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ring-1 max-w-[170px] ${
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
                   c.handling_mode === "assisted"
                     ? "bg-orange-50 text-orange-700 ring-orange-200"
                     : "bg-white text-neutral-600 ring-neutral-200"
                 }`}
               >
-                <span className="truncate">{c.client_name}</span>
+                <span className="min-w-0 break-words">{c.client_name}</span>
                 {c.handling_mode === "assisted" && (
                   <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
                     assisted
@@ -385,10 +385,10 @@ function TraineeCard({
       </div>
 
       <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-        <div className="flex items-center justify-between gap-2 mb-0.5">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
             <Layers className="h-3 w-3 flex-shrink-0" />
-            <span className="truncate">Projects</span>
+            Projects
           </span>
           <button
             onClick={onAssignProjects}
@@ -415,13 +415,13 @@ function TraineeCard({
               <span
                 key={p.project_name}
                 title={`${p.project_name} · ${p.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ring-1 max-w-[170px] ${
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
                   p.handling_mode === "assisted"
                     ? "bg-orange-50 text-orange-700 ring-orange-200"
                     : "bg-white text-neutral-600 ring-neutral-200"
                 }`}
               >
-                <span className="truncate">{p.project_name}</span>
+                <span className="min-w-0 break-words">{p.project_name}</span>
                 {p.handling_mode === "assisted" && (
                   <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
                     assisted
@@ -442,10 +442,10 @@ function TraineeCard({
           .map((v) => ({ client_name: v.client_name, count: v.visit_count }));
         return (
           <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-            <div className="flex items-center justify-between gap-2 mb-0.5">
-              <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+              <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
                 <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">Visits</span>
+                Visits
               </span>
               <button
                 onClick={onLogVisits}
@@ -468,9 +468,9 @@ function TraineeCard({
                 {visited.map((c) => (
                   <span
                     key={c.client_name}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ring-1 max-w-[190px] bg-white text-neutral-600 ring-neutral-200"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full bg-white text-neutral-600 ring-neutral-200"
                   >
-                    <span className="truncate">{c.client_name}</span>
+                    <span className="min-w-0 break-words">{c.client_name}</span>
                     <span className="tabular-nums text-neutral-400 flex-shrink-0">· {c.count}</span>
                   </span>
                 ))}
