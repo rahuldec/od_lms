@@ -235,6 +235,13 @@ function ModuleComparisonTooltip({ active, payload, label }) {
 
 const assistedCount = (list) => list.filter((x) => x.handling_mode === "assisted").length;
 
+// Overall bugs% for a trainee: the plain average of bugs_percent across
+// every sprint they've been assigned, rounded to the nearest whole percent.
+const avgBugsPercent = (sprints) =>
+  sprints.length
+    ? Math.round(sprints.reduce((sum, s) => sum + (s.bugs_percent || 0), 0) / sprints.length)
+    : 0;
+
 // One trainee's card inside a Level distribution group. Split out from the
 // inline map so the assignment score list can hold its own collapsed/expanded
 // state - the score bars are the tallest, least-glanceable part of the card,
@@ -463,6 +470,7 @@ function TraineeCard({
               {assistedCount(mySprints) > 0 && (
                 <span style={{ color: ORANGE }}> · {assistedCount(mySprints)} assisted</span>
               )}
+              <span style={{ color: "#dc2626" }}> · avg {avgBugsPercent(mySprints)}% bugs</span>
             </p>
             <button
               onClick={() => setSprintsOpen((v) => !v)}
