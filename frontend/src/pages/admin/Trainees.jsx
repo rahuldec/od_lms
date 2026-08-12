@@ -42,7 +42,11 @@ import {
   Trash2,
   TrendingUp,
   TrendingDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+import { daysAtLevel } from "@/lib/levelHistory";
 
 const STATUSES = ["Active", "On Hold", "Exited"];
 
@@ -97,6 +101,7 @@ export default function Trainees() {
   const [promotingId, setPromotingId] = useState(null);
   const [demotingId, setDemotingId] = useState(null);
   const [levelDialog, setLevelDialog] = useState(null); // { trainee, action: "promote" | "demote", date }
+  const [sortDaysL0, setSortDaysL0] = useState(null); // "asc" | "desc" | null
 
   const load = async () => {
     setLoading(true);
@@ -127,6 +132,18 @@ export default function Trainees() {
         t.phone?.toLowerCase().includes(q)
     );
   }, [list, search]);
+
+  const rows = useMemo(() => {
+    const withDays = filtered.map((t) => ({ ...t, daysAtL0: daysAtLevel(t, 0) }));
+    if (!sortDaysL0) return withDays;
+    return [...withDays].sort((a, b) =>
+      sortDaysL0 === "desc" ? b.daysAtL0 - a.daysAtL0 : a.daysAtL0 - b.daysAtL0
+    );
+  }, [filtered, sortDaysL0]);
+
+  const toggleSortDaysL0 = () => {
+    setSortDaysL0((cur) => (cur === "desc" ? "asc" : cur === "asc" ? null : "desc"));
+  };
 
   const getBatchName = (batch_id) => {
     const b = batches.find((b) => b.id === batch_id);
@@ -291,22 +308,39 @@ export default function Trainees() {
                 <th className="px-5 py-3 font-medium">Joined</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Level</th>
+                <th className="px-5 py-3 font-medium">
+                  <button
+                    data-testid="sort-days-l0"
+                    onClick={toggleSortDaysL0}
+                    className="inline-flex items-center gap-1 hover:text-neutral-800"
+                    title="Sort by days spent at Level 0"
+                  >
+                    Days @ L0
+                    {sortDaysL0 === "desc" ? (
+                      <ArrowDown className="h-3 w-3" />
+                    ) : sortDaysL0 === "asc" ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 text-neutral-300" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-5 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-neutral-400">Loading...</td>
+                  <td colSpan={9} className="px-5 py-12 text-center text-neutral-400">Loading...</td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-12 text-center text-neutral-400">
+                  <td colSpan={9} className="px-5 py-12 text-center text-neutral-400">
                     No trainees yet. Click "Add trainee" to get started.
                   </td>
                 </tr>
               ) : (
-                filtered.map((t) => (
+                rows.map((t) => (
                   <tr key={t.id} className="border-b border-neutral-50 hover:bg-neutral-50/60">
                     <td className="px-5 py-4 font-medium text-neutral-900">
                       <Link
@@ -348,6 +382,10 @@ export default function Trainees() {
                           since {t.level_since_date}
                         </div>
                       )}
+                    </td>
+                    <td className="px-5 py-4 text-neutral-600 tabular-nums" data-testid={`days-l0-${t.id}`}>
+                      {t.daysAtL0}
+                      <span className="text-neutral-400 ml-1">{t.daysAtL0 === 1 ? "day" : "days"}</span>
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="inline-flex items-center gap-1.5">
