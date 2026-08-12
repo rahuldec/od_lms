@@ -331,12 +331,11 @@ function TraineeCard({
         )}
       </div>
 
-      {/* Client book. Shown for every trainee, empty or not - an empty strip
-          with an Assign affordance is the point, since unassigned trainees
-          are exactly the ones worth spotting here. Every assigned client is
-          listed (no truncation). Visit counts live in their own section
-          below rather than on the badge itself. */}
-      <div className="relative mb-2 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+      {/* Clients / Projects / Visits sit side by side rather than stacked -
+          three short lists read better across than piled one under another,
+          especially now the text inside them is bigger. */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+      <div className="relative rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
             <Briefcase className="h-3 w-3" />
@@ -385,8 +384,7 @@ function TraineeCard({
         )}
       </div>
 
-      {/* Project book. Same shape as Clients. */}
-      <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+      <div className="relative rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
             <Layers className="h-3 w-3" />
@@ -443,7 +441,7 @@ function TraineeCard({
           .map((c) => ({ ...c, count: visits[c.client_name.trim().toLowerCase()] || 0 }))
           .filter((c) => c.count > 0);
         return (
-          <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+          <div className="relative rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
                 <MapPin className="h-3 w-3" />
@@ -484,6 +482,7 @@ function TraineeCard({
           </div>
         );
       })()}
+      </div>
 
       {/* Assignment scores. Collapsed to a one-line summary by default - five
           full progress bars per card, times every trainee in an expanded
@@ -1386,7 +1385,7 @@ export default function AdminDashboard() {
 
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 p-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       {lvlTrainees.map((t) => (
                         <TraineeCard
                           key={t.id}
