@@ -15,7 +15,7 @@ import VisitLogDialog from "@/components/VisitLogDialog";
 import RemarksDialog from "@/components/RemarksDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Plus } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Info, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -257,6 +257,7 @@ function TraineeCard({
   onOpenAssignment,
 }) {
   const [scoresOpen, setScoresOpen] = useState(false);
+  const [sprintsOpen, setSprintsOpen] = useState(false);
 
   const history = Array.isArray(t.history) ? t.history : [];
   const promotions = history.filter((h) => h.type === "promotion");
@@ -456,16 +457,25 @@ function TraineeCard({
           </button>
         </div>
         {mySprints.length > 0 && (
-          <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
-            {mySprints.length} assigned
-            {assistedCount(mySprints) > 0 && (
-              <span style={{ color: ORANGE }}> · {assistedCount(mySprints)} assisted</span>
-            )}
-          </p>
+          <div className="flex items-center gap-1 mb-1.5">
+            <p className="text-[11px] text-neutral-400 tabular-nums">
+              {mySprints.length} assigned
+              {assistedCount(mySprints) > 0 && (
+                <span style={{ color: ORANGE }}> · {assistedCount(mySprints)} assisted</span>
+              )}
+            </p>
+            <button
+              onClick={() => setSprintsOpen((v) => !v)}
+              title={sprintsOpen ? "Hide sprint details" : "Show sprint details"}
+              className="text-neutral-400 hover:text-neutral-600 flex-shrink-0"
+            >
+              <Info className="h-3 w-3" />
+            </button>
+          </div>
         )}
         {mySprints.length === 0 ? (
           <p className="text-sm text-neutral-300 mt-1.5">No sprints assigned</p>
-        ) : (
+        ) : !sprintsOpen ? null : (
           <div className="flex flex-wrap gap-1.5 min-w-0">
             {mySprints.map((s) => (
               <span
