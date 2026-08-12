@@ -293,6 +293,24 @@ class ClientTraineesIn(BaseModel):
     trainee_ids: List[str] = []
 
 
+class ProjectIn(BaseModel):
+    name: str
+
+
+class TraineeProjectAssignmentIn(BaseModel):
+    project_name: str
+    handling_mode: Optional[str] = "solo"  # "solo" | "assisted"
+
+
+class TraineeProjectsIn(BaseModel):
+    assignments: List[TraineeProjectAssignmentIn] = []
+
+
+class ClientVisitIn(BaseModel):
+    client_name: str
+    delta: int = 1
+
+
 class AssignBatchIn(BaseModel):
     batch_id: Optional[str] = None
 
@@ -916,17 +934,23 @@ def _pgrst_value(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-async def _replace_assignments(cx, filter_params: Dict[str, str], rows: List[Dict[str, Any]]):
-    """Deactivate everything matching filter_params, then upsert rows as active."""
+async def _replace_assignments(
+    cx, table: str, conflict_cols: str, filter_params: Dict[str, str], rows: List[Dict[str, Any]]
+):
+    """Deactivate everything matching filter_params, then upsert rows as active.
+
+    Shared by the client and project assignment tables - both are "replace
+    the whole active set" mappings with the same is_active/updated_at shape.
+    """
     now = datetime.now(timezone.utc).isoformat()
     query = "&".join(f"{k}={v}" for k, v in filter_params.items())
     rd = await cx.patch(
-        f"{REST}/{TCA}?{query}",
+        f"{REST}/{table}?{query}",
         headers=ADMIN_HEADERS,
         json={"is_active": False, "updated_at": now},
     )
     if rd.status_code not in (200, 201, 204):
-        logger.error("client assignment deactivate failed: %s %s", rd.status_code, rd.text)
+        logger.error("%s deactivate failed: %s %s", table, rd.status_code, rd.text)
         raise HTTPException(status_code=400, detail=f"deactivate failed: {rd.text}")
 
     if not rows:
@@ -935,7 +959,7 @@ async def _replace_assignments(cx, filter_params: Dict[str, str], rows: List[Dic
     # on_conflict goes in the URL, matching set_batch_modules - keeping the two
     # upserts identical means anything that works there works here.
     r = await cx.post(
-        f"{REST}/{TCA}?on_conflict=trainee_id,client_name",
+        f"{REST}/{table}?on_conflict={conflict_cols}",
         headers={**ADMIN_HEADERS, "Prefer": "resolution=merge-duplicates"},
         json=[{**row, "is_active": True, "updated_at": now} for row in rows],
     )
@@ -943,7 +967,7 @@ async def _replace_assignments(cx, filter_params: Dict[str, str], rows: List[Dic
         # Surface PostgREST's own message rather than a bare 400 - a missing
         # table, a schema-cache miss and a constraint violation all look
         # identical from the browser otherwise.
-        logger.error("client assignment upsert failed: %s %s", r.status_code, r.text)
+        logger.error("%s upsert failed: %s %s", table, r.status_code, r.text)
         raise HTTPException(status_code=400, detail=f"upsert failed: {r.text}")
 
 
@@ -992,7 +1016,9 @@ async def set_trainee_clients(trainee_id: str, body: TraineeClientsIn, _=Depends
         rows.append({"trainee_id": trainee_id, "client_name": name, "handling_mode": mode})
 
     async with httpx.AsyncClient(timeout=20) as cx:
-        await _replace_assignments(cx, {"trainee_id": f"eq.{trainee_id}"}, rows)
+        await _replace_assignments(
+            cx, TCA, "trainee_id,client_name", {"trainee_id": f"eq.{trainee_id}"}, rows
+        )
     return {
         "ok": True,
         "trainee_id": trainee_id,
@@ -1029,6 +1055,8 @@ async def set_client_trainees(body: ClientTraineesIn, _=Depends(require_admin)):
 
         await _replace_assignments(
             cx,
+            TCA,
+            "trainee_id,client_name",
             {"client_name": f"eq.{_pgrst_value(client_name)}"},
             [
                 {
@@ -1040,6 +1068,173 @@ async def set_client_trainees(body: ClientTraineesIn, _=Depends(require_admin)):
             ],
         )
     return {"ok": True, "client_name": client_name, "trainee_ids": trainee_ids}
+
+
+# ---------- trainee <-> project assignments ----------
+# Unlike clients, projects have no external sheet as a source of truth -
+# the catalog lives entirely in Supabase and is grown by admins as they go
+# (create_project is idempotent on name, so the assign dialog can just let
+# an admin type a new name without a separate "manage projects" screen).
+
+PROJECTS = "projects"
+TPA = "trainee_project_assignments"
+
+
+@api.get("/admin/projects")
+async def list_projects(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{PROJECTS}",
+            headers=ADMIN_HEADERS,
+            params={"select": "id,name", "order": "name.asc"},
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/projects")
+async def create_project(body: ProjectIn, _=Depends(require_admin)):
+    """Add a project to the catalog. Idempotent - re-adding an existing name
+    (case-insensitive) returns that project instead of erroring, since the
+    assign dialog treats "type a new name" and "pick an existing one" the
+    same way."""
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        existing = await cx.get(
+            f"{REST}/{PROJECTS}",
+            headers=ADMIN_HEADERS,
+            params={"name": f"eq.{_pgrst_value(name)}", "select": "id,name"},
+        )
+        rows = existing.json() if existing.status_code == 200 else []
+        if rows:
+            return rows[0]
+
+        r = await cx.post(
+            f"{REST}/{PROJECTS}",
+            headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
+            json={"name": name},
+        )
+    if r.status_code not in (200, 201):
+        logger.error("project create failed: %s %s", r.status_code, r.text)
+        raise HTTPException(status_code=400, detail=f"create failed: {r.text}")
+    created = r.json()
+    return created[0] if isinstance(created, list) else created
+
+
+@api.get("/admin/project-assignments")
+async def list_project_assignments(_=Depends(require_admin)):
+    """Every active trainee<->project pair, for the dashboard to group in one call."""
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TPA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "is_active": "eq.true",
+                "select": "id,trainee_id,project_name,handling_mode,assigned_at",
+                "order": "project_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.get("/admin/trainees/{trainee_id}/projects")
+async def get_trainee_projects(trainee_id: str, _=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TPA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{trainee_id}",
+                "is_active": "eq.true",
+                "select": "id,trainee_id,project_name,handling_mode,assigned_at",
+                "order": "project_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/trainees/{trainee_id}/projects")
+async def set_trainee_projects(trainee_id: str, body: TraineeProjectsIn, _=Depends(require_admin)):
+    """Replace the full set of projects assigned to one trainee."""
+    seen, rows = set(), []
+    for a in body.assignments:
+        name = (a.project_name or "").strip()
+        if not name or name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        mode = a.handling_mode if a.handling_mode in HANDLING_MODES else "solo"
+        rows.append({"trainee_id": trainee_id, "project_name": name, "handling_mode": mode})
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        await _replace_assignments(
+            cx, TPA, "trainee_id,project_name", {"trainee_id": f"eq.{trainee_id}"}, rows
+        )
+    return {
+        "ok": True,
+        "trainee_id": trainee_id,
+        "project_names": [r["project_name"] for r in rows],
+        "assignments": rows,
+    }
+
+
+# ---------- client visit counter ----------
+# A simple running total per trainee-client pair, no per-visit history.
+
+TCV = "trainee_client_visits"
+
+
+@api.get("/admin/client-visits")
+async def list_client_visits(_=Depends(require_admin)):
+    async with httpx.AsyncClient(timeout=20) as cx:
+        r = await cx.get(
+            f"{REST}/{TCV}",
+            headers=ADMIN_HEADERS,
+            params={"select": "trainee_id,client_name,visit_count"},
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.post("/admin/trainees/{trainee_id}/visits")
+async def adjust_client_visit(trainee_id: str, body: ClientVisitIn, _=Depends(require_admin)):
+    """Increment or decrement the visit count for one trainee-client pair,
+    clamped at zero so a stray extra click can't go negative."""
+    client_name = (body.client_name or "").strip()
+    if not client_name:
+        raise HTTPException(status_code=400, detail="client_name is required")
+
+    async with httpx.AsyncClient(timeout=20) as cx:
+        existing = await cx.get(
+            f"{REST}/{TCV}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{trainee_id}",
+                "client_name": f"eq.{_pgrst_value(client_name)}",
+                "select": "visit_count",
+            },
+        )
+        rows = existing.json() if existing.status_code == 200 else []
+        current = rows[0]["visit_count"] if rows else 0
+        next_count = max(0, current + body.delta)
+
+        r = await cx.post(
+            f"{REST}/{TCV}?on_conflict=trainee_id,client_name",
+            headers={
+                **ADMIN_HEADERS,
+                "Prefer": "resolution=merge-duplicates,return=representation",
+            },
+            json={
+                "trainee_id": trainee_id,
+                "client_name": client_name,
+                "visit_count": next_count,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    if r.status_code not in (200, 201):
+        logger.error("visit adjust failed: %s %s", r.status_code, r.text)
+        raise HTTPException(status_code=400, detail=f"visit update failed: {r.text}")
+    return {"trainee_id": trainee_id, "client_name": client_name, "visit_count": next_count}
 
 
 # ---------- admin resources ----------
@@ -1558,6 +1753,29 @@ async def my_clients(ctx=Depends(require_user)):
                 "is_active": "eq.true",
                 "select": "client_name,handling_mode,assigned_at",
                 "order": "client_name.asc",
+            },
+        )
+    return r.json() if r.status_code == 200 else []
+
+
+@api.get("/trainee/projects")
+async def my_projects(ctx=Depends(require_user)):
+    if ctx["role"] != "trainee":
+        raise HTTPException(status_code=403, detail="Trainee only")
+    user = ctx["user"]
+    async with httpx.AsyncClient(timeout=20) as cx:
+        rt = await cx.get(f"{REST}/trainees?auth_user_id=eq.{user['id']}&select=id", headers=ADMIN_HEADERS)
+        rows = rt.json() if rt.status_code == 200 else []
+        if not rows:
+            return []
+        r = await cx.get(
+            f"{REST}/{TPA}",
+            headers=ADMIN_HEADERS,
+            params={
+                "trainee_id": f"eq.{rows[0]['id']}",
+                "is_active": "eq.true",
+                "select": "project_name,handling_mode,assigned_at",
+                "order": "project_name.asc",
             },
         )
     return r.json() if r.status_code == 200 else []

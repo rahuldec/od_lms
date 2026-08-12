@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchSheetModules } from "@/lib/sheet";
 import { fetchClients, groupAssignmentsByTrainee } from "@/lib/clients";
+import { groupProjectAssignmentsByTrainee } from "@/lib/projects";
 import { daysAtCurrentLevel } from "@/lib/levelHistory";
 import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
+import ProjectAssignDialog from "@/components/ProjectAssignDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, Plus } from "lucide-react";
@@ -49,6 +51,8 @@ const navItems = [
   { to: "/admin/webinars", label: "Webinars", testId: "nav-webinars", group: "Content" },
   { to: "/admin/results", label: "Results", testId: "nav-results", group: "Content" },
 ];
+
+const ORANGE = "#E05A2B";
 
 const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
 
@@ -220,6 +224,293 @@ function ModuleComparisonTooltip({ active, payload, label }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+const assistedCount = (list) => list.filter((x) => x.handling_mode === "assisted").length;
+
+// One trainee's card inside a Level distribution group. Split out from the
+// inline map so the assignment score list can hold its own collapsed/expanded
+// state - the score bars are the tallest, least-glanceable part of the card,
+// so they start collapsed to a one-line summary instead of always rendering
+// five full progress bars per trainee.
+function TraineeCard({
+  t,
+  assignments,
+  assignmentsLoading,
+  batchNameById,
+  myClients,
+  myProjects,
+  visits,
+  onAssignClients,
+  onAssignProjects,
+  onAdjustVisit,
+  onOpenAssignment,
+}) {
+  const [scoresOpen, setScoresOpen] = useState(false);
+
+  const history = Array.isArray(t.history) ? t.history : [];
+  const promotions = history.filter((h) => h.type === "promotion");
+  const latestPromotion = promotions[promotions.length - 1];
+  const days = daysSince(t.join_date);
+  const levelDays = daysAtCurrentLevel(t);
+
+  let scoreSum = 0;
+  let totalSum = 0;
+  let passedCount = 0;
+  assignments.forEach((a) => {
+    if (a.score != null && a.total != null) {
+      scoreSum += a.score;
+      totalSum += a.total;
+    }
+    if (a.passed) passedCount += 1;
+  });
+  const avgPct = totalSum > 0 ? Math.round((scoreSum / totalSum) * 100) : null;
+
+  return (
+    <div className="relative border border-neutral-200 rounded-xl p-3.5 hover:shadow-sm hover:border-neutral-300 transition-all bg-white overflow-hidden">
+      {days !== null && (
+        <div
+          className="absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
+          style={{ fontSize: "3.75rem", color: ORANGE, opacity: 0.07 }}
+        >
+          {days}
+        </div>
+      )}
+      <div className="relative flex items-start justify-between mb-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className="h-8 w-8 rounded-full grid place-items-center text-white text-xs font-semibold flex-shrink-0"
+            style={{ backgroundColor: ORANGE }}
+          >
+            {t.name?.charAt(0).toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <Link
+              to={`/admin/trainees/${t.id}`}
+              className="text-sm font-medium text-neutral-900 hover:underline truncate block"
+            >
+              {t.name}
+            </Link>
+            <p className="text-xs text-neutral-400 truncate">@{t.username}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 ${
+            t.status === "Active"
+              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+              : "bg-neutral-100 text-neutral-600 ring-neutral-200"
+          }`}
+        >
+          {t.status}
+        </span>
+        <span
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+          style={{ backgroundColor: "#FFF0E8", color: ORANGE }}
+          title={`${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`}
+        >
+          L{t.current_level ?? 0}
+          <span className="opacity-60 tabular-nums">· {levelDays}d</span>
+        </span>
+        {t.batch_id && batchNameById[t.batch_id] && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+            {batchNameById[t.batch_id]}
+          </span>
+        )}
+        {latestPromotion && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] text-neutral-400 ml-auto">
+            <TrendingUp className="h-2.5 w-2.5" />
+            {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
+          </span>
+        )}
+      </div>
+
+      {/* Client book. Shown for every trainee, empty or not - an empty strip
+          with an Assign affordance is the point, since unassigned trainees
+          are exactly the ones worth spotting here. Every assigned client is
+          listed (no truncation), and each carries its own visit counter. */}
+      <div className="relative mb-2 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
+            <Briefcase className="h-2.5 w-2.5" />
+            Clients
+            {myClients.length > 0 && (
+              <span className="tabular-nums normal-case font-medium text-neutral-400">
+                · {myClients.length}
+                {assistedCount(myClients) > 0 && (
+                  <span style={{ color: ORANGE }}> ({assistedCount(myClients)} assisted)</span>
+                )}
+              </span>
+            )}
+          </span>
+          <button
+            onClick={onAssignClients}
+            data-testid={`assign-clients-${t.id}`}
+            className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+            style={{ color: ORANGE }}
+          >
+            {myClients.length > 0 ? "Manage" : (<><Plus className="h-2.5 w-2.5" />Assign</>)}
+          </button>
+        </div>
+        {myClients.length === 0 ? (
+          <p className="text-[11px] text-neutral-300">No clients assigned</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {myClients.map((c) => {
+              const key = c.client_name.trim().toLowerCase();
+              const visitCount = visits[key] || 0;
+              return (
+                <span
+                  key={c.client_name}
+                  title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                  className={`inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[190px] ${
+                    c.handling_mode === "assisted"
+                      ? "bg-orange-50 text-orange-700 ring-orange-200"
+                      : "bg-white text-neutral-600 ring-neutral-200"
+                  }`}
+                >
+                  <span className="truncate">{c.client_name}</span>
+                  {c.handling_mode === "assisted" && (
+                    <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
+                      assisted
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-0.5 ml-0.5 pl-1 border-l border-current/20 flex-shrink-0">
+                    <button
+                      onClick={() => onAdjustVisit(c.client_name, -1)}
+                      disabled={visitCount === 0}
+                      title="Log one fewer visit"
+                      className="leading-none w-3.5 opacity-50 hover:opacity-100 disabled:opacity-20"
+                    >
+                      −
+                    </button>
+                    <span className="tabular-nums" title={`${visitCount} visit${visitCount === 1 ? "" : "s"} logged`}>
+                      {visitCount}
+                    </span>
+                    <button
+                      onClick={() => onAdjustVisit(c.client_name, 1)}
+                      title="Log a visit"
+                      className="leading-none w-3.5 opacity-50 hover:opacity-100"
+                    >
+                      +
+                    </button>
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Project book. Same shape as Clients, no visit tracking. */}
+      <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
+            <Layers className="h-2.5 w-2.5" />
+            Projects
+            {myProjects.length > 0 && (
+              <span className="tabular-nums normal-case font-medium text-neutral-400">
+                · {myProjects.length}
+                {assistedCount(myProjects) > 0 && (
+                  <span style={{ color: ORANGE }}> ({assistedCount(myProjects)} assisted)</span>
+                )}
+              </span>
+            )}
+          </span>
+          <button
+            onClick={onAssignProjects}
+            data-testid={`assign-projects-${t.id}`}
+            className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+            style={{ color: ORANGE }}
+          >
+            {myProjects.length > 0 ? "Manage" : (<><Plus className="h-2.5 w-2.5" />Assign</>)}
+          </button>
+        </div>
+        {myProjects.length === 0 ? (
+          <p className="text-[11px] text-neutral-300">No projects assigned</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {myProjects.map((p) => (
+              <span
+                key={p.project_name}
+                title={`${p.project_name} · ${p.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[170px] ${
+                  p.handling_mode === "assisted"
+                    ? "bg-orange-50 text-orange-700 ring-orange-200"
+                    : "bg-white text-neutral-600 ring-neutral-200"
+                }`}
+              >
+                <span className="truncate">{p.project_name}</span>
+                {p.handling_mode === "assisted" && (
+                  <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
+                    assisted
+                  </span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Assignment scores. Collapsed to a one-line summary by default - five
+          full progress bars per card, times every trainee in an expanded
+          level, is the single biggest source of clutter on this page. */}
+      {assignmentsLoading ? (
+        <p className="text-[11px] text-neutral-400">Loading assignment scores…</p>
+      ) : assignments.length === 0 ? (
+        <p className="text-[11px] text-neutral-400">No assignments yet</p>
+      ) : (
+        <div>
+          <button
+            onClick={() => setScoresOpen((v) => !v)}
+            className="w-full flex items-center justify-between text-[11px] text-neutral-500 hover:text-neutral-700"
+          >
+            <span>
+              {passedCount}/{assignments.length} passed
+              {avgPct != null && (
+                <span className="text-neutral-400"> · avg {avgPct}%</span>
+              )}
+            </span>
+            {scoresOpen ? (
+              <ChevronUp className="h-3 w-3 text-neutral-400" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-neutral-400" />
+            )}
+          </button>
+          {scoresOpen && (
+            <div className="flex flex-col gap-1.5 mt-2">
+              {assignments.map((a) => {
+                const color = a.passed ? "#16a34a" : "#dc2626";
+                const pct = a.total ? Math.min(100, Math.round((a.score / a.total) * 100)) : 0;
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => onOpenAssignment(a)}
+                    className="text-left hover:opacity-80 transition-opacity"
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[11px] text-neutral-500">{a.name}</span>
+                      <span className="text-[11px] font-medium" style={{ color }}>
+                        {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
+                      </span>
+                    </div>
+                    <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${pct}%`, backgroundColor: color }}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -402,6 +693,9 @@ export default function AdminDashboard() {
   const [clients, setClients] = useState([]);
   const [clientAssignments, setClientAssignments] = useState([]);
   const [assignFor, setAssignFor] = useState(null);
+  const [projectAssignments, setProjectAssignments] = useState([]);
+  const [projectAssignFor, setProjectAssignFor] = useState(null);
+  const [clientVisits, setClientVisits] = useState([]);
 
   // Collapsible sections below load nothing until first expanded - the
   // heaviest calls here (assignment scores, activity feed, batch modules)
@@ -451,7 +745,15 @@ export default function AdminDashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const [data, batchData, resultsData, clientData, clientAssignData] = await Promise.all([
+        const [
+          data,
+          batchData,
+          resultsData,
+          clientData,
+          clientAssignData,
+          projectAssignData,
+          visitData,
+        ] = await Promise.all([
           api.listTrainees(),
           api.listBatches().catch(() => []),
           api.listResultsAdmin().catch(() => []),
@@ -459,12 +761,16 @@ export default function AdminDashboard() {
           // clients strip to empty, not take the whole dashboard down.
           fetchClients().catch(() => []),
           api.listClientAssignments().catch(() => []),
+          api.listProjectAssignments().catch(() => []),
+          api.listClientVisits().catch(() => []),
         ]);
         setTrainees(Array.isArray(data) ? data : []);
         setBatches(Array.isArray(batchData) ? batchData : []);
         setResults(Array.isArray(resultsData) ? resultsData.filter((r) => r.published).slice(0, 3) : []);
         setClients(Array.isArray(clientData) ? clientData : []);
         setClientAssignments(Array.isArray(clientAssignData) ? clientAssignData : []);
+        setProjectAssignments(Array.isArray(projectAssignData) ? projectAssignData : []);
+        setClientVisits(Array.isArray(visitData) ? visitData : []);
       } catch (e) {
         toast.error("Could not load trainees");
       } finally {
@@ -514,6 +820,47 @@ export default function AdminDashboard() {
     });
     return map;
   }, [clientAssignments, traineeNameById]);
+
+  const projectsByTrainee = useMemo(
+    () => groupProjectAssignmentsByTrainee(projectAssignments),
+    [projectAssignments]
+  );
+
+  // visitsByTrainee is keyed by trainee id, then by lowercased client name,
+  // for O(1) lookup from each client badge in TraineeCard.
+  const visitsByTrainee = useMemo(() => {
+    const map = {};
+    clientVisits.forEach((v) => {
+      if (!v?.trainee_id || !v?.client_name) return;
+      if (!map[v.trainee_id]) map[v.trainee_id] = {};
+      map[v.trainee_id][v.client_name.trim().toLowerCase()] = v.visit_count || 0;
+    });
+    return map;
+  }, [clientVisits]);
+
+  const adjustVisit = useCallback(async (traineeId, clientName, delta) => {
+    // Optimistic update - the counter should feel instant, and a failed
+    // request is rare enough (and low-stakes enough) to just resync from
+    // the server's response rather than build a rollback path.
+    setClientVisits((prev) => {
+      const key = clientName.trim().toLowerCase();
+      const idx = prev.findIndex(
+        (v) => v.trainee_id === traineeId && v.client_name.trim().toLowerCase() === key
+      );
+      const nextCount = Math.max(0, (idx >= 0 ? prev[idx].visit_count : 0) + delta);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], visit_count: nextCount };
+        return copy;
+      }
+      return [...prev, { trainee_id: traineeId, client_name: clientName, visit_count: nextCount }];
+    });
+    try {
+      await api.adjustClientVisit(traineeId, clientName, delta);
+    } catch {
+      toast.error("Could not update visit count");
+    }
+  }, []);
 
   const filteredTrainees = useMemo(() => {
     const notExited = trainees.filter((t) => t.status !== "Exited");
@@ -1034,190 +1381,22 @@ export default function AdminDashboard() {
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {lvlTrainees.map((t) => {
-                        const history = Array.isArray(t.history) ? t.history : [];
-                        const promotions = history.filter((h) => h.type === "promotion");
-                        const assignments = getAssignments(t.name);
-                        const days = daysSince(t.join_date);
-                        const levelDays = daysAtCurrentLevel(t);
-                        const latestPromotion = promotions[promotions.length - 1];
-                        const myClients = clientsByTrainee[t.id] || [];
-                        const assistedClientCount = myClients.filter(
-                          (c) => c.handling_mode === "assisted"
-                        ).length;
-                        return (
-                          <div
-                            key={t.id}
-                            className="relative border border-neutral-200 rounded-xl p-3.5 hover:shadow-sm hover:border-neutral-300 transition-all bg-white overflow-hidden"
-                          >
-                            {days !== null && (
-                              <div
-                                className="absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
-                                style={{
-                                  fontSize: "3.75rem",
-                                  color: "#E05A2B",
-                                  opacity: 0.07,
-                                }}
-                              >
-                                {days}
-                              </div>
-                            )}
-                            <div className="relative flex items-start justify-between mb-2.5">
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <div
-                                  className="h-8 w-8 rounded-full grid place-items-center text-white text-xs font-semibold flex-shrink-0"
-                                  style={{ backgroundColor: "#E05A2B" }}
-                                >
-                                  {t.name?.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="min-w-0">
-                                  <Link
-                                    to={`/admin/trainees/${t.id}`}
-                                    className="text-sm font-medium text-neutral-900 hover:underline truncate block"
-                                  >
-                                    {t.name}
-                                  </Link>
-                                  <p className="text-xs text-neutral-400 truncate">
-                                    @{t.username}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1.5 mb-3">
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 ${
-                                  t.status === "Active"
-                                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                                    : "bg-neutral-100 text-neutral-600 ring-neutral-200"
-                                }`}
-                              >
-                                {t.status}
-                              </span>
-                              <span
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
-                                style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}
-                                title={`${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`}
-                              >
-                                L{t.current_level ?? 0}
-                                <span className="opacity-60 tabular-nums">· {levelDays}d</span>
-                              </span>
-                              {t.batch_id && batchNameById[t.batch_id] && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 ring-1 ring-blue-200">
-                                  {batchNameById[t.batch_id]}
-                                </span>
-                              )}
-                              {latestPromotion && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] text-neutral-400 ml-auto">
-                                  <TrendingUp className="h-2.5 w-2.5" />
-                                  {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Client book. Shown for every trainee, empty or
-                                not - an empty strip with an Assign affordance
-                                is the point, since unassigned trainees are
-                                exactly the ones worth spotting here. Every
-                                assigned client is listed (no truncation) so
-                                the full book is visible without opening the
-                                manage dialog. */}
-                            <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-                                  <Briefcase className="h-2.5 w-2.5" />
-                                  Clients
-                                  {myClients.length > 0 && (
-                                    <span className="tabular-nums normal-case font-medium text-neutral-400">
-                                      · {myClients.length}
-                                      {assistedClientCount > 0 && (
-                                        <span style={{ color: "#E05A2B" }}>
-                                          {" "}
-                                          ({assistedClientCount} assisted)
-                                        </span>
-                                      )}
-                                    </span>
-                                  )}
-                                </span>
-                                <button
-                                  onClick={() => setAssignFor(t)}
-                                  data-testid={`assign-clients-${t.id}`}
-                                  className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-                                  style={{ color: "#E05A2B" }}
-                                >
-                                  {myClients.length > 0 ? (
-                                    "Manage"
-                                  ) : (
-                                    <>
-                                      <Plus className="h-2.5 w-2.5" />
-                                      Assign
-                                    </>
-                                  )}
-                                </button>
-                              </div>
-                              {myClients.length === 0 ? (
-                                <p className="text-[11px] text-neutral-300">
-                                  No clients assigned
-                                </p>
-                              ) : (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {myClients.map((c) => (
-                                    <span
-                                      key={c.client_name}
-                                      title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[170px] ${
-                                        c.handling_mode === "assisted"
-                                          ? "bg-orange-50 text-orange-700 ring-orange-200"
-                                          : "bg-white text-neutral-600 ring-neutral-200"
-                                      }`}
-                                    >
-                                      <span className="truncate">{c.client_name}</span>
-                                      {c.handling_mode === "assisted" && (
-                                        <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
-                                          assisted
-                                        </span>
-                                      )}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            {assignmentsLoading ? (
-                              <p className="text-[11px] text-neutral-400">Loading assignment scores…</p>
-                            ) : assignments.length > 0 ? (
-                              <div className="flex flex-col gap-1.5">
-                                {assignments.map((a) => {
-                                  const color = a.passed ? "#16a34a" : "#dc2626";
-                                  const pct = a.total ? Math.min(100, Math.round((a.score / a.total) * 100)) : 0;
-                                  return (
-                                    <button
-                                      key={a.id}
-                                      onClick={() => setActiveAssignment(a)}
-                                      className="text-left hover:opacity-80 transition-opacity"
-                                    >
-                                      <div className="flex items-center justify-between mb-0.5">
-                                        <span className="text-[11px] text-neutral-500">{a.name}</span>
-                                        <span className="text-[11px] font-medium" style={{ color }}>
-                                          {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
-                                        </span>
-                                      </div>
-                                      <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full rounded-full"
-                                          style={{ width: `${pct}%`, backgroundColor: color }}
-                                        />
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-[11px] text-neutral-400">No assignments yet</p>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {lvlTrainees.map((t) => (
+                        <TraineeCard
+                          key={t.id}
+                          t={t}
+                          assignments={getAssignments(t.name)}
+                          assignmentsLoading={assignmentsLoading}
+                          batchNameById={batchNameById}
+                          myClients={clientsByTrainee[t.id] || []}
+                          myProjects={projectsByTrainee[t.id] || []}
+                          visits={visitsByTrainee[t.id] || {}}
+                          onAssignClients={() => setAssignFor(t)}
+                          onAssignProjects={() => setProjectAssignFor(t)}
+                          onAdjustVisit={(clientName, delta) => adjustVisit(t.id, clientName, delta)}
+                          onOpenAssignment={setActiveAssignment}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -1251,6 +1430,25 @@ export default function AdminDashboard() {
                 id: `${assignFor.id}-${a.client_name}`,
                 trainee_id: assignFor.id,
                 client_name: a.client_name,
+                handling_mode: a.handling_mode,
+              })),
+            ])
+          }
+        />
+      )}
+
+      {projectAssignFor && (
+        <ProjectAssignDialog
+          trainee={projectAssignFor}
+          assigned={projectsByTrainee[projectAssignFor.id] || []}
+          onClose={() => setProjectAssignFor(null)}
+          onSaved={(assignments) =>
+            setProjectAssignments((prev) => [
+              ...prev.filter((a) => a.trainee_id !== projectAssignFor.id),
+              ...assignments.map((a) => ({
+                id: `${projectAssignFor.id}-${a.project_name}`,
+                trainee_id: projectAssignFor.id,
+                project_name: a.project_name,
                 handling_mode: a.handling_mode,
               })),
             ])

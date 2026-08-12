@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Circle,
   FileText,
+  Layers,
   Play,
   ChevronRight,
   Loader2,
@@ -102,6 +103,7 @@ export default function TraineeHome() {
   const [results, setResults] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [clients, setClients] = useState([]);
+  const [projects, setProjects] = useState([]);
 
   const reloadProgress = async () => {
     const res = await api.myProgress();
@@ -114,12 +116,13 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const [mods, allResults, publishedResults, mySchedules, myClients, _] = await Promise.all([
+        const [mods, allResults, publishedResults, mySchedules, myClients, myProjects, _] = await Promise.all([
           fetchSheetModules(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listResults().catch(() => []),
           api.listMySchedules().catch(() => []),
           api.myClients().catch(() => []),
+          api.myProjects().catch(() => []),
           reloadProgress(),
         ]);
 
@@ -129,6 +132,7 @@ export default function TraineeHome() {
         setResults(Array.isArray(publishedResults) ? publishedResults : []);
         setSchedules(Array.isArray(mySchedules) ? mySchedules : []);
         setClients(Array.isArray(myClients) ? myClients : []);
+        setProjects(Array.isArray(myProjects) ? myProjects : []);
       } catch (e) {
         toast.error("Could not load training content");
       } finally {
@@ -269,6 +273,31 @@ export default function TraineeHome() {
                   style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
                 >
                   {c.handling_mode === "assisted" ? "assisted" : "solo"}
+                </span>
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {projects.length > 0 && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4 inline-flex items-center gap-1.5">
+            <Layers className="h-3 w-3" />
+            Projects · {projects.length}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {projects.map((p) => (
+              <span
+                key={p.project_name}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-neutral-50 text-neutral-700 ring-1 ring-neutral-200"
+              >
+                {p.project_name}
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ color: p.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                >
+                  {p.handling_mode === "assisted" ? "assisted" : "solo"}
                 </span>
               </span>
             ))}

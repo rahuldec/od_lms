@@ -202,6 +202,55 @@ export const api = {
         .then((r) => r.data)
     ),
 
+  // Client visit counter - a simple running total per trainee-client pair.
+  listClientVisits: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/client-visits`, { headers }).then((r) => r.data)
+    ),
+  adjustClientVisit: (traineeId, clientName, delta) =>
+    withAuthRetry((headers) =>
+      axios
+        .post(
+          `${BASE}/admin/trainees/${traineeId}/visits`,
+          { client_name: clientName, delta },
+          { headers }
+        )
+        .then((r) => r.data)
+    ),
+
+  // Projects catalog + trainee <-> project assignment. Unlike clients,
+  // there's no external sheet - the catalog lives in Supabase and grows as
+  // admins add new project names from the assign dialog.
+  listProjects: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/projects`, { headers }).then((r) => r.data)
+    ),
+  createProject: (name) =>
+    withAuthRetry((headers) =>
+      axios.post(`${BASE}/admin/projects`, { name }, { headers }).then((r) => r.data)
+    ),
+  listProjectAssignments: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/project-assignments`, { headers }).then((r) => r.data)
+    ),
+  getTraineeProjects: (traineeId) =>
+    withAuthRetry((headers) =>
+      axios
+        .get(`${BASE}/admin/trainees/${traineeId}/projects`, { headers })
+        .then((r) => r.data)
+    ),
+  // assignments: [{ project_name, handling_mode }]
+  setTraineeProjects: (traineeId, assignments) =>
+    withAuthRetry((headers) =>
+      axios
+        .post(
+          `${BASE}/admin/trainees/${traineeId}/projects`,
+          { assignments },
+          { headers }
+        )
+        .then((r) => r.data)
+    ),
+
   myProgress: () =>
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/progress`, { headers }).then((r) => r.data)
@@ -209,6 +258,10 @@ export const api = {
   myClients: () =>
     withAuthRetry((headers) =>
       axios.get(`${BASE}/trainee/clients`, { headers }).then((r) => r.data)
+    ),
+  myProjects: () =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/trainee/projects`, { headers }).then((r) => r.data)
     ),
   upsertProgress: (body) =>
     withAuthRetry((headers) =>

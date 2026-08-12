@@ -5,9 +5,10 @@ import { fetchSheetModules } from "@/lib/sheet";
 import { fetchClients } from "@/lib/clients";
 import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
+import ProjectAssignDialog from "@/components/ProjectAssignDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Plus, Hourglass } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Layers, Plus, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { daysAtLevel } from "@/lib/levelHistory";
@@ -107,15 +108,18 @@ export default function TraineeDetail() {
   const [clients, setClients] = useState([]);
   const [myClients, setMyClients] = useState([]);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [myProjects, setMyProjects] = useState([]);
+  const [projectAssignOpen, setProjectAssignOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [tRes, mods, clientList, myClientRows] = await Promise.all([
+        const [tRes, mods, clientList, myClientRows, myProjectRows] = await Promise.all([
           api.getTrainee(id),
           fetchSheetModules().catch(() => []),
           fetchClients().catch(() => []),
           api.getTraineeClients(id).catch(() => []),
+          api.getTraineeProjects(id).catch(() => []),
         ]);
         setTrainee(tRes.trainee || null);
         setProgress(tRes.progress || []);
@@ -124,6 +128,12 @@ export default function TraineeDetail() {
         setMyClients(
           (myClientRows || []).map((r) => ({
             client_name: r.client_name,
+            handling_mode: r.handling_mode || "solo",
+          }))
+        );
+        setMyProjects(
+          (myProjectRows || []).map((r) => ({
+            project_name: r.project_name,
             handling_mode: r.handling_mode || "solo",
           }))
         );
@@ -261,6 +271,43 @@ export default function TraineeDetail() {
                       style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
                     >
                       {c.handling_mode === "assisted" ? "assisted" : "solo"}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Project book */}
+          <Card className="rounded-2xl border-neutral-200/80 p-7">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 inline-flex items-center gap-1.5">
+                <Layers className="h-3 w-3" />
+                Projects
+              </p>
+              <button
+                onClick={() => setProjectAssignOpen(true)}
+                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5"
+                style={{ color: "#E05A2B" }}
+              >
+                {myProjects.length > 0 ? "Manage" : <><Plus className="h-3 w-3" />Assign</>}
+              </button>
+            </div>
+            <p className="text-4xl font-semibold mt-2 tabular-nums">{myProjects.length}</p>
+            <p className="text-sm text-neutral-500 mt-1">assigned</p>
+            {myProjects.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-1.5">
+                {myProjects.map((p) => (
+                  <span
+                    key={p.project_name}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
+                  >
+                    {p.project_name}
+                    <span
+                      className="text-[9px] uppercase tracking-wide"
+                      style={{ color: p.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                    >
+                      {p.handling_mode === "assisted" ? "assisted" : "solo"}
                     </span>
                   </span>
                 ))}
@@ -429,6 +476,15 @@ export default function TraineeDetail() {
           assigned={myClients}
           onClose={() => setAssignOpen(false)}
           onSaved={setMyClients}
+        />
+      )}
+
+      {projectAssignOpen && (
+        <ProjectAssignDialog
+          trainee={trainee}
+          assigned={myProjects}
+          onClose={() => setProjectAssignOpen(false)}
+          onSaved={setMyProjects}
         />
       )}
     </AppShell>
