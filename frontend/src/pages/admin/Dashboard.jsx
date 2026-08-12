@@ -282,7 +282,7 @@ function TraineeCard({
       <div className="relative flex items-start justify-between mb-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
           <div
-            className="h-8 w-8 rounded-full grid place-items-center text-white text-xs font-semibold flex-shrink-0"
+            className="h-9 w-9 rounded-full grid place-items-center text-white text-sm font-semibold flex-shrink-0"
             style={{ backgroundColor: ORANGE }}
           >
             {t.name?.charAt(0).toUpperCase()}
@@ -290,18 +290,18 @@ function TraineeCard({
           <div className="min-w-0">
             <Link
               to={`/admin/trainees/${t.id}`}
-              className="text-sm font-medium text-neutral-900 hover:underline truncate block"
+              className="text-base font-medium text-neutral-900 hover:underline truncate block"
             >
               {t.name}
             </Link>
-            <p className="text-xs text-neutral-400 truncate">@{t.username}</p>
+            <p className="text-sm text-neutral-400 truncate">@{t.username}</p>
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-1.5 mb-3 flex-wrap">
         <span
-          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ring-1 ${
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
             t.status === "Active"
               ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
               : "bg-neutral-100 text-neutral-600 ring-neutral-200"
@@ -310,7 +310,7 @@ function TraineeCard({
           {t.status}
         </span>
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
           style={{ backgroundColor: "#FFF0E8", color: ORANGE }}
           title={`${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`}
         >
@@ -318,13 +318,13 @@ function TraineeCard({
           <span className="opacity-60 tabular-nums">· {levelDays}d</span>
         </span>
         {t.batch_id && batchNameById[t.batch_id] && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 ring-1 ring-blue-200">
             {batchNameById[t.batch_id]}
           </span>
         )}
         {latestPromotion && (
-          <span className="inline-flex items-center gap-0.5 text-[10px] text-neutral-400 ml-auto">
-            <TrendingUp className="h-2.5 w-2.5" />
+          <span className="inline-flex items-center gap-0.5 text-xs text-neutral-400 ml-auto">
+            <TrendingUp className="h-3 w-3" />
             {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
           </span>
         )}
@@ -337,8 +337,8 @@ function TraineeCard({
           below rather than on the badge itself. */}
       <div className="relative mb-2 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-            <Briefcase className="h-2.5 w-2.5" />
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
+            <Briefcase className="h-3 w-3" />
             Clients
             {myClients.length > 0 && (
               <span className="tabular-nums normal-case font-medium text-neutral-400">
@@ -352,21 +352,21 @@ function TraineeCard({
           <button
             onClick={onAssignClients}
             data-testid={`assign-clients-${t.id}`}
-            className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
             style={{ color: ORANGE }}
           >
-            {myClients.length > 0 ? "Manage" : (<><Plus className="h-2.5 w-2.5" />Assign</>)}
+            {myClients.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
         {myClients.length === 0 ? (
-          <p className="text-[11px] text-neutral-300">No clients assigned</p>
+          <p className="text-sm text-neutral-300">No clients assigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {myClients.map((c) => (
               <span
                 key={c.client_name}
                 title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[170px] ${
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ring-1 max-w-[170px] ${
                   c.handling_mode === "assisted"
                     ? "bg-orange-50 text-orange-700 ring-orange-200"
                     : "bg-white text-neutral-600 ring-neutral-200"
@@ -374,7 +374,7 @@ function TraineeCard({
               >
                 <span className="truncate">{c.client_name}</span>
                 {c.handling_mode === "assisted" && (
-                  <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
                     assisted
                   </span>
                 )}
@@ -387,8 +387,8 @@ function TraineeCard({
       {/* Project book. Same shape as Clients. */}
       <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-            <Layers className="h-2.5 w-2.5" />
+          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
+            <Layers className="h-3 w-3" />
             Projects
             {myProjects.length > 0 && (
               <span className="tabular-nums normal-case font-medium text-neutral-400">
@@ -402,21 +402,21 @@ function TraineeCard({
           <button
             onClick={onAssignProjects}
             data-testid={`assign-projects-${t.id}`}
-            className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
             style={{ color: ORANGE }}
           >
-            {myProjects.length > 0 ? "Manage" : (<><Plus className="h-2.5 w-2.5" />Assign</>)}
+            {myProjects.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
         {myProjects.length === 0 ? (
-          <p className="text-[11px] text-neutral-300">No projects assigned</p>
+          <p className="text-sm text-neutral-300">No projects assigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {myProjects.map((p) => (
               <span
                 key={p.project_name}
                 title={`${p.project_name} · ${p.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[170px] ${
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ring-1 max-w-[170px] ${
                   p.handling_mode === "assisted"
                     ? "bg-orange-50 text-orange-700 ring-orange-200"
                     : "bg-white text-neutral-600 ring-neutral-200"
@@ -424,7 +424,7 @@ function TraineeCard({
               >
                 <span className="truncate">{p.project_name}</span>
                 {p.handling_mode === "assisted" && (
-                  <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
                     assisted
                   </span>
                 )}
@@ -444,8 +444,8 @@ function TraineeCard({
         return (
           <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
-                <MapPin className="h-2.5 w-2.5" />
+              <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
+                <MapPin className="h-3 w-3" />
                 Visits
                 {visited.length > 0 && (
                   <span className="tabular-nums normal-case font-medium text-neutral-400">
@@ -456,23 +456,23 @@ function TraineeCard({
               <button
                 onClick={onLogVisits}
                 data-testid={`log-visits-${t.id}`}
-                className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
                 style={{ color: ORANGE }}
                 disabled={myClients.length === 0}
               >
-                {visited.length > 0 ? "Manage" : (<><Plus className="h-2.5 w-2.5" />Log</>)}
+                {visited.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Log</>)}
               </button>
             </div>
             {myClients.length === 0 ? (
-              <p className="text-[11px] text-neutral-300">Assign a client first</p>
+              <p className="text-sm text-neutral-300">Assign a client first</p>
             ) : visited.length === 0 ? (
-              <p className="text-[11px] text-neutral-300">No visits logged</p>
+              <p className="text-sm text-neutral-300">No visits logged</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {visited.map((c) => (
                   <span
                     key={c.client_name}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[190px] bg-white text-neutral-600 ring-neutral-200"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium ring-1 max-w-[190px] bg-white text-neutral-600 ring-neutral-200"
                   >
                     <span className="truncate">{c.client_name}</span>
                     <span className="tabular-nums text-neutral-400 flex-shrink-0">· {c.count}</span>
@@ -488,14 +488,14 @@ function TraineeCard({
           full progress bars per card, times every trainee in an expanded
           level, is the single biggest source of clutter on this page. */}
       {assignmentsLoading ? (
-        <p className="text-[11px] text-neutral-400">Loading assignment scores…</p>
+        <p className="text-sm text-neutral-400">Loading assignment scores…</p>
       ) : assignments.length === 0 ? (
-        <p className="text-[11px] text-neutral-400">No assignments yet</p>
+        <p className="text-sm text-neutral-400">No assignments yet</p>
       ) : (
         <div>
           <button
             onClick={() => setScoresOpen((v) => !v)}
-            className="w-full flex items-center justify-between text-[11px] text-neutral-500 hover:text-neutral-700"
+            className="w-full flex items-center justify-between text-sm text-neutral-500 hover:text-neutral-700"
           >
             <span>
               {passedCount}/{assignments.length} passed
@@ -521,8 +521,8 @@ function TraineeCard({
                     className="text-left hover:opacity-80 transition-opacity"
                   >
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-[11px] text-neutral-500">{a.name}</span>
-                      <span className="text-[11px] font-medium" style={{ color }}>
+                      <span className="text-sm text-neutral-500">{a.name}</span>
+                      <span className="text-sm font-medium" style={{ color }}>
                         {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
                       </span>
                     </div>
@@ -1385,7 +1385,7 @@ export default function AdminDashboard() {
 
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 p-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                       {lvlTrainees.map((t) => (
                         <TraineeCard
                           key={t.id}
