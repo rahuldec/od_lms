@@ -1,6 +1,6 @@
 // Groups trainee<->sprint assignment rows, mirroring lib/projects.js.
 
-/** [{trainee_id, sprint_name, sprint_type, handling_mode}] -> { [traineeId]: [{sprint_name, sprint_type, handling_mode}, ...] } */
+/** [{trainee_id, sprint_name, sprint_type, handling_mode, bugs_percent}] -> { [traineeId]: [{sprint_name, sprint_type, handling_mode, bugs_percent}, ...] } */
 export const groupSprintAssignmentsByTrainee = (assignments) => {
   const map = {};
   (assignments || []).forEach((a) => {
@@ -10,6 +10,7 @@ export const groupSprintAssignmentsByTrainee = (assignments) => {
       sprint_name: a.sprint_name,
       sprint_type: a.sprint_type === "major" ? "major" : "minor",
       handling_mode: a.handling_mode || "solo",
+      bugs_percent: a.bugs_percent || 0,
     });
   });
   Object.values(map).forEach((list) =>

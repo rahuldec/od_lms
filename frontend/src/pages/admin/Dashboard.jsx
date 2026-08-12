@@ -470,7 +470,7 @@ function TraineeCard({
             {mySprints.map((s) => (
               <span
                 key={s.sprint_name}
-                title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.handling_mode === "assisted" ? "Assisted" : "Solo"} · ${s.bugs_percent || 0}% bugs found`}
                 className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
                   s.handling_mode === "assisted"
                     ? "bg-orange-50 text-orange-700 ring-orange-200"
@@ -487,6 +487,11 @@ function TraineeCard({
                 {s.handling_mode === "assisted" && (
                   <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
                     assisted
+                  </span>
+                )}
+                {s.bugs_percent > 0 && (
+                  <span className="text-[10px] font-semibold tabular-nums flex-shrink-0" style={{ color: "#dc2626" }}>
+                    {s.bugs_percent}% bugs
                   </span>
                 )}
               </span>
@@ -1571,6 +1576,7 @@ export default function AdminDashboard() {
                 sprint_name: a.sprint_name,
                 sprint_type: a.sprint_type,
                 handling_mode: a.handling_mode,
+                bugs_percent: a.bugs_percent,
               })),
             ])
           }

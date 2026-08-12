@@ -319,6 +319,7 @@ class TraineeSprintAssignmentIn(BaseModel):
     sprint_name: str
     sprint_type: Optional[str] = "minor"  # "major" | "minor"
     handling_mode: Optional[str] = "solo"  # "solo" | "assisted"
+    bugs_percent: Optional[float] = 0  # % of bugs found by the trainee in this sprint
 
 
 class TraineeSprintsIn(BaseModel):
@@ -1298,7 +1299,7 @@ async def list_sprint_assignments(_=Depends(require_admin)):
             headers=ADMIN_HEADERS,
             params={
                 "is_active": "eq.true",
-                "select": "id,trainee_id,sprint_name,sprint_type,handling_mode,assigned_at",
+                "select": "id,trainee_id,sprint_name,sprint_type,handling_mode,bugs_percent,assigned_at",
                 "order": "sprint_name.asc",
             },
         )
@@ -1314,7 +1315,7 @@ async def get_trainee_sprints(trainee_id: str, _=Depends(require_admin)):
             params={
                 "trainee_id": f"eq.{trainee_id}",
                 "is_active": "eq.true",
-                "select": "id,trainee_id,sprint_name,sprint_type,handling_mode,assigned_at",
+                "select": "id,trainee_id,sprint_name,sprint_type,handling_mode,bugs_percent,assigned_at",
                 "order": "sprint_name.asc",
             },
         )
@@ -1332,11 +1333,13 @@ async def set_trainee_sprints(trainee_id: str, body: TraineeSprintsIn, _=Depends
         seen.add(name.lower())
         mode = a.handling_mode if a.handling_mode in HANDLING_MODES else "solo"
         sprint_type = a.sprint_type if a.sprint_type in SPRINT_TYPES else "minor"
+        bugs_percent = min(100, max(0, a.bugs_percent or 0))
         rows.append({
             "trainee_id": trainee_id,
             "sprint_name": name,
             "sprint_type": sprint_type,
             "handling_mode": mode,
+            "bugs_percent": bugs_percent,
         })
 
     async with httpx.AsyncClient(timeout=20) as cx:
@@ -1926,7 +1929,7 @@ async def my_sprints(ctx=Depends(require_user)):
             params={
                 "trainee_id": f"eq.{rows[0]['id']}",
                 "is_active": "eq.true",
-                "select": "sprint_name,sprint_type,handling_mode,assigned_at",
+                "select": "sprint_name,sprint_type,handling_mode,bugs_percent,assigned_at",
                 "order": "sprint_name.asc",
             },
         )

@@ -16,15 +16,16 @@ const TYPES = [
 ];
 
 /**
- * Assign sprints to one trainee: solo or with assistance, major or minor.
+ * Assign sprints to one trainee: solo or with assistance, major or minor,
+ * plus the % of bugs the trainee found in that sprint.
  *
  * Same in-app catalog pattern as ProjectAssignDialog (no external sheet,
- * typing a new name creates it), with an extra major/minor toggle per
- * selected sprint alongside the solo/assisted one.
+ * typing a new name creates it), with extra major/minor and bugs% controls
+ * per selected sprint alongside the solo/assisted one.
  *
  * Props:
  *   trainee    the trainee being edited
- *   assigned   [{sprint_name, sprint_type, handling_mode}] currently assigned
+ *   assigned   [{sprint_name, sprint_type, handling_mode, bugs_percent}] currently assigned
  *   onSaved(assignments)   called with the saved set
  *   onClose
  */
@@ -41,6 +42,9 @@ export default function SprintAssignDialog({ trainee, assigned = [], onSaved, on
   const [types, setTypes] = useState(() =>
     Object.fromEntries(assigned.map((a) => [a.sprint_name, a.sprint_type || "minor"]))
   );
+  const [bugs, setBugs] = useState(() =>
+    Object.fromEntries(assigned.map((a) => [a.sprint_name, String(a.bugs_percent || 0)]))
+  );
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +60,7 @@ export default function SprintAssignDialog({ trainee, assigned = [], onSaved, on
     setSelected(new Set(assigned.map((a) => a.sprint_name)));
     setModes(Object.fromEntries(assigned.map((a) => [a.sprint_name, a.handling_mode || "solo"])));
     setTypes(Object.fromEntries(assigned.map((a) => [a.sprint_name, a.sprint_type || "minor"])));
+    setBugs(Object.fromEntries(assigned.map((a) => [a.sprint_name, String(a.bugs_percent || 0)])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trainee?.id]);
 
@@ -80,12 +85,18 @@ export default function SprintAssignDialog({ trainee, assigned = [], onSaved, on
         next.add(name);
         setModes((m) => (m[name] ? m : { ...m, [name]: "solo" }));
         setTypes((t) => (t[name] ? t : { ...t, [name]: "minor" }));
+        setBugs((b) => (b[name] !== undefined ? b : { ...b, [name]: "0" }));
       }
       return next;
     });
 
   const setMode = (name, mode) => setModes((m) => ({ ...m, [name]: mode }));
   const setType = (name, type) => setTypes((t) => ({ ...t, [name]: type }));
+  const setBug = (name, value) => {
+    if (value !== "" && !/^\d{0,3}$/.test(value)) return;
+    if (value !== "" && parseInt(value, 10) > 100) return;
+    setBugs((b) => ({ ...b, [name]: value }));
+  };
 
   const addSprint = async () => {
     const name = newName.trim();
@@ -109,15 +120,18 @@ export default function SprintAssignDialog({ trainee, assigned = [], onSaved, on
 
   const dirty = useMemo(() => {
     const before = new Map(
-      assigned.map((a) => [a.sprint_name, `${a.handling_mode || "solo"}|${a.sprint_type || "minor"}`])
+      assigned.map((a) => [
+        a.sprint_name,
+        `${a.handling_mode || "solo"}|${a.sprint_type || "minor"}|${a.bugs_percent || 0}`,
+      ])
     );
     if (before.size !== selected.size) return true;
     for (const n of selected) {
-      const cur = `${modes[n] || "solo"}|${types[n] || "minor"}`;
+      const cur = `${modes[n] || "solo"}|${types[n] || "minor"}|${parseInt(bugs[n] || "0", 10)}`;
       if (!before.has(n) || before.get(n) !== cur) return true;
     }
     return false;
-  }, [assigned, selected, modes, types]);
+  }, [assigned, selected, modes, types, bugs]);
 
   const save = async () => {
     setSaving(true);
@@ -125,6 +139,7 @@ export default function SprintAssignDialog({ trainee, assigned = [], onSaved, on
       sprint_name,
       handling_mode: modes[sprint_name] || "solo",
       sprint_type: types[sprint_name] || "minor",
+      bugs_percent: parseInt(bugs[sprint_name] || "0", 10),
     }));
     try {
       await api.setTraineeSprints(trainee.id, assignments);
@@ -273,6 +288,16 @@ export default function SprintAssignDialog({ trainee, assigned = [], onSaved, on
                                 {m.label}
                               </button>
                             ))}
+                          </div>
+                          <div className="flex items-center gap-1 border border-neutral-200 rounded-full pl-2.5 pr-1 py-0.5">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={bugs[s.name] ?? "0"}
+                              onChange={(e) => setBug(s.name, e.target.value)}
+                              className="w-8 text-[11px] font-medium text-right focus:outline-none"
+                            />
+                            <span className="text-[11px] text-neutral-400">% bugs</span>
                           </div>
                         </div>
                       )}
