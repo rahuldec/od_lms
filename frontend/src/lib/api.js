@@ -202,17 +202,18 @@ export const api = {
         .then((r) => r.data)
     ),
 
-  // Client visit counter - a simple running total per trainee-client pair.
+  // Client visit tracking - admin enters the total visits done per client,
+  // rather than incrementing one at a time.
   listClientVisits: () =>
     withAuthRetry((headers) =>
       axios.get(`${BASE}/admin/client-visits`, { headers }).then((r) => r.data)
     ),
-  adjustClientVisit: (traineeId, clientName, delta) =>
+  setClientVisit: (traineeId, clientName, visitCount) =>
     withAuthRetry((headers) =>
       axios
         .post(
           `${BASE}/admin/trainees/${traineeId}/visits`,
-          { client_name: clientName, delta },
+          { client_name: clientName, visit_count: visitCount },
           { headers }
         )
         .then((r) => r.data)

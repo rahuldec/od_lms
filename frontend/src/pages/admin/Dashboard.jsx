@@ -9,9 +9,10 @@ import { daysAtCurrentLevel } from "@/lib/levelHistory";
 import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
 import ProjectAssignDialog from "@/components/ProjectAssignDialog";
+import VisitLogDialog from "@/components/VisitLogDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, Plus } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -245,7 +246,7 @@ function TraineeCard({
   visits,
   onAssignClients,
   onAssignProjects,
-  onAdjustVisit,
+  onLogVisits,
   onOpenAssignment,
 }) {
   const [scoresOpen, setScoresOpen] = useState(false);
@@ -332,7 +333,8 @@ function TraineeCard({
       {/* Client book. Shown for every trainee, empty or not - an empty strip
           with an Assign affordance is the point, since unassigned trainees
           are exactly the ones worth spotting here. Every assigned client is
-          listed (no truncation), and each carries its own visit counter. */}
+          listed (no truncation). Visit counts live in their own section
+          below rather than on the badge itself. */}
       <div className="relative mb-2 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
@@ -360,53 +362,29 @@ function TraineeCard({
           <p className="text-[11px] text-neutral-300">No clients assigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5">
-            {myClients.map((c) => {
-              const key = c.client_name.trim().toLowerCase();
-              const visitCount = visits[key] || 0;
-              return (
-                <span
-                  key={c.client_name}
-                  title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                  className={`inline-flex items-center gap-1 pl-2 pr-1 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[190px] ${
-                    c.handling_mode === "assisted"
-                      ? "bg-orange-50 text-orange-700 ring-orange-200"
-                      : "bg-white text-neutral-600 ring-neutral-200"
-                  }`}
-                >
-                  <span className="truncate">{c.client_name}</span>
-                  {c.handling_mode === "assisted" && (
-                    <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
-                      assisted
-                    </span>
-                  )}
-                  <span className="inline-flex items-center gap-0.5 ml-0.5 pl-1 border-l border-current/20 flex-shrink-0">
-                    <button
-                      onClick={() => onAdjustVisit(c.client_name, -1)}
-                      disabled={visitCount === 0}
-                      title="Log one fewer visit"
-                      className="leading-none w-3.5 opacity-50 hover:opacity-100 disabled:opacity-20"
-                    >
-                      −
-                    </button>
-                    <span className="tabular-nums" title={`${visitCount} visit${visitCount === 1 ? "" : "s"} logged`}>
-                      {visitCount}
-                    </span>
-                    <button
-                      onClick={() => onAdjustVisit(c.client_name, 1)}
-                      title="Log a visit"
-                      className="leading-none w-3.5 opacity-50 hover:opacity-100"
-                    >
-                      +
-                    </button>
+            {myClients.map((c) => (
+              <span
+                key={c.client_name}
+                title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[170px] ${
+                  c.handling_mode === "assisted"
+                    ? "bg-orange-50 text-orange-700 ring-orange-200"
+                    : "bg-white text-neutral-600 ring-neutral-200"
+                }`}
+              >
+                <span className="truncate">{c.client_name}</span>
+                {c.handling_mode === "assisted" && (
+                  <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
+                    assisted
                   </span>
-                </span>
-              );
-            })}
+                )}
+              </span>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Project book. Same shape as Clients, no visit tracking. */}
+      {/* Project book. Same shape as Clients. */}
       <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
@@ -455,6 +433,56 @@ function TraineeCard({
           </div>
         )}
       </div>
+
+      {/* Visits. Only lists clients with a logged count (rather than every
+          assigned client at 0) so an untouched book doesn't look identical
+          to the Clients section above it. */}
+      {(() => {
+        const visited = myClients
+          .map((c) => ({ ...c, count: visits[c.client_name.trim().toLowerCase()] || 0 }))
+          .filter((c) => c.count > 0);
+        return (
+          <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
+                <MapPin className="h-2.5 w-2.5" />
+                Visits
+                {visited.length > 0 && (
+                  <span className="tabular-nums normal-case font-medium text-neutral-400">
+                    · {visited.reduce((sum, c) => sum + c.count, 0)}
+                  </span>
+                )}
+              </span>
+              <button
+                onClick={onLogVisits}
+                data-testid={`log-visits-${t.id}`}
+                className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+                style={{ color: ORANGE }}
+                disabled={myClients.length === 0}
+              >
+                {visited.length > 0 ? "Manage" : (<><Plus className="h-2.5 w-2.5" />Log</>)}
+              </button>
+            </div>
+            {myClients.length === 0 ? (
+              <p className="text-[11px] text-neutral-300">Assign a client first</p>
+            ) : visited.length === 0 ? (
+              <p className="text-[11px] text-neutral-300">No visits logged</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {visited.map((c) => (
+                  <span
+                    key={c.client_name}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[190px] bg-white text-neutral-600 ring-neutral-200"
+                  >
+                    <span className="truncate">{c.client_name}</span>
+                    <span className="tabular-nums text-neutral-400 flex-shrink-0">· {c.count}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Assignment scores. Collapsed to a one-line summary by default - five
           full progress bars per card, times every trainee in an expanded
@@ -696,6 +724,7 @@ export default function AdminDashboard() {
   const [projectAssignments, setProjectAssignments] = useState([]);
   const [projectAssignFor, setProjectAssignFor] = useState(null);
   const [clientVisits, setClientVisits] = useState([]);
+  const [visitDialogFor, setVisitDialogFor] = useState(null);
 
   // Collapsible sections below load nothing until first expanded - the
   // heaviest calls here (assignment scores, activity feed, batch modules)
@@ -837,30 +866,6 @@ export default function AdminDashboard() {
     });
     return map;
   }, [clientVisits]);
-
-  const adjustVisit = useCallback(async (traineeId, clientName, delta) => {
-    // Optimistic update - the counter should feel instant, and a failed
-    // request is rare enough (and low-stakes enough) to just resync from
-    // the server's response rather than build a rollback path.
-    setClientVisits((prev) => {
-      const key = clientName.trim().toLowerCase();
-      const idx = prev.findIndex(
-        (v) => v.trainee_id === traineeId && v.client_name.trim().toLowerCase() === key
-      );
-      const nextCount = Math.max(0, (idx >= 0 ? prev[idx].visit_count : 0) + delta);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = { ...copy[idx], visit_count: nextCount };
-        return copy;
-      }
-      return [...prev, { trainee_id: traineeId, client_name: clientName, visit_count: nextCount }];
-    });
-    try {
-      await api.adjustClientVisit(traineeId, clientName, delta);
-    } catch {
-      toast.error("Could not update visit count");
-    }
-  }, []);
 
   const filteredTrainees = useMemo(() => {
     const notExited = trainees.filter((t) => t.status !== "Exited");
@@ -1393,7 +1398,7 @@ export default function AdminDashboard() {
                           visits={visitsByTrainee[t.id] || {}}
                           onAssignClients={() => setAssignFor(t)}
                           onAssignProjects={() => setProjectAssignFor(t)}
-                          onAdjustVisit={(clientName, delta) => adjustVisit(t.id, clientName, delta)}
+                          onLogVisits={() => setVisitDialogFor(t)}
                           onOpenAssignment={setActiveAssignment}
                         />
                       ))}
@@ -1452,6 +1457,31 @@ export default function AdminDashboard() {
                 handling_mode: a.handling_mode,
               })),
             ])
+          }
+        />
+      )}
+
+      {visitDialogFor && (
+        <VisitLogDialog
+          trainee={visitDialogFor}
+          clients={clientsByTrainee[visitDialogFor.id] || []}
+          visits={visitsByTrainee[visitDialogFor.id] || {}}
+          onClose={() => setVisitDialogFor(null)}
+          onSaved={(saved) =>
+            setClientVisits((prev) => {
+              const key = (n) => n.trim().toLowerCase();
+              const savedKeys = new Set(saved.map((s) => key(s.client_name)));
+              return [
+                ...prev.filter(
+                  (v) => !(v.trainee_id === visitDialogFor.id && savedKeys.has(key(v.client_name)))
+                ),
+                ...saved.map((s) => ({
+                  trainee_id: visitDialogFor.id,
+                  client_name: s.client_name,
+                  visit_count: s.visit_count,
+                })),
+              ];
+            })
           }
         />
       )}

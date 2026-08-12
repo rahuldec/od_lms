@@ -308,7 +308,7 @@ class TraineeProjectsIn(BaseModel):
 
 class ClientVisitIn(BaseModel):
     client_name: str
-    delta: int = 1
+    visit_count: int = 0
 
 
 class AssignBatchIn(BaseModel):
@@ -1197,27 +1197,16 @@ async def list_client_visits(_=Depends(require_admin)):
 
 
 @api.post("/admin/trainees/{trainee_id}/visits")
-async def adjust_client_visit(trainee_id: str, body: ClientVisitIn, _=Depends(require_admin)):
-    """Increment or decrement the visit count for one trainee-client pair,
-    clamped at zero so a stray extra click can't go negative."""
+async def set_client_visit(trainee_id: str, body: ClientVisitIn, _=Depends(require_admin)):
+    """Set the visit count for one trainee-client pair to an explicit value
+    (not a delta) - the admin types the total visits done, rather than
+    clicking +/- one at a time."""
     client_name = (body.client_name or "").strip()
     if not client_name:
         raise HTTPException(status_code=400, detail="client_name is required")
+    visit_count = max(0, body.visit_count)
 
     async with httpx.AsyncClient(timeout=20) as cx:
-        existing = await cx.get(
-            f"{REST}/{TCV}",
-            headers=ADMIN_HEADERS,
-            params={
-                "trainee_id": f"eq.{trainee_id}",
-                "client_name": f"eq.{_pgrst_value(client_name)}",
-                "select": "visit_count",
-            },
-        )
-        rows = existing.json() if existing.status_code == 200 else []
-        current = rows[0]["visit_count"] if rows else 0
-        next_count = max(0, current + body.delta)
-
         r = await cx.post(
             f"{REST}/{TCV}?on_conflict=trainee_id,client_name",
             headers={
@@ -1227,14 +1216,14 @@ async def adjust_client_visit(trainee_id: str, body: ClientVisitIn, _=Depends(re
             json={
                 "trainee_id": trainee_id,
                 "client_name": client_name,
-                "visit_count": next_count,
+                "visit_count": visit_count,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             },
         )
     if r.status_code not in (200, 201):
-        logger.error("visit adjust failed: %s %s", r.status_code, r.text)
+        logger.error("visit set failed: %s %s", r.status_code, r.text)
         raise HTTPException(status_code=400, detail=f"visit update failed: {r.text}")
-    return {"trainee_id": trainee_id, "client_name": client_name, "visit_count": next_count}
+    return {"trainee_id": trainee_id, "client_name": client_name, "visit_count": visit_count}
 
 
 # ---------- admin resources ----------
