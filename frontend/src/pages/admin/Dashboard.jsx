@@ -996,7 +996,9 @@ export default function AdminDashboard() {
 
   const levelGroups = [0, 1, 2, 3].map((lvl) => ({
     level: lvl,
-    trainees: filteredTrainees.filter((t) => (t.current_level ?? 0) === lvl),
+    trainees: filteredTrainees
+      .filter((t) => (t.current_level ?? 0) === lvl)
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
   }));
 
   const now = new Date();
