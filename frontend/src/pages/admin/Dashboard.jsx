@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
@@ -228,14 +228,16 @@ function ModuleComparisonTooltip({ active, payload, label }) {
 // batch is actively on. Editing assignments / current module happens on the
 // Batch Detail page — this is just a quick at-a-glance overview across all
 // batches.
-function BatchModulesPanel({ batches, trainees }) {
+function BatchModulesPanel({ batches, trainees, open, onToggle }) {
   const [loading, setLoading] = useState(true);
   const [assignmentsByBatch, setAssignmentsByBatch] = useState({});
   const [moduleOrder, setModuleOrder] = useState([]);
 
-  // Curriculum order, fetched once, used so every batch lists its modules in
-  // the same sequence instead of whatever order they happened to be saved in.
+  // Collapsed by default - nothing here fetches until the section is
+  // expanded, since the module order comes from the sheet and the per-batch
+  // assignments are one Supabase call per batch.
   useEffect(() => {
+    if (!open) return;
     (async () => {
       try {
         const mods = await fetchSheetModules();
@@ -244,9 +246,10 @@ function BatchModulesPanel({ batches, trainees }) {
         setModuleOrder([]);
       }
     })();
-  }, []);
+  }, [open]);
 
   useEffect(() => {
+    if (!open) return;
     if (batches.length === 0) {
       setLoading(false);
       return;
@@ -273,7 +276,7 @@ function BatchModulesPanel({ batches, trainees }) {
     return () => {
       cancelled = true;
     };
-  }, [batches]);
+  }, [open, batches]);
 
   const sortByCurriculum = (names) => {
     if (moduleOrder.length === 0) return names;
@@ -302,23 +305,33 @@ function BatchModulesPanel({ batches, trainees }) {
 
   return (
     <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
-      <div className="flex items-center gap-2 mb-1">
-        <Layers className="h-4 w-4 text-neutral-400" />
-        <h2 className="text-xl font-semibold">Modules assigned per batch</h2>
-      </div>
-      <p className="text-sm text-neutral-500 mb-5">
-        What each batch currently sees, in curriculum order. The flagged module is what the batch is currently on. Manage from a batch's detail page.
-      </p>
+      <button onClick={onToggle} className="w-full flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Layers className="h-4 w-4 text-neutral-400" />
+          <h2 className="text-xl font-semibold">Modules assigned per batch</h2>
+        </div>
+        {open ? (
+          <ChevronUp className="h-4 w-4 text-neutral-400" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-neutral-400" />
+        )}
+      </button>
 
-      {batches.length === 0 ? (
-        <p className="text-sm text-neutral-400">
-          No batches yet. Create one from the Batches page first.
-        </p>
-      ) : loading ? (
-        <p className="text-sm text-neutral-400">Loading…</p>
-      ) : (
-        <div className="divide-y divide-neutral-100">
-          {sortedBatches.map((b) => {
+      {open && (
+        <>
+          <p className="text-sm text-neutral-500 mt-1 mb-5">
+            What each batch currently sees, in curriculum order. The flagged module is what the batch is currently on. Manage from a batch's detail page.
+          </p>
+
+          {batches.length === 0 ? (
+            <p className="text-sm text-neutral-400">
+              No batches yet. Create one from the Batches page first.
+            </p>
+          ) : loading ? (
+            <p className="text-sm text-neutral-400">Loading…</p>
+          ) : (
+            <div className="divide-y divide-neutral-100">
+              {sortedBatches.map((b) => {
             const names = sortByCurriculum(assignmentsByBatch[b.id] || []);
             return (
               <div key={b.id} className="py-3.5 flex items-start gap-4 first:pt-0 last:pb-0">
@@ -363,9 +376,11 @@ function BatchModulesPanel({ batches, trainees }) {
                   )}
                 </div>
               </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </Card>
   );
@@ -387,27 +402,66 @@ export default function AdminDashboard() {
   const [clientAssignments, setClientAssignments] = useState([]);
   const [assignFor, setAssignFor] = useState(null);
 
+  // Collapsible sections below load nothing until first expanded - the
+  // heaviest calls here (assignment scores, activity feed, batch modules)
+  // each involve a live Google Sheet round trip, so a dashboard visit that
+  // never opens them should not pay for them.
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const activityRequested = useRef(false);
+
+  const [batchModulesOpen, setBatchModulesOpen] = useState(false);
+
+  const [moduleComparisonOpen, setModuleComparisonOpen] = useState(false);
+  const [traineePerfOpen, setTraineePerfOpen] = useState(false);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const assignmentsRequested = useRef(false);
+
+  const ensureAssignmentResults = useCallback(async () => {
+    if (assignmentsRequested.current) return;
+    assignmentsRequested.current = true;
+    setAssignmentsLoading(true);
+    try {
+      const data = await fetchAllAssignmentResults();
+      setAssignmentResults(data || {});
+    } catch {
+      // leave empty - sections just show "no data recorded"
+    } finally {
+      setAssignmentsLoading(false);
+    }
+  }, []);
+
+  const ensureActivityFeed = useCallback(async () => {
+    if (activityRequested.current) return;
+    activityRequested.current = true;
+    setActivityLoading(true);
+    try {
+      const [feedData, modsData] = await Promise.all([
+        api.listActivityFeed().catch(() => []),
+        fetchSheetModules().catch(() => []),
+      ]);
+      setActivityFeed(Array.isArray(feedData) ? feedData : []);
+      setSheetModules(Array.isArray(modsData) ? modsData : []);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
-        const [data, aResults, batchData, resultsData, feedData, modsData, clientData, clientAssignData] = await Promise.all([
+        const [data, batchData, resultsData, clientData, clientAssignData] = await Promise.all([
           api.listTrainees(),
-          fetchAllAssignmentResults().catch(() => ({})),
           api.listBatches().catch(() => []),
           api.listResultsAdmin().catch(() => []),
-          api.listActivityFeed().catch(() => []),
-          fetchSheetModules().catch(() => []),
-          // Both are non-fatal: a sheet outage or a missing table should degrade
-          // the clients strip to empty, not take the whole dashboard down.
+          // Non-fatal: a sheet outage or a missing table should degrade the
+          // clients strip to empty, not take the whole dashboard down.
           fetchClients().catch(() => []),
           api.listClientAssignments().catch(() => []),
         ]);
         setTrainees(Array.isArray(data) ? data : []);
-        setAssignmentResults(aResults || {});
         setBatches(Array.isArray(batchData) ? batchData : []);
         setResults(Array.isArray(resultsData) ? resultsData.filter((r) => r.published).slice(0, 3) : []);
-        setActivityFeed(Array.isArray(feedData) ? feedData : []);
-        setSheetModules(Array.isArray(modsData) ? modsData : []);
         setClients(Array.isArray(clientData) ? clientData : []);
         setClientAssignments(Array.isArray(clientAssignData) ? clientAssignData : []);
       } catch (e) {
@@ -609,17 +663,33 @@ export default function AdminDashboard() {
       </div>
 
       {/* ---- Activity Feed ---- */}
-      {(loading || activityFeed.length > 0) && (
-        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-neutral-400" />
-              <h2 className="text-xl font-semibold">Activity feed</h2>
-            </div>
-            <span className="text-xs text-neutral-400">{activityFeed.length} recent events</span>
+      <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
+        <button
+          onClick={() => {
+            setActivityOpen((v) => !v);
+            ensureActivityFeed();
+          }}
+          className="w-full flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-neutral-400" />
+            <h2 className="text-xl font-semibold">Activity feed</h2>
           </div>
+          <div className="flex items-center gap-3">
+            {activityOpen && !activityLoading && (
+              <span className="text-xs text-neutral-400">{activityFeed.length} recent events</span>
+            )}
+            {activityOpen ? (
+              <ChevronUp className="h-4 w-4 text-neutral-400" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-neutral-400" />
+            )}
+          </div>
+        </button>
 
-          {loading ? (
+        {activityOpen && (
+          <div className="mt-5">
+          {activityLoading ? (
             <p className="text-sm text-neutral-400">Loading…</p>
           ) : activityFeed.length === 0 ? (
             <p className="text-sm text-neutral-400">No activity yet.</p>
@@ -691,8 +761,9 @@ export default function AdminDashboard() {
               )}
             </>
           )}
-        </Card>
-      )}
+          </div>
+        )}
+      </Card>
 
       {results.length > 0 && (
         <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
@@ -742,74 +813,111 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick module assignment per batch */}
-      <BatchModulesPanel batches={batches} trainees={trainees.filter((t) => t.status !== "Exited")} />
+      <BatchModulesPanel
+        batches={batches}
+        trainees={trainees.filter((t) => t.status !== "Exited")}
+        open={batchModulesOpen}
+        onToggle={() => setBatchModulesOpen((v) => !v)}
+      />
 
       {/* Module-wise comparison of trainees */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
-        <div className="flex items-center gap-2 mb-1">
-          <BarChart3 className="h-4 w-4 text-neutral-400" />
-          <h2 className="text-xl font-semibold">Module-wise comparison</h2>
-        </div>
-        <p className="text-sm text-neutral-500 mb-6">
-          Every trainee's score side by side, grouped by module and sorted by average performance. Hover a bar group to see the full breakdown.
-        </p>
-        {loading ? (
-          <p className="text-sm text-neutral-400">Loading...</p>
-        ) : moduleComparison.data.length === 0 ? (
-          <p className="text-sm text-neutral-400">No assignment scores recorded yet.</p>
-        ) : (
-          <div style={{ width: "100%", height: 380 }}>
-            <ResponsiveContainer>
-              <BarChart
-                data={moduleComparison.data}
-                margin={{ top: 24, right: 10, left: 0, bottom: 10 }}
-                barCategoryGap="28%"
-                barGap={3}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" vertical={false} />
-                <XAxis dataKey="module" tick={{ fontSize: 12, fill: "#737373" }} axisLine={{ stroke: "#e5e5e5" }} tickLine={false} />
-                <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} axisLine={false} tickLine={false} />
-                <ReferenceLine
-                  y={PASSING_MARK}
-                  stroke="#d4d4d4"
-                  strokeDasharray="4 4"
-                  label={{ value: `Pass (${PASSING_MARK})`, position: "right", fontSize: 11, fill: "#a3a3a3" }}
-                />
-                <Tooltip content={<ModuleComparisonTooltip />} cursor={{ fill: "#fafafa" }} />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} iconType="circle" iconSize={8} />
-                {moduleComparison.traineeNames.map((name, i) => (
-                  <Bar
-                    key={name}
-                    dataKey={name}
-                    fill={TRAINEE_COLORS[i % TRAINEE_COLORS.length]}
-                    radius={[3, 3, 0, 0]}
-                    maxBarSize={26}
-                  >
-                    <LabelList
-                      dataKey={name}
-                      position="top"
-                      fontSize={10}
-                      fill="#a3a3a3"
-                      formatter={(v) => (v != null ? v : "")}
-                    />
-                  </Bar>
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+        <button
+          onClick={() => {
+            setModuleComparisonOpen((v) => !v);
+            ensureAssignmentResults();
+          }}
+          className="w-full flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-neutral-400" />
+            <h2 className="text-xl font-semibold">Module-wise comparison</h2>
           </div>
+          {moduleComparisonOpen ? (
+            <ChevronUp className="h-4 w-4 text-neutral-400" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-neutral-400" />
+          )}
+        </button>
+        {moduleComparisonOpen && (
+          <>
+            <p className="text-sm text-neutral-500 mt-1 mb-6">
+              Every trainee's score side by side, grouped by module and sorted by average performance. Hover a bar group to see the full breakdown.
+            </p>
+            {assignmentsLoading ? (
+              <p className="text-sm text-neutral-400">Loading...</p>
+            ) : moduleComparison.data.length === 0 ? (
+              <p className="text-sm text-neutral-400">No assignment scores recorded yet.</p>
+            ) : (
+              <div style={{ width: "100%", height: 380 }}>
+                <ResponsiveContainer>
+                  <BarChart
+                    data={moduleComparison.data}
+                    margin={{ top: 24, right: 10, left: 0, bottom: 10 }}
+                    barCategoryGap="28%"
+                    barGap={3}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f1f1" vertical={false} />
+                    <XAxis dataKey="module" tick={{ fontSize: 12, fill: "#737373" }} axisLine={{ stroke: "#e5e5e5" }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 12, fill: "#737373" }} allowDecimals={false} axisLine={false} tickLine={false} />
+                    <ReferenceLine
+                      y={PASSING_MARK}
+                      stroke="#d4d4d4"
+                      strokeDasharray="4 4"
+                      label={{ value: `Pass (${PASSING_MARK})`, position: "right", fontSize: 11, fill: "#a3a3a3" }}
+                    />
+                    <Tooltip content={<ModuleComparisonTooltip />} cursor={{ fill: "#fafafa" }} />
+                    <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} iconType="circle" iconSize={8} />
+                    {moduleComparison.traineeNames.map((name, i) => (
+                      <Bar
+                        key={name}
+                        dataKey={name}
+                        fill={TRAINEE_COLORS[i % TRAINEE_COLORS.length]}
+                        radius={[3, 3, 0, 0]}
+                        maxBarSize={26}
+                      >
+                        <LabelList
+                          dataKey={name}
+                          position="top"
+                          fontSize={10}
+                          fill="#a3a3a3"
+                          formatter={(v) => (v != null ? v : "")}
+                        />
+                      </Bar>
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </>
         )}
       </Card>
 
       {/* Trainee-wise performance: same scores, pivoted to rank trainees */}
       <Card className="rounded-2xl border-neutral-200/80 p-7 mb-8">
-        <div className="flex items-center gap-2 mb-1">
-          <BarChart3 className="h-4 w-4 text-neutral-400" />
-          <h2 className="text-xl font-semibold">Trainee-wise performance</h2>
-        </div>
-        <p className="text-sm text-neutral-500 mb-6">
+        <button
+          onClick={() => {
+            setTraineePerfOpen((v) => !v);
+            ensureAssignmentResults();
+          }}
+          className="w-full flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-neutral-400" />
+            <h2 className="text-xl font-semibold">Trainee-wise performance</h2>
+          </div>
+          {traineePerfOpen ? (
+            <ChevronUp className="h-4 w-4 text-neutral-400" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-neutral-400" />
+          )}
+        </button>
+        {traineePerfOpen && (
+          <>
+        <p className="text-sm text-neutral-500 mt-1 mb-6">
           Every trainee's scores across all modules, ranked by overall average. Hover a bar group for the full breakdown.
         </p>
-        {loading ? (
+        {assignmentsLoading ? (
           <p className="text-sm text-neutral-400">Loading...</p>
         ) : traineePerformance.data.length === 0 ? (
           <p className="text-sm text-neutral-400">No assignment scores recorded yet.</p>
@@ -854,6 +962,8 @@ export default function AdminDashboard() {
               </table>
             </div>
         )}
+          </>
+        )}
       </Card>
 
       <Card className="rounded-2xl border-neutral-200/80 p-7">
@@ -884,7 +994,10 @@ export default function AdminDashboard() {
             return (
               <div key={level} className="border border-neutral-100 rounded-2xl overflow-hidden">
                 <button
-                  onClick={() => setExpandedLevel(isExpanded ? null : level)}
+                  onClick={() => {
+                    setExpandedLevel(isExpanded ? null : level);
+                    if (!isExpanded) ensureAssignmentResults();
+                  }}
                   className="w-full px-5 py-4 flex items-center gap-4 hover:bg-neutral-50 transition-colors"
                 >
                   <div
@@ -927,6 +1040,9 @@ export default function AdminDashboard() {
                         const days = daysSince(t.join_date);
                         const latestPromotion = promotions[promotions.length - 1];
                         const myClients = clientsByTrainee[t.id] || [];
+                        const assistedClientCount = myClients.filter(
+                          (c) => c.handling_mode === "assisted"
+                        ).length;
                         return (
                           <div
                             key={t.id}
@@ -998,20 +1114,31 @@ export default function AdminDashboard() {
                             {/* Client book. Shown for every trainee, empty or
                                 not - an empty strip with an Assign affordance
                                 is the point, since unassigned trainees are
-                                exactly the ones worth spotting here. */}
-                            <div className="relative mb-3">
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-[10px] uppercase tracking-wider text-neutral-400 inline-flex items-center gap-1">
+                                exactly the ones worth spotting here. Every
+                                assigned client is listed (no truncation) so
+                                the full book is visible without opening the
+                                manage dialog. */}
+                            <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold">
                                   <Briefcase className="h-2.5 w-2.5" />
                                   Clients
                                   {myClients.length > 0 && (
-                                    <span className="tabular-nums">· {myClients.length}</span>
+                                    <span className="tabular-nums normal-case font-medium text-neutral-400">
+                                      · {myClients.length}
+                                      {assistedClientCount > 0 && (
+                                        <span style={{ color: "#E05A2B" }}>
+                                          {" "}
+                                          ({assistedClientCount} assisted)
+                                        </span>
+                                      )}
+                                    </span>
                                   )}
                                 </span>
                                 <button
                                   onClick={() => setAssignFor(t)}
                                   data-testid={`assign-clients-${t.id}`}
-                                  className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5"
+                                  className="text-[10px] font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
                                   style={{ color: "#E05A2B" }}
                                 >
                                   {myClients.length > 0 ? (
@@ -1029,36 +1156,32 @@ export default function AdminDashboard() {
                                   No clients assigned
                                 </p>
                               ) : (
-                                <div className="flex flex-wrap gap-1">
-                                  {myClients.slice(0, 4).map((c) => (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {myClients.map((c) => (
                                     <span
                                       key={c.client_name}
-                                      title={`${c.client_name} · ${c.handling_mode === "assisted" ? "assisted" : "solo"}`}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200 max-w-[150px] truncate"
+                                      title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium ring-1 max-w-[170px] ${
+                                        c.handling_mode === "assisted"
+                                          ? "bg-orange-50 text-orange-700 ring-orange-200"
+                                          : "bg-white text-neutral-600 ring-neutral-200"
+                                      }`}
                                     >
-                                      {c.client_name}
-                                      <span
-                                        className="text-[8px] uppercase tracking-wide flex-shrink-0"
-                                        style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
-                                      >
-                                        {c.handling_mode === "assisted" ? "assisted" : "solo"}
-                                      </span>
+                                      <span className="truncate">{c.client_name}</span>
+                                      {c.handling_mode === "assisted" && (
+                                        <span className="text-[8px] font-semibold uppercase tracking-wide flex-shrink-0">
+                                          assisted
+                                        </span>
+                                      )}
                                     </span>
                                   ))}
-                                  {myClients.length > 4 && (
-                                    <button
-                                      onClick={() => setAssignFor(t)}
-                                      title={myClients.slice(4).map((c) => c.client_name).join(", ")}
-                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium text-neutral-400 hover:text-neutral-600"
-                                    >
-                                      +{myClients.length - 4} more
-                                    </button>
-                                  )}
                                 </div>
                               )}
                             </div>
 
-                            {assignments.length > 0 ? (
+                            {assignmentsLoading ? (
+                              <p className="text-[11px] text-neutral-400">Loading assignment scores…</p>
+                            ) : assignments.length > 0 ? (
                               <div className="flex flex-col gap-1.5">
                                 {assignments.map((a) => {
                                   const color = a.passed ? "#16a34a" : "#dc2626";
