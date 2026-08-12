@@ -15,7 +15,7 @@ import VisitLogDialog from "@/components/VisitLogDialog";
 import RemarksDialog from "@/components/RemarksDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Info, Plus } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -30,14 +30,19 @@ import {
   ReferenceLine,
 } from "recharts";
 
-const Stat = ({ icon: Icon, label, value, testId }) => (
+const Stat = ({ icon: Icon, label, value, testId, accent }) => (
   <Card data-testid={testId} className="rounded-2xl border-neutral-200/80 p-6 hover:shadow-sm transition-shadow">
     <div className="flex items-start justify-between">
       <div>
         <p className="text-xs uppercase tracking-[0.14em] text-neutral-500">{label}</p>
-        <p className="text-4xl font-semibold mt-3 text-neutral-900 tabular-nums">{value}</p>
+        <p className="text-4xl font-semibold mt-3 tabular-nums" style={{ color: accent?.color || "#171717" }}>
+          {value}
+        </p>
       </div>
-      <div className="h-9 w-9 rounded-xl grid place-items-center" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
+      <div
+        className="h-9 w-9 rounded-xl grid place-items-center"
+        style={{ backgroundColor: accent?.bg || "#FFF0E8", color: accent?.color || "#E05A2B" }}
+      >
         <Icon className="h-5 w-5" />
       </div>
     </div>
@@ -60,6 +65,11 @@ const navItems = [
 const ORANGE = "#E05A2B";
 
 const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
+
+// Days a trainee is expected to spend at each level before it's worth
+// flagging them as stuck - not a hard rule, just a prompt to go look.
+const LEVEL_DAY_LIMITS = { 0: 30, 1: 60, 2: 60, 3: 60 };
+const needsAttention = (t) => daysAtCurrentLevel(t) > (LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60);
 
 // Palette for per-trainee bars in the module comparison chart. Cycled if more
 // trainees than colors.
@@ -271,6 +281,7 @@ function TraineeCard({
   const latestPromotion = promotions[promotions.length - 1];
   const days = daysSince(t.join_date);
   const levelDays = daysAtCurrentLevel(t);
+  const flagged = needsAttention(t);
 
   let scoreSum = 0;
   let totalSum = 0;
@@ -326,9 +337,18 @@ function TraineeCard({
         </span>
         <span
           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-          style={{ backgroundColor: "#FFF0E8", color: ORANGE }}
-          title={`${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`}
+          style={
+            flagged
+              ? { backgroundColor: "#FEE2E2", color: "#dc2626" }
+              : { backgroundColor: "#FFF0E8", color: ORANGE }
+          }
+          title={
+            flagged
+              ? `${levelDays} days at Level ${t.current_level ?? 0} - longer than the expected ${LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60}`
+              : `${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`
+          }
         >
+          {flagged && <AlertTriangle className="h-2.5 w-2.5" />}
           L{t.current_level ?? 0}
           <span className="opacity-60 tabular-nums">· {levelDays}d</span>
         </span>
@@ -993,6 +1013,7 @@ export default function AdminDashboard() {
   const total = filteredTrainees.length;
   const active = filteredTrainees.filter((t) => t.status === "Active").length;
   const onHold = filteredTrainees.filter((t) => t.status === "On Hold").length;
+  const attentionCount = filteredTrainees.filter(needsAttention).length;
 
   const levelGroups = [0, 1, 2, 3].map((lvl) => ({
     level: lvl,
@@ -1126,11 +1147,18 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
         <Stat testId="stat-total" icon={Users} label="Total trainees" value={loading ? "-" : total} />
         <Stat testId="stat-active" icon={CheckCircle2} label="Active" value={loading ? "-" : active} />
         <Stat testId="stat-onhold" icon={PauseCircle} label="On hold" value={loading ? "-" : onHold} />
         <Stat testId="stat-promotions" icon={TrendingUp} label="Promotions this month" value={loading ? "-" : promotionsThisMonth} />
+        <Stat
+          testId="stat-attention"
+          icon={AlertTriangle}
+          label="Needs attention"
+          value={loading ? "-" : attentionCount}
+          accent={attentionCount > 0 ? { bg: "#FEE2E2", color: "#dc2626" } : undefined}
+        />
       </div>
 
       {/* ---- Activity Feed ---- */}
@@ -1462,6 +1490,7 @@ export default function AdminDashboard() {
               (acc, t) => acc + (clientsByTrainee[t.id]?.length || 0),
               0
             );
+            const lvlAttentionCount = lvlTrainees.filter(needsAttention).length;
             return (
               <div key={level} className="border border-neutral-100 rounded-2xl overflow-hidden">
                 <button
@@ -1484,6 +1513,12 @@ export default function AdminDashboard() {
                         {lvlTrainees.length} trainees - {pct}%
                         {lvlClientCount > 0 && (
                           <span className="text-neutral-400"> - {lvlClientCount} clients</span>
+                        )}
+                        {lvlAttentionCount > 0 && (
+                          <span className="font-medium" style={{ color: "#dc2626" }}>
+                            {" "}
+                            - {lvlAttentionCount} need attention
+                          </span>
                         )}
                       </span>
                     </div>

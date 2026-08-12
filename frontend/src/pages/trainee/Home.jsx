@@ -12,6 +12,7 @@ import {
   Circle,
   FileText,
   Layers,
+  Rocket,
   Play,
   ChevronRight,
   Loader2,
@@ -104,6 +105,7 @@ export default function TraineeHome() {
   const [schedules, setSchedules] = useState([]);
   const [clients, setClients] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [sprints, setSprints] = useState([]);
 
   const reloadProgress = async () => {
     const res = await api.myProgress();
@@ -116,13 +118,14 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const [mods, allResults, publishedResults, mySchedules, myClients, myProjects, _] = await Promise.all([
+        const [mods, allResults, publishedResults, mySchedules, myClients, myProjects, mySprints, _] = await Promise.all([
           fetchSheetModules(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listResults().catch(() => []),
           api.listMySchedules().catch(() => []),
           api.myClients().catch(() => []),
           api.myProjects().catch(() => []),
+          api.mySprints().catch(() => []),
           reloadProgress(),
         ]);
 
@@ -133,6 +136,7 @@ export default function TraineeHome() {
         setSchedules(Array.isArray(mySchedules) ? mySchedules : []);
         setClients(Array.isArray(myClients) ? myClients : []);
         setProjects(Array.isArray(myProjects) ? myProjects : []);
+        setSprints(Array.isArray(mySprints) ? mySprints : []);
       } catch (e) {
         toast.error("Could not load training content");
       } finally {
@@ -299,6 +303,42 @@ export default function TraineeHome() {
                 >
                   {p.handling_mode === "assisted" ? "assisted" : "solo"}
                 </span>
+              </span>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {sprints.length > 0 && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4 inline-flex items-center gap-1.5">
+            <Rocket className="h-3 w-3" />
+            Sprints · {sprints.length}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {sprints.map((s) => (
+              <span
+                key={s.sprint_name}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-neutral-50 text-neutral-700 ring-1 ring-neutral-200"
+              >
+                {s.sprint_name}
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ color: s.sprint_type === "major" ? "#2563eb" : "#a3a3a3" }}
+                >
+                  {s.sprint_type === "major" ? "major" : "minor"}
+                </span>
+                <span
+                  className="text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ color: s.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                >
+                  {s.handling_mode === "assisted" ? "assisted" : "solo"}
+                </span>
+                {s.bugs_percent > 0 && (
+                  <span className="text-[10px] font-semibold tabular-nums" style={{ color: "#dc2626" }}>
+                    {s.bugs_percent}% bugs
+                  </span>
+                )}
               </span>
             ))}
           </div>

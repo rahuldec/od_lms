@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchSheetModules } from "@/lib/sheet";
-import { getLevelPeriods, toDateOnly, daysBetween } from "@/lib/levelHistory";
+import { getLevelPeriods, toDateOnly, daysBetween, daysAtCurrentLevel } from "@/lib/levelHistory";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import {
@@ -10,6 +10,8 @@ import {
   X,
   Briefcase,
   Layers,
+  Rocket,
+  MessageSquare,
   MapPin,
   Play,
   AlertTriangle,
@@ -39,6 +41,10 @@ const fmtDate = (value) => {
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// Days a trainee is expected to spend at each level before it's worth
+// flagging them as stuck - not a hard rule, just a prompt to go look.
+const LEVEL_DAY_LIMITS = { 0: 30, 1: 60, 2: 60, 3: 60 };
+
 /** [{trainee_id, ...}] -> { [traineeId]: [{...}] } */
 const groupByTrainee = (rows) => {
   const map = {};
@@ -54,6 +60,7 @@ export default function Reports() {
   const [trainees, setTrainees] = useState([]);
   const [clientAssignments, setClientAssignments] = useState([]);
   const [projectAssignments, setProjectAssignments] = useState([]);
+  const [sprintAssignments, setSprintAssignments] = useState([]);
   const [clientVisits, setClientVisits] = useState([]);
   const [progressRows, setProgressRows] = useState([]);
   const [assignmentResults, setAssignmentResults] = useState({});
@@ -68,6 +75,7 @@ export default function Reports() {
           traineeData,
           clientData,
           projectData,
+          sprintData,
           visitData,
           progressData,
           assignmentData,
@@ -76,6 +84,7 @@ export default function Reports() {
           api.listTrainees(),
           api.listClientAssignments().catch(() => []),
           api.listProjectAssignments().catch(() => []),
+          api.listSprintAssignments().catch(() => []),
           api.listClientVisits().catch(() => []),
           api.listAllProgress().catch(() => []),
           fetchAllAssignmentResults().catch(() => ({})),
@@ -84,6 +93,7 @@ export default function Reports() {
         setTrainees(Array.isArray(traineeData) ? traineeData : []);
         setClientAssignments(Array.isArray(clientData) ? clientData : []);
         setProjectAssignments(Array.isArray(projectData) ? projectData : []);
+        setSprintAssignments(Array.isArray(sprintData) ? sprintData : []);
         setClientVisits(Array.isArray(visitData) ? visitData : []);
         setProgressRows(Array.isArray(progressData) ? progressData : []);
         setAssignmentResults(assignmentData || {});
@@ -107,6 +117,7 @@ export default function Reports() {
   const progressByTrainee = useMemo(() => groupByTrainee(progressRows), [progressRows]);
   const clientsByTrainee = useMemo(() => groupByTrainee(clientAssignments), [clientAssignments]);
   const projectsByTrainee = useMemo(() => groupByTrainee(projectAssignments), [projectAssignments]);
+  const sprintsByTrainee = useMemo(() => groupByTrainee(sprintAssignments), [sprintAssignments]);
   const visitsByTrainee = useMemo(() => groupByTrainee(clientVisits), [clientVisits]);
 
   // One row per trainee who has reached Level 1 at some point, built from
@@ -139,11 +150,25 @@ export default function Reports() {
           .filter((p) => toDateOnly(p.assigned_at) >= l1Date)
           .sort((a, b) => (a.assigned_at < b.assigned_at ? 1 : -1));
 
+        const sprintRows = (sprintsByTrainee[t.id] || [])
+          .filter((s) => toDateOnly(s.assigned_at) >= l1Date)
+          .sort((a, b) => (a.assigned_at < b.assigned_at ? 1 : -1));
+        const avgBugsPercent = sprintRows.length
+          ? Math.round(
+              sprintRows.reduce((sum, s) => sum + (s.bugs_percent || 0), 0) / sprintRows.length
+            )
+          : null;
+
         const visitRows = (visitsByTrainee[t.id] || []).filter((v) => v.visit_count > 0);
         const totalVisits = visitRows.reduce((sum, v) => sum + (v.visit_count || 0), 0);
 
         const assignments = assignmentResults[t.name.trim().toLowerCase()] || [];
         const passedCount = assignments.filter((a) => a.passed).length;
+
+        const currentLevel = t.current_level ?? 0;
+        const daysAtLevel = daysAtCurrentLevel(t, today);
+        const levelLimit = LEVEL_DAY_LIMITS[currentLevel] ?? 60;
+        const needsAttention = daysAtLevel > levelLimit;
 
         return {
           trainee: t,
@@ -152,26 +177,34 @@ export default function Reports() {
           lessonRows,
           clientRows,
           projectRows,
+          sprintRows,
+          avgBugsPercent,
           visitRows,
           totalVisits,
           assignments,
           passedCount,
+          currentLevel,
+          daysAtLevel,
+          levelLimit,
+          needsAttention,
         };
       })
       .filter(Boolean)
-      .sort((a, b) => b.daysSinceL1 - a.daysSinceL1);
+      .sort((a, b) => (b.needsAttention - a.needsAttention) || (b.daysSinceL1 - a.daysSinceL1));
     return { rows: built, notYetCount: notYet };
   }, [
     trainees,
     progressByTrainee,
     clientsByTrainee,
     projectsByTrainee,
+    sprintsByTrainee,
     visitsByTrainee,
     assignmentResults,
     lessonTitleById,
   ]);
 
   const exportPdf = () => window.print();
+  const attentionCount = rows.filter((r) => r.needsAttention).length;
 
   return (
     <AppShell navItems={navItems} subtitle="Admin">
@@ -181,8 +214,14 @@ export default function Reports() {
           <h1 className="text-4xl font-semibold mt-1 tracking-tight">Since Level 1</h1>
           <p className="text-neutral-500 mt-2 max-w-2xl">
             What each trainee has done since the day they were promoted to Level 1 - lessons
-            watched, clients and projects picked up, and visits logged. Trainees still at Level 0
-            aren't shown{notYetCount > 0 ? ` (${notYetCount} of them)` : ""}.
+            watched, clients/projects/sprints picked up, and visits logged. Trainees still at
+            Level 0 aren't shown{notYetCount > 0 ? ` (${notYetCount} of them)` : ""}.
+            {attentionCount > 0 && (
+              <span className="block mt-1 font-medium" style={{ color: "#dc2626" }}>
+                {attentionCount} trainee{attentionCount === 1 ? "" : "s"} flagged - longer than
+                expected at their current level.
+              </span>
+            )}
           </p>
         </div>
         <button
@@ -221,6 +260,8 @@ export default function Reports() {
                   <th className="py-2.5 pr-4 font-medium text-right">Assignments</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Clients</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Projects</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Sprints</th>
+                  <th className="py-2.5 pr-4 font-medium text-right">Avg bugs%</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Visits</th>
                   <th className="py-2.5 pr-5 font-medium text-right no-print">Details</th>
                 </tr>
@@ -228,13 +269,13 @@ export default function Reports() {
               <tbody className="divide-y divide-neutral-50">
                 {loading ? (
                   <tr>
-                    <td colSpan={10} className="py-8 text-center text-neutral-400">
+                    <td colSpan={12} className="py-8 text-center text-neutral-400">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-8 text-center text-neutral-400">
+                    <td colSpan={12} className="py-8 text-center text-neutral-400">
                       No trainee has reached Level 1 yet.
                     </td>
                   </tr>
@@ -246,7 +287,16 @@ export default function Reports() {
                       onClick={() => setDetailFor(r)}
                     >
                       <td className="py-2.5 pl-5 pr-4 font-medium text-neutral-800">
-                        {r.trainee.name}
+                        <span className="inline-flex items-center gap-1.5">
+                          {r.needsAttention && (
+                            <span
+                              className="h-1.5 w-1.5 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: "#dc2626" }}
+                              title={`${r.daysAtLevel} days at Level ${r.currentLevel} - expected within ${r.levelLimit}`}
+                            />
+                          )}
+                          {r.trainee.name}
+                        </span>
                       </td>
                       <td className="py-2.5 pr-4 text-neutral-500">{fmtDate(r.trainee.join_date)}</td>
                       <td className="py-2.5 pr-4 text-neutral-500">{fmtDate(r.l1Date)}</td>
@@ -264,6 +314,12 @@ export default function Reports() {
                       </td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
                         {r.projectRows.length}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
+                        {r.sprintRows.length}
+                      </td>
+                      <td className="py-2.5 pr-4 text-right tabular-nums" style={{ color: r.avgBugsPercent != null ? "#dc2626" : undefined }}>
+                        {r.avgBugsPercent != null ? `${r.avgBugsPercent}%` : <span className="text-neutral-300">—</span>}
                       </td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
                         {r.totalVisits}
@@ -297,7 +353,23 @@ export default function Reports() {
 }
 
 function ReportDetailModal({ report, onClose }) {
-  const { trainee, l1Date, daysSinceL1, lessonRows, clientRows, projectRows, visitRows, assignments, passedCount } = report;
+  const {
+    trainee,
+    l1Date,
+    daysSinceL1,
+    lessonRows,
+    clientRows,
+    projectRows,
+    sprintRows,
+    avgBugsPercent,
+    visitRows,
+    assignments,
+    passedCount,
+    currentLevel,
+    daysAtLevel,
+    levelLimit,
+    needsAttention,
+  } = report;
 
   return (
     <div
@@ -340,6 +412,12 @@ function ReportDetailModal({ report, onClose }) {
               Joined {fmtDate(trainee.join_date)} · Promoted to Level 1 on {fmtDate(l1Date)} ·{" "}
               {daysSinceL1} days since
             </p>
+            {needsAttention && (
+              <p className="text-sm font-medium mt-2" style={{ color: "#dc2626" }}>
+                Flagged: {daysAtLevel} days at Level {currentLevel}, longer than the expected{" "}
+                {levelLimit}.
+              </p>
+            )}
           </div>
 
           <section>
@@ -440,6 +518,64 @@ function ReportDetailModal({ report, onClose }) {
                 ))}
               </ul>
             )}
+          </section>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
+              <Rocket className="h-3 w-3" />
+              Sprints handled since L1 · {sprintRows.length}
+              {avgBugsPercent != null && (
+                <span className="normal-case font-medium" style={{ color: "#dc2626" }}>
+                  · avg {avgBugsPercent}% bugs
+                </span>
+              )}
+            </h3>
+            {sprintRows.length === 0 ? (
+              <p className="text-sm text-neutral-400">None yet.</p>
+            ) : (
+              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
+                {sprintRows.map((s) => (
+                  <li key={s.sprint_name} className="px-3 py-2 flex items-center justify-between gap-3">
+                    <span className="text-sm text-neutral-700 truncate">
+                      {s.sprint_name}
+                      <span
+                        className="ml-2 text-[10px] font-semibold uppercase tracking-wide"
+                        style={{ color: s.sprint_type === "major" ? "#2563eb" : "#a3a3a3" }}
+                      >
+                        {s.sprint_type}
+                      </span>
+                      {s.handling_mode === "assisted" && (
+                        <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: ORANGE }}>
+                          assisted
+                        </span>
+                      )}
+                      {s.bugs_percent > 0 && (
+                        <span className="ml-2 text-[10px] font-semibold tabular-nums" style={{ color: "#dc2626" }}>
+                          {s.bugs_percent}% bugs
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-neutral-400 flex-shrink-0 tabular-nums">
+                      {fmtDate(s.assigned_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3" />
+              Remarks
+            </h3>
+            <p className="text-sm whitespace-pre-wrap break-words p-3 rounded-xl bg-neutral-50">
+              {trainee.notes ? (
+                <span className="text-neutral-700">{trainee.notes}</span>
+              ) : (
+                <span className="text-neutral-400">No remarks yet</span>
+              )}
+            </p>
           </section>
 
           <section>

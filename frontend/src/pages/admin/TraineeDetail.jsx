@@ -6,9 +6,11 @@ import { fetchClients } from "@/lib/clients";
 import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
 import ProjectAssignDialog from "@/components/ProjectAssignDialog";
+import SprintAssignDialog from "@/components/SprintAssignDialog";
+import RemarksDialog from "@/components/RemarksDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Layers, Plus, Hourglass } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Layers, Rocket, MessageSquare, Plus, Hourglass } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { daysAtLevel } from "@/lib/levelHistory";
@@ -111,16 +113,20 @@ export default function TraineeDetail() {
   const [assignOpen, setAssignOpen] = useState(false);
   const [myProjects, setMyProjects] = useState([]);
   const [projectAssignOpen, setProjectAssignOpen] = useState(false);
+  const [mySprints, setMySprints] = useState([]);
+  const [sprintAssignOpen, setSprintAssignOpen] = useState(false);
+  const [remarksOpen, setRemarksOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [tRes, mods, clientList, myClientRows, myProjectRows] = await Promise.all([
+        const [tRes, mods, clientList, myClientRows, myProjectRows, mySprintRows] = await Promise.all([
           api.getTrainee(id),
           fetchSheetModules().catch(() => []),
           fetchClients().catch(() => []),
           api.getTraineeClients(id).catch(() => []),
           api.getTraineeProjects(id).catch(() => []),
+          api.getTraineeSprints(id).catch(() => []),
         ]);
         setTrainee(tRes.trainee || null);
         setProgress(tRes.progress || []);
@@ -136,6 +142,14 @@ export default function TraineeDetail() {
           (myProjectRows || []).map((r) => ({
             project_name: r.project_name,
             handling_mode: r.handling_mode || "solo",
+          }))
+        );
+        setMySprints(
+          (mySprintRows || []).map((r) => ({
+            sprint_name: r.sprint_name,
+            sprint_type: r.sprint_type === "major" ? "major" : "minor",
+            handling_mode: r.handling_mode || "solo",
+            bugs_percent: r.bugs_percent || 0,
           }))
         );
 
@@ -233,11 +247,28 @@ export default function TraineeDetail() {
               <p className="mt-1 font-medium">{trainee.phone || "—"}</p>
             </div>
           </div>
-          {trainee.notes && (
-            <div className="mt-6 p-4 rounded-xl bg-neutral-50 text-sm text-neutral-700">
-              {trainee.notes}
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1.5">
+                <MessageSquare className="h-3 w-3" />
+                Remarks
+              </p>
+              <button
+                onClick={() => setRemarksOpen(true)}
+                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5"
+                style={{ color: "#E05A2B" }}
+              >
+                {trainee.notes ? "Edit" : <><Plus className="h-3 w-3" />Add</>}
+              </button>
             </div>
-          )}
+            <div className="p-4 rounded-xl bg-neutral-50 text-sm whitespace-pre-wrap break-words">
+              {trainee.notes ? (
+                <span className="text-neutral-700">{trainee.notes}</span>
+              ) : (
+                <span className="text-neutral-400">No remarks yet</span>
+              )}
+            </div>
+          </div>
         </Card>
 
         {/* Right column */}
@@ -310,6 +341,67 @@ export default function TraineeDetail() {
                     >
                       {p.handling_mode === "assisted" ? "assisted" : "solo"}
                     </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Sprint book */}
+          <Card className="rounded-2xl border-neutral-200/80 p-7">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 inline-flex items-center gap-1.5">
+                <Rocket className="h-3 w-3" />
+                Sprints
+              </p>
+              <button
+                onClick={() => setSprintAssignOpen(true)}
+                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5"
+                style={{ color: "#E05A2B" }}
+              >
+                {mySprints.length > 0 ? "Manage" : <><Plus className="h-3 w-3" />Assign</>}
+              </button>
+            </div>
+            <p className="text-4xl font-semibold mt-2 tabular-nums">{mySprints.length}</p>
+            <p className="text-sm text-neutral-500 mt-1">
+              assigned
+              {mySprints.length > 0 && (
+                <span style={{ color: "#dc2626" }}>
+                  {" "}
+                  · avg{" "}
+                  {Math.round(
+                    mySprints.reduce((sum, s) => sum + (s.bugs_percent || 0), 0) / mySprints.length
+                  )}
+                  % bugs
+                </span>
+              )}
+            </p>
+            {mySprints.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-1.5">
+                {mySprints.map((s) => (
+                  <span
+                    key={s.sprint_name}
+                    title={`${s.bugs_percent || 0}% bugs found`}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
+                  >
+                    {s.sprint_name}
+                    <span
+                      className="text-[9px] uppercase tracking-wide"
+                      style={{ color: s.sprint_type === "major" ? "#2563eb" : "#a3a3a3" }}
+                    >
+                      {s.sprint_type}
+                    </span>
+                    <span
+                      className="text-[9px] uppercase tracking-wide"
+                      style={{ color: s.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
+                    >
+                      {s.handling_mode === "assisted" ? "assisted" : "solo"}
+                    </span>
+                    {s.bugs_percent > 0 && (
+                      <span className="text-[9px] font-semibold tabular-nums" style={{ color: "#dc2626" }}>
+                        {s.bugs_percent}%
+                      </span>
+                    )}
                   </span>
                 ))}
               </div>
@@ -486,6 +578,23 @@ export default function TraineeDetail() {
           assigned={myProjects}
           onClose={() => setProjectAssignOpen(false)}
           onSaved={setMyProjects}
+        />
+      )}
+
+      {sprintAssignOpen && (
+        <SprintAssignDialog
+          trainee={trainee}
+          assigned={mySprints}
+          onClose={() => setSprintAssignOpen(false)}
+          onSaved={setMySprints}
+        />
+      )}
+
+      {remarksOpen && (
+        <RemarksDialog
+          trainee={trainee}
+          onClose={() => setRemarksOpen(false)}
+          onSaved={(notes) => setTrainee((prev) => ({ ...prev, notes }))}
         />
       )}
     </AppShell>
