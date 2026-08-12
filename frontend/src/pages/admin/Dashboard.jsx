@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchSheetModules } from "@/lib/sheet";
 import { fetchClients, groupAssignmentsByTrainee } from "@/lib/clients";
+import { daysAtCurrentLevel } from "@/lib/levelHistory";
 import AppShell from "@/components/AppShell";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
 import { Card } from "@/components/ui/card";
@@ -1038,6 +1039,7 @@ export default function AdminDashboard() {
                         const promotions = history.filter((h) => h.type === "promotion");
                         const assignments = getAssignments(t.name);
                         const days = daysSince(t.join_date);
+                        const levelDays = daysAtCurrentLevel(t);
                         const latestPromotion = promotions[promotions.length - 1];
                         const myClients = clientsByTrainee[t.id] || [];
                         const assistedClientCount = myClients.filter(
@@ -1093,10 +1095,12 @@ export default function AdminDashboard() {
                                 {t.status}
                               </span>
                               <span
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                                 style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}
+                                title={`${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`}
                               >
                                 L{t.current_level ?? 0}
+                                <span className="opacity-60 tabular-nums">· {levelDays}d</span>
                               </span>
                               {t.batch_id && batchNameById[t.batch_id] && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 ring-1 ring-blue-200">
