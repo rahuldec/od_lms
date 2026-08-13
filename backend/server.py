@@ -249,6 +249,11 @@ class TraineeUpdate(BaseModel):
     batch_id: Optional[str] = None
     level_since_date: Optional[str] = None
     department: Optional[str] = None  # "CS" | "QA"
+    # Admin-only correction path for a trainee's promotion/demotion log, e.g.
+    # to remove stray entries left by mis-clicked promote/demote actions.
+    # Not surfaced in the normal edit form - send explicitly when repairing
+    # a record's level history.
+    history: Optional[list] = None
 
 
 class LevelChangeIn(BaseModel):
