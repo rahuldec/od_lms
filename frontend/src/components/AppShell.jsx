@@ -95,7 +95,7 @@ export default function AppShell({ children, navItems = [], subtitle }) {
   const navGroups = buildNavGroups(navItems);
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900">
+    <div className="min-h-screen bg-neutral-100/70 text-neutral-900">
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-neutral-200/70">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-3" data-testid="brand">

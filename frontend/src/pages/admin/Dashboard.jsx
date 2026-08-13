@@ -269,13 +269,16 @@ function LevelTimeline({ trainee }) {
 
   return (
     <div className="mb-3">
-      <div className="flex h-2 rounded-full overflow-hidden ring-1 ring-neutral-100 bg-neutral-100">
+      <div className="flex h-6 rounded-lg overflow-hidden ring-1 ring-neutral-200 bg-neutral-100">
         {segments.map((s) => (
           <div
             key={s.level}
+            className="flex items-center justify-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden"
             style={{ width: `${(s.days / totalDays) * 100}%`, backgroundColor: levelColors[s.level] }}
             title={`Level ${s.level}: ${s.days} day${s.days === 1 ? "" : "s"}`}
-          />
+          >
+            L{s.level} · {s.days}d
+          </div>
         ))}
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
@@ -337,7 +340,7 @@ function TraineeCard({
   const avgPct = totalSum > 0 ? Math.round((scoreSum / totalSum) * 100) : null;
 
   return (
-    <div className="relative border border-neutral-200 rounded-xl p-3.5 hover:shadow-sm hover:border-neutral-300 transition-all bg-white overflow-hidden">
+    <div className="relative border border-neutral-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all bg-white overflow-hidden">
       {days !== null && (
         <div
           className="absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
@@ -424,7 +427,7 @@ function TraineeCard({
           another, especially now the text inside them is bigger. Cards are
           full-width now specifically to give this row room to breathe. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-      <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+      <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
             <Briefcase className="h-3 w-3 flex-shrink-0" />
@@ -473,7 +476,7 @@ function TraineeCard({
         )}
       </div>
 
-      <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+      <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
             <Layers className="h-3 w-3 flex-shrink-0" />
@@ -522,7 +525,7 @@ function TraineeCard({
         )}
       </div>
 
-      <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+      <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
             <Rocket className="h-3 w-3 flex-shrink-0" />
@@ -600,7 +603,7 @@ function TraineeCard({
           .filter((v) => v.visit_count > 0)
           .map((v) => ({ client_name: v.client_name, count: v.visit_count }));
         return (
-          <div className="relative min-w-0 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+          <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
               <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
                 <MapPin className="h-3 w-3 flex-shrink-0" />
@@ -642,7 +645,7 @@ function TraineeCard({
 
       {/* Remarks. Backed by trainees.notes - general free-text notes, not
           tied to any specific client/project/sprint. */}
-      <div className="relative mb-3 rounded-lg bg-neutral-50/70 ring-1 ring-neutral-100 p-2.5">
+      <div className="relative mb-3 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
             <MessageSquare className="h-3 w-3 flex-shrink-0" />
