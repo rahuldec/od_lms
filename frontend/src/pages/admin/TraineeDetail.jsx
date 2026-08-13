@@ -351,7 +351,8 @@ export default function TraineeDetail() {
             )}
           </Card>
 
-          {/* Sprint book */}
+          {/* Sprint book - a QA-team concept, hidden for CS trainees */}
+          {trainee.department !== "CS" && (
           <Card className="rounded-2xl border-neutral-200/80 p-7">
             <div className="flex items-center justify-between">
               <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 inline-flex items-center gap-1.5">
@@ -411,6 +412,7 @@ export default function TraineeDetail() {
               </div>
             )}
           </Card>
+          )}
 
           {/* Days at Level 0 */}
           <Card className="rounded-2xl border-neutral-200/80 p-7" data-testid="days-at-level0-card">

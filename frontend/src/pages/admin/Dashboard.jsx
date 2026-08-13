@@ -326,6 +326,8 @@ function TraineeCard({
   const days = daysSince(t.join_date);
   const levelDays = daysAtCurrentLevel(t);
   const flagged = needsAttention(t);
+  // Sprints are a QA-team concept - CS trainees never see the section.
+  const showSprints = t.department !== "CS";
 
   let scoreSum = 0;
   let totalSum = 0;
@@ -426,7 +428,7 @@ function TraineeCard({
           stacked - short lists read better across than piled one under
           another, especially now the text inside them is bigger. Cards are
           full-width now specifically to give this row room to breathe. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 ${showSprints ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
       <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
@@ -525,6 +527,7 @@ function TraineeCard({
         )}
       </div>
 
+      {showSprints && (
       <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
@@ -594,6 +597,7 @@ function TraineeCard({
           </div>
         )}
       </div>
+      )}
 
       {/* Visits. A visit can be logged for any client from the sheet, not
           only ones formally assigned to this trainee, so this reads from

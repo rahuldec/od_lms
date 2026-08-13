@@ -309,7 +309,7 @@ export default function TraineeHome() {
         </Card>
       )}
 
-      {sprints.length > 0 && (
+      {trainee?.department !== "CS" && sprints.length > 0 && (
         <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4 inline-flex items-center gap-1.5">
             <Rocket className="h-3 w-3" />
