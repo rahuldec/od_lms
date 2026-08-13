@@ -257,26 +257,10 @@ const avgBugsPercent = (sprints) =>
 // cycle still counts correctly) - a quick visual answer to "how long did
 // they sit at L0 vs L1" without opening the full history.
 function LevelTimeline({ trainee }) {
-  const periods = getLevelPeriods(trainee);
-  const daysPerLevel = periods.reduce((acc, p) => {
+  const daysPerLevel = getLevelPeriods(trainee).reduce((acc, p) => {
     acc[p.level] = (acc[p.level] || 0) + p.days;
     return acc;
   }, {});
-
-  // The open (current) stint's length should match the L-badge above it
-  // (daysAtCurrentLevel, driven by level_since_date - the field admins
-  // actually edit) rather than the history-derived value, since the two
-  // drift apart whenever level_since_date is corrected without also
-  // backdating the matching history entry. Only the last period is the
-  // open stint; earlier closed stints at the same level (re-promotions)
-  // are left as history reports them.
-  const currentLevel = trainee.current_level ?? 0;
-  const lastPeriod = periods[periods.length - 1];
-  if (lastPeriod && lastPeriod.level === currentLevel) {
-    daysPerLevel[currentLevel] =
-      (daysPerLevel[currentLevel] || 0) - lastPeriod.days + daysAtCurrentLevel(trainee);
-  }
-
   const segments = [0, 1, 2, 3]
     .filter((lvl) => daysPerLevel[lvl] > 0)
     .map((lvl) => ({ level: lvl, days: daysPerLevel[lvl] }));

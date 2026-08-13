@@ -51,9 +51,15 @@ export function daysAtLevel(trainee, level, todayStr) {
     .reduce((sum, p) => sum + p.days, 0);
 }
 
-// Days in the trainee's current level only (their present, still-open stint).
+// Days in the trainee's current level only (their present, still-open
+// stint). Derived from the history array via getLevelPeriods rather than
+// the separate level_since_date column - the two are set together by
+// promote/demote, but level_since_date can also be hand-edited on the
+// Trainees form without updating history to match, which drifts the two
+// apart. history plus join_date is the one number that stays internally
+// consistent with "days since joining" everywhere else on a trainee card.
 export function daysAtCurrentLevel(trainee, todayStr = new Date().toISOString().slice(0, 10)) {
-  const since = toDateOnly(trainee?.level_since_date);
-  if (!since) return 0;
-  return daysBetween(since, todayStr);
+  const periods = getLevelPeriods(trainee, todayStr);
+  const last = periods[periods.length - 1];
+  return last ? last.days : 0;
 }
