@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
-import { fetchSheetModules } from "@/lib/sheet";
 import { getLevelPeriods, toDateOnly, daysBetween, daysAtCurrentLevel } from "@/lib/levelHistory";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
@@ -13,7 +12,6 @@ import {
   Rocket,
   MessageSquare,
   MapPin,
-  Play,
   AlertTriangle,
 } from "lucide-react";
 
@@ -62,9 +60,7 @@ export default function Reports() {
   const [projectAssignments, setProjectAssignments] = useState([]);
   const [sprintAssignments, setSprintAssignments] = useState([]);
   const [clientVisits, setClientVisits] = useState([]);
-  const [progressRows, setProgressRows] = useState([]);
   const [assignmentResults, setAssignmentResults] = useState({});
-  const [sheetModules, setSheetModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailFor, setDetailFor] = useState(null);
 
@@ -77,44 +73,27 @@ export default function Reports() {
           projectData,
           sprintData,
           visitData,
-          progressData,
           assignmentData,
-          moduleData,
         ] = await Promise.all([
           api.listTrainees(),
           api.listClientAssignments().catch(() => []),
           api.listProjectAssignments().catch(() => []),
           api.listSprintAssignments().catch(() => []),
           api.listClientVisits().catch(() => []),
-          api.listAllProgress().catch(() => []),
           fetchAllAssignmentResults().catch(() => ({})),
-          fetchSheetModules().catch(() => []),
         ]);
         setTrainees(Array.isArray(traineeData) ? traineeData : []);
         setClientAssignments(Array.isArray(clientData) ? clientData : []);
         setProjectAssignments(Array.isArray(projectData) ? projectData : []);
         setSprintAssignments(Array.isArray(sprintData) ? sprintData : []);
         setClientVisits(Array.isArray(visitData) ? visitData : []);
-        setProgressRows(Array.isArray(progressData) ? progressData : []);
         setAssignmentResults(assignmentData || {});
-        setSheetModules(Array.isArray(moduleData) ? moduleData : []);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  const lessonTitleById = useMemo(() => {
-    const map = {};
-    sheetModules.forEach((mod) => {
-      (mod.lessons || []).forEach((l) => {
-        map[l.id] = l.title;
-      });
-    });
-    return map;
-  }, [sheetModules]);
-
-  const progressByTrainee = useMemo(() => groupByTrainee(progressRows), [progressRows]);
   const clientsByTrainee = useMemo(() => groupByTrainee(clientAssignments), [clientAssignments]);
   const projectsByTrainee = useMemo(() => groupByTrainee(projectAssignments), [projectAssignments]);
   const sprintsByTrainee = useMemo(() => groupByTrainee(sprintAssignments), [sprintAssignments]);
@@ -136,11 +115,6 @@ export default function Reports() {
           return null;
         }
         const l1Date = l1Period.start;
-
-        const lessonRows = (progressByTrainee[t.id] || [])
-          .filter((p) => p.watched && toDateOnly(p.updated_at) >= l1Date)
-          .map((p) => ({ ...p, title: lessonTitleById[p.lesson_id] || p.lesson_id }))
-          .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
 
         const clientRows = (clientsByTrainee[t.id] || [])
           .filter((c) => toDateOnly(c.assigned_at) >= l1Date)
@@ -174,7 +148,6 @@ export default function Reports() {
           trainee: t,
           l1Date,
           daysSinceL1: daysBetween(l1Date, today),
-          lessonRows,
           clientRows,
           projectRows,
           sprintRows,
@@ -194,13 +167,11 @@ export default function Reports() {
     return { rows: built, notYetCount: notYet };
   }, [
     trainees,
-    progressByTrainee,
     clientsByTrainee,
     projectsByTrainee,
     sprintsByTrainee,
     visitsByTrainee,
     assignmentResults,
-    lessonTitleById,
   ]);
 
   const exportPdf = () => window.print();
@@ -213,9 +184,9 @@ export default function Reports() {
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Reports</p>
           <h1 className="text-4xl font-semibold mt-1 tracking-tight">Since Level 1</h1>
           <p className="text-neutral-500 mt-2 max-w-2xl">
-            What each trainee has done since the day they were promoted to Level 1 - lessons
-            watched, clients/projects/sprints picked up, and visits logged. Trainees still at
-            Level 0 aren't shown{notYetCount > 0 ? ` (${notYetCount} of them)` : ""}.
+            What each trainee has done since the day they were promoted to Level 1 - clients/
+            projects/sprints picked up and visits logged. Trainees still at Level 0 aren't
+            shown{notYetCount > 0 ? ` (${notYetCount} of them)` : ""}.
             {attentionCount > 0 && (
               <span className="block mt-1 font-medium" style={{ color: "#dc2626" }}>
                 {attentionCount} trainee{attentionCount === 1 ? "" : "s"} flagged - longer than
@@ -256,7 +227,6 @@ export default function Reports() {
                   <th className="py-2.5 pr-4 font-medium">Joined</th>
                   <th className="py-2.5 pr-4 font-medium">Promoted to L1</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Days since</th>
-                  <th className="py-2.5 pr-4 font-medium text-right">Lessons watched</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Assignments</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Clients</th>
                   <th className="py-2.5 pr-4 font-medium text-right">Projects</th>
@@ -269,13 +239,13 @@ export default function Reports() {
               <tbody className="divide-y divide-neutral-50">
                 {loading ? (
                   <tr>
-                    <td colSpan={12} className="py-8 text-center text-neutral-400">
+                    <td colSpan={11} className="py-8 text-center text-neutral-400">
                       Loading…
                     </td>
                   </tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-8 text-center text-neutral-400">
+                    <td colSpan={11} className="py-8 text-center text-neutral-400">
                       No trainee has reached Level 1 yet.
                     </td>
                   </tr>
@@ -302,9 +272,6 @@ export default function Reports() {
                       <td className="py-2.5 pr-4 text-neutral-500">{fmtDate(r.l1Date)}</td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
                         {r.daysSinceL1}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
-                        {r.lessonRows.length}
                       </td>
                       <td className="py-2.5 pr-4 text-right tabular-nums text-neutral-600">
                         {r.passedCount}/{r.assignments.length}
@@ -357,7 +324,6 @@ function ReportDetailModal({ report, onClose }) {
     trainee,
     l1Date,
     daysSinceL1,
-    lessonRows,
     clientRows,
     projectRows,
     sprintRows,
@@ -419,27 +385,6 @@ function ReportDetailModal({ report, onClose }) {
               </p>
             )}
           </div>
-
-          <section>
-            <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2 inline-flex items-center gap-1.5">
-              <Play className="h-3 w-3" />
-              Lessons watched since L1 · {lessonRows.length}
-            </h3>
-            {lessonRows.length === 0 ? (
-              <p className="text-sm text-neutral-400">None yet.</p>
-            ) : (
-              <ul className="divide-y divide-neutral-50 border border-neutral-100 rounded-xl overflow-hidden">
-                {lessonRows.map((l) => (
-                  <li key={l.lesson_id} className="px-3 py-2 flex items-center justify-between gap-3">
-                    <span className="text-sm text-neutral-700 truncate">{l.title}</span>
-                    <span className="text-xs text-neutral-400 flex-shrink-0 tabular-nums">
-                      {fmtDate(l.updated_at)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
 
           <section>
             <h3 className="text-xs uppercase tracking-wider text-neutral-500 font-semibold mb-2">
