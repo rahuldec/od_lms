@@ -14,6 +14,15 @@ export const daysBetween = (startStr, endStr) => {
 };
 
 // Chronological list of { level, start, end, days } periods.
+//
+// The final period always reflects current_level/level_since_date exactly
+// as they stand on the trainee row, not whatever the history log implies -
+// those two fields are set together by the admin's most recent promote,
+// demote, or hand-edit, and that's the final word on where the trainee is
+// now. history entries are only used to reconstruct earlier, closed stints
+// (anything strictly before level_since_date); a mis-clicked or backdated
+// entry in there can no longer contradict the present state, since the
+// current period isn't derived from the log at all.
 export function getLevelPeriods(trainee, todayStr = new Date().toISOString().slice(0, 10)) {
   if (!trainee) return [];
   const history = Array.isArray(trainee.history) ? trainee.history : [];
@@ -25,16 +34,19 @@ export function getLevelPeriods(trainee, todayStr = new Date().toISOString().sli
     toDateOnly(trainee.created_at) ||
     todayStr;
 
+  const currentLevel = trainee.current_level ?? 0;
+  const sinceDate = toDateOnly(trainee.level_since_date) || startDate;
+
   const changes = history
     .filter((h) => h.type === "promotion" || h.type === "demotion")
     .map((h) => ({
       date: toDateOnly(h.effective_date) || toDateOnly(h.at),
       level: h.to,
     }))
-    .filter((c) => c.date)
+    .filter((c) => c.date && c.date < sinceDate)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
-  const marks = [{ date: startDate, level: 0 }, ...changes];
+  const marks = [{ date: startDate, level: 0 }, ...changes, { date: sinceDate, level: currentLevel }];
 
   return marks.map((mark, i) => {
     const start = mark.date;
@@ -52,27 +64,10 @@ export function daysAtLevel(trainee, level, todayStr) {
 }
 
 // Days in the trainee's current level only (their present, still-open
-// stint). Derived from the history array via getLevelPeriods rather than
-// the separate level_since_date column - the two are set together by
-// promote/demote, but level_since_date can also be hand-edited on the
-// Trainees form without updating history to match, which drifts the two
-// apart. history plus join_date is the one number that stays internally
-// consistent with "days since joining" everywhere else on a trainee card.
-//
-// Deliberately does NOT just take the chronologically last period: if
-// history has a stray or out-of-order entry (e.g. a demotion recorded
-// without a matching later re-promotion, so the last period's level no
-// longer agrees with current_level), the "last" period can be at a
-// different level than current_level, which would show a number here
-// that has nothing to do with the level actually printed next to it.
-// Walking backward for the most recent period that *is* current_level
-// keeps this number honest relative to what it's labeled as, even when
-// the trainee's current_level and history have drifted apart.
+// stint). getLevelPeriods always anchors its last period to
+// current_level/level_since_date, so this is just that period's length -
+// no history lookup needed, and nothing in the log can throw it off.
 export function daysAtCurrentLevel(trainee, todayStr = new Date().toISOString().slice(0, 10)) {
   const periods = getLevelPeriods(trainee, todayStr);
-  const currentLevel = trainee?.current_level ?? 0;
-  for (let i = periods.length - 1; i >= 0; i--) {
-    if (periods[i].level === currentLevel) return periods[i].days;
-  }
-  return 0;
+  return periods.length ? periods[periods.length - 1].days : 0;
 }
