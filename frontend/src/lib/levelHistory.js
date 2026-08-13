@@ -58,8 +58,21 @@ export function daysAtLevel(trainee, level, todayStr) {
 // Trainees form without updating history to match, which drifts the two
 // apart. history plus join_date is the one number that stays internally
 // consistent with "days since joining" everywhere else on a trainee card.
+//
+// Deliberately does NOT just take the chronologically last period: if
+// history has a stray or out-of-order entry (e.g. a demotion recorded
+// without a matching later re-promotion, so the last period's level no
+// longer agrees with current_level), the "last" period can be at a
+// different level than current_level, which would show a number here
+// that has nothing to do with the level actually printed next to it.
+// Walking backward for the most recent period that *is* current_level
+// keeps this number honest relative to what it's labeled as, even when
+// the trainee's current_level and history have drifted apart.
 export function daysAtCurrentLevel(trainee, todayStr = new Date().toISOString().slice(0, 10)) {
   const periods = getLevelPeriods(trainee, todayStr);
-  const last = periods[periods.length - 1];
-  return last ? last.days : 0;
+  const currentLevel = trainee?.current_level ?? 0;
+  for (let i = periods.length - 1; i >= 0; i--) {
+    if (periods[i].level === currentLevel) return periods[i].days;
+  }
+  return 0;
 }
