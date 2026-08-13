@@ -10,7 +10,10 @@ import SprintAssignDialog from "@/components/SprintAssignDialog";
 import RemarksDialog from "@/components/RemarksDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Layers, Rocket, MessageSquare, Plus, Hourglass } from "lucide-react";
+import {
+  ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Layers, Rocket,
+  MessageSquare, Plus, Hourglass, Flag, TrendingUp, TrendingDown, LogIn,
+} from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
 import { daysAtLevel } from "@/lib/levelHistory";
@@ -33,6 +36,15 @@ const fmtMinutes = (sec) => {
   const s = Math.floor((sec || 0) % 60);
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 };
+
+const fmtEventDate = (iso) =>
+  new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 
 const scoreColor = (ratio) => {
   if (ratio >= 0.7) return "#16a34a";
@@ -116,22 +128,25 @@ export default function TraineeDetail() {
   const [mySprints, setMySprints] = useState([]);
   const [sprintAssignOpen, setSprintAssignOpen] = useState(false);
   const [remarksOpen, setRemarksOpen] = useState(false);
+  const [loginEvents, setLoginEvents] = useState([]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [tRes, mods, clientList, myClientRows, myProjectRows, mySprintRows] = await Promise.all([
+        const [tRes, mods, clientList, myClientRows, myProjectRows, mySprintRows, loginRows] = await Promise.all([
           api.getTrainee(id),
           fetchSheetModules().catch(() => []),
           fetchClients().catch(() => []),
           api.getTraineeClients(id).catch(() => []),
           api.getTraineeProjects(id).catch(() => []),
           api.getTraineeSprints(id).catch(() => []),
+          api.getTraineeLoginTimeline(id).catch(() => []),
         ]);
         setTrainee(tRes.trainee || null);
         setProgress(tRes.progress || []);
         setModules(mods || []);
         setClients(clientList || []);
+        setLoginEvents(loginRows || []);
         setMyClients(
           (myClientRows || []).map((r) => ({
             client_name: r.client_name,
@@ -186,6 +201,33 @@ export default function TraineeDetail() {
   const watchedCount = useMemo(() => progress.filter((p) => p.watched).length, [progress]);
   const totalSeconds = useMemo(() => progress.reduce((acc, p) => acc + (p.watch_seconds || 0), 0), [progress]);
   const daysAtL0 = useMemo(() => daysAtLevel(trainee, 0), [trainee]);
+
+  // One entry per calendar day logged in (not one per ping, which would be
+  // noisy) merged with the trainee's promotion/demotion/joined log, newest
+  // first - a single feed for "what's happened on this record."
+  const timelineEvents = useMemo(() => {
+    const history = Array.isArray(trainee?.history) ? trainee.history : [];
+    const historyEvents = history.map((h) => ({
+      kind: h.type,
+      at: h.at,
+      from: h.from,
+      to: h.to,
+      effectiveDate: h.effective_date,
+    }));
+
+    const seenDays = new Set();
+    const loginDayEvents = [];
+    for (const e of loginEvents) {
+      const day = String(e.created_at).slice(0, 10);
+      if (seenDays.has(day)) continue;
+      seenDays.add(day);
+      loginDayEvents.push({ kind: "login", at: e.created_at });
+    }
+
+    return [...historyEvents, ...loginDayEvents]
+      .filter((e) => e.at)
+      .sort((a, b) => new Date(b.at) - new Date(a.at));
+  }, [trainee, loginEvents]);
 
   if (loading) {
     return (
@@ -567,7 +609,60 @@ export default function TraineeDetail() {
           ))}
         </div>
       </Card>
-    
+
+      {/* Timeline */}
+      <Card className="rounded-2xl border-neutral-200/80 p-7 mt-6" data-testid="trainee-timeline-card">
+        <h2 className="text-xl font-semibold mb-1">Timeline</h2>
+        <p className="text-sm text-neutral-500 mb-6">
+          Level changes and login activity, most recent first.
+        </p>
+        {timelineEvents.length === 0 ? (
+          <p className="text-sm text-neutral-400">No activity recorded yet.</p>
+        ) : (
+          <ul className="space-y-4">
+            {timelineEvents.slice(0, 30).map((ev, i) => {
+              const isLevelChange = ev.kind === "promotion" || ev.kind === "demotion";
+              const icon =
+                ev.kind === "joined" ? (
+                  <Flag className="h-4 w-4" style={{ color: "#94a3b8" }} />
+                ) : ev.kind === "promotion" ? (
+                  <TrendingUp className="h-4 w-4" style={{ color: "#16a34a" }} />
+                ) : ev.kind === "demotion" ? (
+                  <TrendingDown className="h-4 w-4" style={{ color: "#dc2626" }} />
+                ) : (
+                  <LogIn className="h-4 w-4 text-neutral-400" />
+                );
+              const label =
+                ev.kind === "joined"
+                  ? `Joined at Level ${ev.to ?? 0}`
+                  : isLevelChange
+                  ? `${ev.kind === "promotion" ? "Promoted" : "Demoted"} Level ${ev.from ?? 0} → Level ${ev.to ?? 0}`
+                  : "Logged in";
+              const effectiveNote =
+                isLevelChange && ev.effectiveDate && ev.effectiveDate !== String(ev.at).slice(0, 10)
+                  ? ` (effective ${ev.effectiveDate})`
+                  : "";
+              return (
+                <li key={i} className="flex items-start gap-3 text-sm">
+                  <div className="h-7 w-7 rounded-full bg-neutral-50 ring-1 ring-neutral-200 flex items-center justify-center flex-shrink-0">
+                    {icon}
+                  </div>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <p className="text-neutral-800">
+                      {label}
+                      {effectiveNote && <span className="text-neutral-400">{effectiveNote}</span>}
+                    </p>
+                  </div>
+                  <span className="text-xs text-neutral-400 whitespace-nowrap tabular-nums pt-1">
+                    {fmtEventDate(ev.at)}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+
       {assignOpen && (
         <ClientAssignDialog
           trainee={trainee}

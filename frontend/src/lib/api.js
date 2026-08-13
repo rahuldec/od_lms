@@ -89,6 +89,10 @@ export const api = {
     withAuthRetry((headers) =>
       axios.get(`${BASE}/admin/trainees/${id}`, { headers }).then((r) => r.data)
     ),
+  getTraineeLoginTimeline: (id) =>
+    withAuthRetry((headers) =>
+      axios.get(`${BASE}/admin/trainees/${id}/timeline`, { headers }).then((r) => r.data)
+    ),
   createTrainee: (body) =>
     withAuthRetry((headers) =>
       axios.post(`${BASE}/admin/trainees`, body, { headers }).then((r) => r.data)

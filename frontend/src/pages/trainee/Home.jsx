@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { fetchSheetModules } from "@/lib/sheet";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import AppShell from "@/components/AppShell";
+import LevelTimeline from "@/components/LevelTimeline";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -235,6 +236,9 @@ export default function TraineeHome() {
             Day {Math.max(0, Math.floor((new Date() - new Date(trainee.join_date)) / (1000 * 60 * 60 * 24)))} of your journey
           </p>
         )}
+        <div className="max-w-xl mt-3">
+          <LevelTimeline trainee={trainee} />
+        </div>
         <p className="text-neutral-500 mt-2 max-w-xl">
           Your Okie Dokie ERP training program - modules, video lessons and assignments, all in one place.
         </p>
