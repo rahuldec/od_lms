@@ -15,9 +15,11 @@ import ProjectAssignDialog from "@/components/ProjectAssignDialog";
 import SprintAssignDialog from "@/components/SprintAssignDialog";
 import VisitLogDialog from "@/components/VisitLogDialog";
 import RemarksDialog from "@/components/RemarksDialog";
+import CsatDialog from "@/components/CsatDialog";
+import CardSettingsDialog from "@/components/CardSettingsDialog";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Flag, FileText, Play, ArrowUp, ArrowDown, Activity, LogIn, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile } from "lucide-react";
 import { toast } from "sonner";
 import {
   BarChart,
@@ -72,6 +74,15 @@ const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
 // flagging them as stuck - not a hard rule, just a prompt to go look.
 const LEVEL_DAY_LIMITS = { 0: 30, 1: 60, 2: 60, 3: 60 };
 const needsAttention = (t) => daysAtCurrentLevel(t) > (LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60);
+
+// Which optional dashboard-card sections apply to a trainee. Null/missing
+// enabled_cards means "everything on" - existing trainees keep every
+// section until an admin explicitly narrows it down via the card's
+// settings icon.
+const isCardEnabled = (t, key) => !Array.isArray(t.enabled_cards) || t.enabled_cards.includes(key);
+// Static so Tailwind's content scanner can find each full class name -
+// a computed string like `lg:grid-cols-${n}` wouldn't be picked up.
+const GRID_COLS_LG = { 1: "lg:grid-cols-1", 2: "lg:grid-cols-2", 3: "lg:grid-cols-3", 4: "lg:grid-cols-4", 5: "lg:grid-cols-5" };
 
 // Palette for per-trainee bars in the module comparison chart. Cycled if more
 // trainees than colors.
@@ -273,6 +284,8 @@ function TraineeCard({
   onAssignSprints,
   onLogVisits,
   onEditRemarks,
+  onEditCsat,
+  onEditCardSettings,
   onOpenAssignment,
 }) {
   const [scoresOpen, setScoresOpen] = useState(false);
@@ -284,8 +297,21 @@ function TraineeCard({
   const days = daysSince(t.join_date);
   const levelDays = daysAtCurrentLevel(t);
   const flagged = needsAttention(t);
-  // Sprints are a QA-team concept - CS trainees never see the section.
+  // Sprints are a QA-team concept - CS trainees never see the section,
+  // regardless of the admin's card settings for this trainee.
   const showSprints = t.department !== "CS";
+
+  // Which of the optional sections below actually render for this trainee -
+  // drives both which wells show up and how many grid columns to use, so a
+  // trainee with only Clients enabled doesn't leave three empty slots.
+  const cardsEnabled = {
+    clients: isCardEnabled(t, "clients"),
+    projects: isCardEnabled(t, "projects"),
+    sprints: showSprints && isCardEnabled(t, "sprints"),
+    visits: isCardEnabled(t, "visits"),
+    csat: isCardEnabled(t, "csat"),
+  };
+  const visibleCardCount = Object.values(cardsEnabled).filter(Boolean).length;
 
   let scoreSum = 0;
   let totalSum = 0;
@@ -324,6 +350,15 @@ function TraineeCard({
             <p className="text-sm truncate" style={{ color: "var(--g3d-faint)" }}>@{t.username}</p>
           </div>
         </div>
+        <button
+          onClick={onEditCardSettings}
+          data-testid={`card-settings-${t.id}`}
+          title="Choose which sections show on this card"
+          className="flex-shrink-0 h-7 w-7 rounded-full grid place-items-center hover:opacity-70"
+          style={{ color: "var(--g3d-faint)" }}
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </button>
       </div>
 
       <div className="flex items-center gap-1.5 mb-3 flex-wrap">
@@ -443,11 +478,15 @@ function TraineeCard({
         )}
       </div>
 
-      {/* Clients / Projects / Sprints / Visits sit side by side rather than
-          stacked - short lists read better across than piled one under
-          another, especially now the text inside them is bigger. Cards are
-          full-width now specifically to give this row room to breathe. */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 ${showSprints ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+      {/* Clients / Projects / Sprints / Visits / CSAT sit side by side rather
+          than stacked - short lists read better across than piled one under
+          another, especially now the text inside them is bigger. Which of
+          these appear at all is per-trainee (the card's settings icon),
+          so the grid only reserves as many columns as are actually shown -
+          a trainee with just Clients enabled doesn't leave empty slots. */}
+      {visibleCardCount > 0 && (
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 ${GRID_COLS_LG[Math.min(visibleCardCount, 5)]}`}>
+      {cardsEnabled.clients && (
       <div className="g3d-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
@@ -497,7 +536,9 @@ function TraineeCard({
           </div>
         )}
       </div>
+      )}
 
+      {cardsEnabled.projects && (
       <div className="g3d-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
@@ -547,8 +588,9 @@ function TraineeCard({
           </div>
         )}
       </div>
+      )}
 
-      {showSprints && (
+      {cardsEnabled.sprints && (
       <div className="g3d-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
           <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
@@ -625,7 +667,7 @@ function TraineeCard({
       {/* Visits. A visit can be logged for any client from the sheet, not
           only ones formally assigned to this trainee, so this reads from
           visitRows directly rather than cross-referencing myClients. */}
-      {(() => {
+      {cardsEnabled.visits && (() => {
         const visited = visitRows
           .filter((v) => v.visit_count > 0)
           .map((v) => ({ client_name: v.client_name, count: v.visit_count }));
@@ -665,7 +707,36 @@ function TraineeCard({
           </div>
         );
       })()}
+
+      {/* CSAT. Admin-entered, backed by trainees.csat_score - no external
+          source wired up. */}
+      {cardsEnabled.csat && (
+        <div className="g3d-well relative min-w-0 p-2.5">
+          <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
+            <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+              <Smile className="h-3 w-3 flex-shrink-0" />
+              CSAT
+            </span>
+            <button
+              onClick={onEditCsat}
+              data-testid={`edit-csat-${t.id}`}
+              className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+              style={{ color: "var(--g3d-accent)" }}
+            >
+              {t.csat_score != null ? "Edit" : (<><Plus className="h-3 w-3" />Add</>)}
+            </button>
+          </div>
+          {t.csat_score != null ? (
+            <p className="text-lg font-semibold mt-1.5 tabular-nums" style={{ color: "var(--g3d-ink)" }}>
+              {t.csat_score}%
+            </p>
+          ) : (
+            <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>Not recorded</p>
+          )}
+        </div>
+      )}
       </div>
+      )}
 
       {/* Remarks. Backed by trainees.notes - general free-text notes, not
           tied to any specific client/project/sprint. */}
@@ -878,6 +949,8 @@ export default function AdminDashboard() {
   const [clientVisits, setClientVisits] = useState([]);
   const [visitDialogFor, setVisitDialogFor] = useState(null);
   const [remarksFor, setRemarksFor] = useState(null);
+  const [csatFor, setCsatFor] = useState(null);
+  const [cardSettingsFor, setCardSettingsFor] = useState(null);
 
   // Collapsible sections below load nothing until first expanded - the
   // heaviest calls here (assignment scores, activity feed, batch modules)
@@ -1590,6 +1663,8 @@ export default function AdminDashboard() {
                           onAssignSprints={() => setSprintAssignFor(t)}
                           onLogVisits={() => setVisitDialogFor(t)}
                           onEditRemarks={() => setRemarksFor(t)}
+                          onEditCsat={() => setCsatFor(t)}
+                          onEditCardSettings={() => setCardSettingsFor(t)}
                           onOpenAssignment={setActiveAssignment}
                         />
                       ))}
@@ -1704,6 +1779,28 @@ export default function AdminDashboard() {
           onClose={() => setRemarksFor(null)}
           onSaved={(notes) =>
             setTrainees((prev) => prev.map((t) => (t.id === remarksFor.id ? { ...t, notes } : t)))
+          }
+        />
+      )}
+
+      {csatFor && (
+        <CsatDialog
+          trainee={csatFor}
+          onClose={() => setCsatFor(null)}
+          onSaved={(csat_score) =>
+            setTrainees((prev) => prev.map((t) => (t.id === csatFor.id ? { ...t, csat_score } : t)))
+          }
+        />
+      )}
+
+      {cardSettingsFor && (
+        <CardSettingsDialog
+          trainee={cardSettingsFor}
+          onClose={() => setCardSettingsFor(null)}
+          onSaved={(enabled_cards) =>
+            setTrainees((prev) =>
+              prev.map((t) => (t.id === cardSettingsFor.id ? { ...t, enabled_cards } : t))
+            )
           }
         />
       )}

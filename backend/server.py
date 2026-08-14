@@ -254,6 +254,13 @@ class TraineeUpdate(BaseModel):
     # Not surfaced in the normal edit form - send explicitly when repairing
     # a record's level history.
     history: Optional[list] = None
+    # Which optional dashboard-card sections apply to this trainee (e.g.
+    # ["clients","visits"]). Null/missing means "everything on" - existing
+    # trainees keep every section until an admin explicitly narrows it down.
+    enabled_cards: Optional[list] = None
+    # Admin-entered CSAT score, 0-100. No external source (e.g. a sheet) -
+    # set directly, same pattern as notes.
+    csat_score: Optional[float] = None
 
 
 class LevelChangeIn(BaseModel):
