@@ -91,12 +91,14 @@
   box-shadow: 0 3px 0 var(--g3d-accent-deep), 0 5px 8px -2px rgba(237, 96, 31, 0.45);
 }
 
-/* frosted sub-panel holding each section (Clients / Projects / Visits / Remarks) */
+/* frosted sub-panel holding each section (Clients / Projects / Visits / Remarks).
+   Deliberately a shade darker/warmer than .g3d-card's own fill - two
+   near-white tones stacked on each other read as one surface otherwise. */
 .g3d-well {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(129, 26, 15, 0.1);
+  background: rgba(247, 231, 214, 0.85);
+  border: 1px solid rgba(129, 26, 15, 0.16);
   border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(129, 26, 15, 0.07);
+  box-shadow: inset 0 1px 2px rgba(129, 26, 15, 0.05), 0 1px 2px rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
