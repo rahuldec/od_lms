@@ -63,11 +63,6 @@
   box-shadow: 0 4px 0 var(--g3d-accent-deep), 0 7px 10px -3px rgba(237, 96, 31, 0.5);
 }
 
-.g3d-ghost-num {
-  color: var(--g3d-ink);
-  opacity: 0.05;
-}
-
 /* pill-shaped status/meta chips in the header row */
 .g3d-chip {
   background: var(--fill, var(--g3d-panel));

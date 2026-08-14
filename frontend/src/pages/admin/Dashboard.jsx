@@ -327,14 +327,6 @@ function TraineeCard({
 
   return (
     <div className="g3d-scope g3d-card relative p-4 overflow-hidden">
-      {days !== null && (
-        <div
-          className="g3d-ghost-num absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
-          style={{ fontSize: "3.75rem" }}
-        >
-          {days}
-        </div>
-      )}
       <div className="relative flex items-start justify-between mb-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="g3d-avatar h-9 w-9 grid place-items-center text-white text-sm font-bold flex-shrink-0">
@@ -350,15 +342,26 @@ function TraineeCard({
             <p className="text-sm truncate" style={{ color: "var(--g3d-faint)" }}>@{t.username}</p>
           </div>
         </div>
-        <button
-          onClick={onEditCardSettings}
-          data-testid={`card-settings-${t.id}`}
-          title="Choose which sections show on this card"
-          className="flex-shrink-0 h-7 w-7 rounded-full grid place-items-center hover:opacity-70"
-          style={{ color: "var(--g3d-faint)" }}
-        >
-          <Settings className="h-3.5 w-3.5" />
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {days !== null && (
+            <span
+              className="text-base font-extrabold tabular-nums"
+              style={{ color: "var(--g3d-ink)" }}
+              title={`${days} day${days === 1 ? "" : "s"} in training`}
+            >
+              {days}d
+            </span>
+          )}
+          <button
+            onClick={onEditCardSettings}
+            data-testid={`card-settings-${t.id}`}
+            title="Choose which sections show on this card"
+            className="h-7 w-7 rounded-full grid place-items-center hover:opacity-70"
+            style={{ color: "var(--g3d-faint)" }}
+          >
+            <Settings className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 mb-3 flex-wrap">
@@ -418,7 +421,7 @@ function TraineeCard({
           this page. Moved above Clients/Projects/etc so scoring is the
           first thing seen after the level bar, not the last. */}
       <div className="g3d-well relative mb-3 p-2.5">
-        <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+        <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
           <BarChart3 className="h-3 w-3 flex-shrink-0" />
           Learning Phase
         </span>
@@ -489,7 +492,7 @@ function TraineeCard({
       {cardsEnabled.clients && (
       <div className="g3d-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
             <Briefcase className="h-3 w-3 flex-shrink-0" />
             Clients
           </span>
@@ -541,7 +544,7 @@ function TraineeCard({
       {cardsEnabled.projects && (
       <div className="g3d-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
             <Layers className="h-3 w-3 flex-shrink-0" />
             Projects
           </span>
@@ -593,7 +596,7 @@ function TraineeCard({
       {cardsEnabled.sprints && (
       <div className="g3d-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
             <Rocket className="h-3 w-3 flex-shrink-0" />
             Sprints
           </span>
@@ -674,7 +677,7 @@ function TraineeCard({
         return (
           <div className="g3d-well relative min-w-0 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-              <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+              <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
                 <MapPin className="h-3 w-3 flex-shrink-0" />
                 Visits
               </span>
@@ -713,7 +716,7 @@ function TraineeCard({
       {cardsEnabled.csat && (
         <div className="g3d-well relative min-w-0 p-2.5">
           <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-            <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+            <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
               <Smile className="h-3 w-3 flex-shrink-0" />
               CSAT
             </span>
@@ -742,7 +745,7 @@ function TraineeCard({
           tied to any specific client/project/sprint. */}
       <div className="g3d-well relative mb-3 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
             <MessageSquare className="h-3 w-3 flex-shrink-0" />
             Remarks
           </span>

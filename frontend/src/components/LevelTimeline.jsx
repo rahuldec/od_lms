@@ -31,11 +31,11 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
     const lastLevel = segments[segments.length - 1]?.level;
     return (
       <div className="mb-3">
-        <div className="g3d-track flex h-5">
+        <div className="g3d-track flex h-8">
           {segments.map((s) => (
             <div
               key={s.level}
-              className="g3d-track-fill flex items-center justify-center text-[9.5px] font-bold text-white whitespace-nowrap overflow-hidden"
+              className="g3d-track-fill flex items-center justify-center text-[11px] font-bold text-white whitespace-nowrap overflow-hidden px-1"
               style={{
                 width: `${(s.days / totalDays) * 100}%`,
                 backgroundColor: glass3dLevelColors[s.level],
@@ -43,7 +43,7 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
               }}
               title={`Level ${s.level}: ${s.days} day${s.days === 1 ? "" : "s"}`}
             >
-              L{s.level}
+              L{s.level} · {s.days}d
             </div>
           ))}
         </div>
