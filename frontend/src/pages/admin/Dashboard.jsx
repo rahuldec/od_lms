@@ -7,6 +7,7 @@ import { fetchClients, groupAssignmentsByTrainee } from "@/lib/clients";
 import { groupProjectAssignmentsByTrainee } from "@/lib/projects";
 import { groupSprintAssignmentsByTrainee } from "@/lib/sprints";
 import { daysAtCurrentLevel } from "@/lib/levelHistory";
+import "@/styles/clay.css";
 import AppShell from "@/components/AppShell";
 import LevelTimeline from "@/components/LevelTimeline";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
@@ -299,52 +300,46 @@ function TraineeCard({
   const avgPct = totalSum > 0 ? Math.round((scoreSum / totalSum) * 100) : null;
 
   return (
-    <div className="relative border border-neutral-200 rounded-xl p-3.5 shadow-sm hover:shadow-md hover:border-neutral-300 transition-all bg-white overflow-hidden">
+    <div className="clay-scope clay-card relative p-4 overflow-hidden">
       {days !== null && (
         <div
-          className="absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
-          style={{ fontSize: "3.75rem", color: ORANGE, opacity: 0.07 }}
+          className="clay-ghost-num absolute -top-2 -right-1 select-none pointer-events-none leading-none font-black tracking-tighter"
+          style={{ fontSize: "3.75rem" }}
         >
           {days}
         </div>
       )}
       <div className="relative flex items-start justify-between mb-2.5">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className="h-9 w-9 rounded-full grid place-items-center text-white text-sm font-semibold flex-shrink-0"
-            style={{ backgroundColor: ORANGE }}
-          >
+          <div className="clay-avatar h-9 w-9 rounded-full grid place-items-center text-white text-sm font-bold flex-shrink-0">
             {t.name?.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
             <Link
               to={`/admin/trainees/${t.id}`}
-              className="text-base font-medium text-neutral-900 hover:underline truncate block"
+              className="text-base font-semibold hover:underline truncate block"
             >
               {t.name}
             </Link>
-            <p className="text-sm text-neutral-400 truncate">@{t.username}</p>
+            <p className="text-sm truncate" style={{ color: "var(--clay-faint)" }}>@{t.username}</p>
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-1.5 mb-3 flex-wrap">
         <span
-          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
+          className="clay-chip"
+          style={
             t.status === "Active"
-              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-              : "bg-neutral-100 text-neutral-600 ring-neutral-200"
-          }`}
+              ? { "--fill": "var(--clay-good-bg)", "--ink2": "var(--clay-good-ink)" }
+              : undefined
+          }
         >
           {t.status}
         </span>
         <span
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-          style={
-            flagged
-              ? { backgroundColor: "#FEE2E2", color: "#dc2626" }
-              : { backgroundColor: "#FFF0E8", color: ORANGE }
-          }
+          className="clay-chip solid"
+          style={flagged ? { "--fill": "var(--clay-bad-bg)", color: "var(--clay-bad-ink)" } : undefined}
           title={
             flagged
               ? `${levelDays} days at Level ${t.current_level ?? 0} - longer than the expected ${LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60}`
@@ -353,42 +348,43 @@ function TraineeCard({
         >
           {flagged && <AlertTriangle className="h-2.5 w-2.5" />}
           L{t.current_level ?? 0}
-          <span className="opacity-60 tabular-nums">· {levelDays}d</span>
+          <span className="opacity-80 tabular-nums">· {levelDays}d</span>
         </span>
         {t.batch_id && batchNameById[t.batch_id] && (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 ring-1 ring-blue-200">
+          <span className="clay-chip" style={{ "--fill": "var(--clay-batch-bg)", "--ink2": "var(--clay-batch-ink)" }}>
             {batchNameById[t.batch_id]}
           </span>
         )}
         {t.department && (
           <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
+            className="clay-chip"
+            style={
               t.department === "QA"
-                ? "bg-purple-50 text-purple-700 ring-purple-200"
-                : "bg-blue-50 text-blue-700 ring-blue-200"
-            }`}
+                ? { "--fill": "var(--clay-qa-bg)", "--ink2": "var(--clay-qa-ink)" }
+                : { "--fill": "var(--clay-cs-bg)", "--ink2": "var(--clay-cs-ink)" }
+            }
           >
             {t.department}
           </span>
         )}
         {latestPromotion && (
-          <span className="inline-flex items-center gap-0.5 text-xs text-neutral-400 ml-auto">
+          <span className="inline-flex items-center gap-0.5 text-xs ml-auto" style={{ color: "var(--clay-faint)" }}>
             <TrendingUp className="h-3 w-3" />
             {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
           </span>
         )}
       </div>
 
-      <LevelTimeline trainee={t} />
+      <LevelTimeline trainee={t} variant="clay" />
 
       {/* Clients / Projects / Sprints / Visits sit side by side rather than
           stacked - short lists read better across than piled one under
           another, especially now the text inside them is bigger. Cards are
           full-width now specifically to give this row room to breathe. */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 ${showSprints ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
-      <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
+      <div className="clay-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--clay-faint)" }}>
             <Briefcase className="h-3 w-3 flex-shrink-0" />
             Clients
           </span>
@@ -396,32 +392,33 @@ function TraineeCard({
             onClick={onAssignClients}
             data-testid={`assign-clients-${t.id}`}
             className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: ORANGE }}
+            style={{ color: "var(--clay-accent)" }}
           >
             {myClients.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
         {myClients.length > 0 && (
-          <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+          <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--clay-faint)" }}>
             {myClients.length} assigned
             {assistedCount(myClients) > 0 && (
-              <span style={{ color: ORANGE }}> · {assistedCount(myClients)} assisted</span>
+              <span style={{ color: "var(--clay-accent)" }}> · {assistedCount(myClients)} assisted</span>
             )}
           </p>
         )}
         {myClients.length === 0 ? (
-          <p className="text-sm text-neutral-300 mt-1.5">No clients assigned</p>
+          <p className="text-sm mt-1.5" style={{ color: "var(--clay-faint)" }}>No clients assigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5 min-w-0">
             {myClients.map((c) => (
               <span
                 key={c.client_name}
                 title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
+                className="clay-pill text-sm"
+                style={
                   c.handling_mode === "assisted"
-                    ? "bg-orange-50 text-orange-700 ring-orange-200"
-                    : "bg-white text-neutral-600 ring-neutral-200"
-                }`}
+                    ? { "--fill": "var(--clay-accent-soft)", "--ink2": "var(--clay-accent-ink)" }
+                    : undefined
+                }
               >
                 <span className="min-w-0 break-words">{c.client_name}</span>
                 {c.handling_mode === "assisted" && (
@@ -435,9 +432,9 @@ function TraineeCard({
         )}
       </div>
 
-      <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
+      <div className="clay-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--clay-faint)" }}>
             <Layers className="h-3 w-3 flex-shrink-0" />
             Projects
           </span>
@@ -445,32 +442,33 @@ function TraineeCard({
             onClick={onAssignProjects}
             data-testid={`assign-projects-${t.id}`}
             className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: ORANGE }}
+            style={{ color: "var(--clay-accent)" }}
           >
             {myProjects.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
         {myProjects.length > 0 && (
-          <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+          <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--clay-faint)" }}>
             {myProjects.length} assigned
             {assistedCount(myProjects) > 0 && (
-              <span style={{ color: ORANGE }}> · {assistedCount(myProjects)} assisted</span>
+              <span style={{ color: "var(--clay-accent)" }}> · {assistedCount(myProjects)} assisted</span>
             )}
           </p>
         )}
         {myProjects.length === 0 ? (
-          <p className="text-sm text-neutral-300 mt-1.5">No projects assigned</p>
+          <p className="text-sm mt-1.5" style={{ color: "var(--clay-faint)" }}>No projects assigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5 min-w-0">
             {myProjects.map((p) => (
               <span
                 key={p.project_name}
                 title={`${p.project_name} · ${p.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
+                className="clay-pill text-sm"
+                style={
                   p.handling_mode === "assisted"
-                    ? "bg-orange-50 text-orange-700 ring-orange-200"
-                    : "bg-white text-neutral-600 ring-neutral-200"
-                }`}
+                    ? { "--fill": "var(--clay-accent-soft)", "--ink2": "var(--clay-accent-ink)" }
+                    : undefined
+                }
               >
                 <span className="min-w-0 break-words">{p.project_name}</span>
                 {p.handling_mode === "assisted" && (
@@ -485,9 +483,9 @@ function TraineeCard({
       </div>
 
       {showSprints && (
-      <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
+      <div className="clay-well relative min-w-0 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--clay-faint)" }}>
             <Rocket className="h-3 w-3 flex-shrink-0" />
             Sprints
           </span>
@@ -495,47 +493,49 @@ function TraineeCard({
             onClick={onAssignSprints}
             data-testid={`assign-sprints-${t.id}`}
             className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: ORANGE }}
+            style={{ color: "var(--clay-accent)" }}
           >
             {mySprints.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
           </button>
         </div>
         {mySprints.length > 0 && (
           <div className="flex items-center gap-1 mb-1.5">
-            <p className="text-[11px] text-neutral-400 tabular-nums">
+            <p className="text-[11px] tabular-nums" style={{ color: "var(--clay-faint)" }}>
               {mySprints.length} assigned
               {assistedCount(mySprints) > 0 && (
-                <span style={{ color: ORANGE }}> · {assistedCount(mySprints)} assisted</span>
+                <span style={{ color: "var(--clay-accent)" }}> · {assistedCount(mySprints)} assisted</span>
               )}
-              <span style={{ color: "#dc2626" }}> · avg {avgBugsPercent(mySprints)}% bugs</span>
+              <span style={{ color: "var(--clay-bad-ink)" }}> · avg {avgBugsPercent(mySprints)}% bugs</span>
             </p>
             <button
               onClick={() => setSprintsOpen((v) => !v)}
               title={sprintsOpen ? "Hide sprint details" : "Show sprint details"}
-              className="text-neutral-400 hover:text-neutral-600 flex-shrink-0"
+              className="flex-shrink-0"
+              style={{ color: "var(--clay-faint)" }}
             >
               <Info className="h-3 w-3" />
             </button>
           </div>
         )}
         {mySprints.length === 0 ? (
-          <p className="text-sm text-neutral-300 mt-1.5">No sprints assigned</p>
+          <p className="text-sm mt-1.5" style={{ color: "var(--clay-faint)" }}>No sprints assigned</p>
         ) : !sprintsOpen ? null : (
           <div className="flex flex-wrap gap-1.5 min-w-0">
             {mySprints.map((s) => (
               <span
                 key={s.sprint_name}
                 title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.handling_mode === "assisted" ? "Assisted" : "Solo"} · ${s.bugs_percent || 0}% bugs found`}
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full ${
+                className="clay-pill text-sm"
+                style={
                   s.handling_mode === "assisted"
-                    ? "bg-orange-50 text-orange-700 ring-orange-200"
-                    : "bg-white text-neutral-600 ring-neutral-200"
-                }`}
+                    ? { "--fill": "var(--clay-accent-soft)", "--ink2": "var(--clay-accent-ink)" }
+                    : undefined
+                }
               >
                 <span className="min-w-0 break-words">{s.sprint_name}</span>
                 <span
                   className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
-                  style={{ color: s.sprint_type === "major" ? "#2563eb" : "#a3a3a3" }}
+                  style={{ color: s.sprint_type === "major" ? "var(--clay-batch-ink)" : "var(--clay-faint)" }}
                 >
                   {s.sprint_type}
                 </span>
@@ -545,7 +545,7 @@ function TraineeCard({
                   </span>
                 )}
                 {s.bugs_percent > 0 && (
-                  <span className="text-[10px] font-semibold tabular-nums flex-shrink-0" style={{ color: "#dc2626" }}>
+                  <span className="text-[10px] font-semibold tabular-nums flex-shrink-0" style={{ color: "var(--clay-bad-ink)" }}>
                     {s.bugs_percent}% bugs
                   </span>
                 )}
@@ -564,9 +564,9 @@ function TraineeCard({
           .filter((v) => v.visit_count > 0)
           .map((v) => ({ client_name: v.client_name, count: v.visit_count }));
         return (
-          <div className="relative min-w-0 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
+          <div className="clay-well relative min-w-0 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-              <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+              <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--clay-faint)" }}>
                 <MapPin className="h-3 w-3 flex-shrink-0" />
                 Visits
               </span>
@@ -574,27 +574,24 @@ function TraineeCard({
                 onClick={onLogVisits}
                 data-testid={`log-visits-${t.id}`}
                 className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-                style={{ color: ORANGE }}
+                style={{ color: "var(--clay-accent)" }}
               >
                 {visited.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Log</>)}
               </button>
             </div>
             {visited.length > 0 && (
-              <p className="text-[11px] text-neutral-400 mb-1.5 tabular-nums">
+              <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--clay-faint)" }}>
                 {visited.reduce((sum, c) => sum + c.count, 0)} total
               </p>
             )}
             {visited.length === 0 ? (
-              <p className="text-sm text-neutral-300 mt-1.5">No visits logged</p>
+              <p className="text-sm mt-1.5" style={{ color: "var(--clay-faint)" }}>No visits logged</p>
             ) : (
               <div className="flex flex-wrap gap-1.5 min-w-0">
                 {visited.map((c) => (
-                  <span
-                    key={c.client_name}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-2xl text-sm font-medium ring-1 max-w-full bg-white text-neutral-600 ring-neutral-200"
-                  >
+                  <span key={c.client_name} className="clay-pill text-sm">
                     <span className="min-w-0 break-words">{c.client_name}</span>
-                    <span className="tabular-nums text-neutral-400 flex-shrink-0">· {c.count}</span>
+                    <span className="tabular-nums flex-shrink-0" style={{ color: "var(--clay-faint)" }}>· {c.count}</span>
                   </span>
                 ))}
               </div>
@@ -606,9 +603,9 @@ function TraineeCard({
 
       {/* Remarks. Backed by trainees.notes - general free-text notes, not
           tied to any specific client/project/sprint. */}
-      <div className="relative mb-3 rounded-lg bg-neutral-100/60 ring-1 ring-neutral-200/70 p-2.5">
+      <div className="clay-well relative mb-3 p-2.5">
         <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1 font-semibold flex-shrink-0">
+          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--clay-faint)" }}>
             <MessageSquare className="h-3 w-3 flex-shrink-0" />
             Remarks
           </span>
@@ -616,12 +613,12 @@ function TraineeCard({
             onClick={onEditRemarks}
             data-testid={`edit-remarks-${t.id}`}
             className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: ORANGE }}
+            style={{ color: "var(--clay-accent)" }}
           >
             {t.notes ? "Edit" : (<><Plus className="h-3 w-3" />Add</>)}
           </button>
         </div>
-        <p className={`text-sm mt-1.5 whitespace-pre-wrap break-words ${t.notes ? "text-neutral-600" : "text-neutral-300"}`}>
+        <p className="text-sm mt-1.5 whitespace-pre-wrap break-words" style={{ color: t.notes ? "var(--clay-ink)" : "var(--clay-faint)" }}>
           {t.notes || "No remarks yet"}
         </p>
       </div>
@@ -630,31 +627,33 @@ function TraineeCard({
           full progress bars per card, times every trainee in an expanded
           level, is the single biggest source of clutter on this page. */}
       {assignmentsLoading ? (
-        <p className="text-sm text-neutral-400">Loading assignment scores…</p>
+        <p className="text-sm" style={{ color: "var(--clay-faint)" }}>Loading assignment scores…</p>
       ) : assignments.length === 0 ? (
-        <p className="text-sm text-neutral-400">No assignments yet</p>
+        <p className="text-sm" style={{ color: "var(--clay-faint)" }}>No assignments yet</p>
       ) : (
         <div>
           <button
             onClick={() => setScoresOpen((v) => !v)}
-            className="w-full flex items-center justify-between text-sm text-neutral-500 hover:text-neutral-700"
+            className="w-full flex items-center justify-between text-sm hover:opacity-80"
+            style={{ color: "var(--clay-soft)" }}
           >
             <span>
               {passedCount}/{assignments.length} passed
               {avgPct != null && (
-                <span className="text-neutral-400"> · avg {avgPct}%</span>
+                <span style={{ color: "var(--clay-faint)" }}> · avg {avgPct}%</span>
               )}
             </span>
             {scoresOpen ? (
-              <ChevronUp className="h-3 w-3 text-neutral-400" />
+              <ChevronUp className="h-3 w-3" style={{ color: "var(--clay-faint)" }} />
             ) : (
-              <ChevronDown className="h-3 w-3 text-neutral-400" />
+              <ChevronDown className="h-3 w-3" style={{ color: "var(--clay-faint)" }} />
             )}
           </button>
           {scoresOpen && (
             <div className="flex flex-col gap-1.5 mt-2">
               {assignments.map((a) => {
-                const color = a.passed ? "#16a34a" : "#dc2626";
+                const color = a.passed ? "var(--clay-good-ink)" : "var(--clay-bad-ink)";
+                const fill = a.passed ? "var(--clay-good-bg)" : "var(--clay-bad-bg)";
                 const pct = a.total ? Math.min(100, Math.round((a.score / a.total) * 100)) : 0;
                 return (
                   <button
@@ -663,15 +662,15 @@ function TraineeCard({
                     className="text-left hover:opacity-80 transition-opacity"
                   >
                     <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-sm text-neutral-500">{a.name}</span>
+                      <span className="text-sm" style={{ color: "var(--clay-soft)" }}>{a.name}</span>
                       <span className="text-sm font-medium" style={{ color }}>
                         {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
                       </span>
                     </div>
-                    <div className="h-1 bg-neutral-100 rounded-full overflow-hidden">
+                    <div className="clay-track h-1.5">
                       <div
-                        className="h-full rounded-full"
-                        style={{ width: `${pct}%`, backgroundColor: color }}
+                        className="clay-track-fill h-full"
+                        style={{ width: `${pct}%`, backgroundColor: fill }}
                       />
                     </div>
                   </button>
