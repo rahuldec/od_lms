@@ -1,7 +1,10 @@
 import { getLevelPeriods } from "@/lib/levelHistory";
 
 export const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
-const glass3dLevelColors = ["#9fb4e0", "#3f6fe0", "#b79ce8", "#6fbf8f"];
+// Sampled from the Okie Dokie logo: warm neutral for the not-yet-reached
+// base, then orange -> maroon -> gold for L1-L3, echoing the logo's own
+// ring/badge/star colors.
+const glass3dLevelColors = ["#c9b8a0", "#ed601f", "#811a0f", "#c99a2e"];
 
 // Horizontal stacked bar showing how many days a trainee has spent at each
 // level in total (summed across every stint, so a promote/demote/re-promote

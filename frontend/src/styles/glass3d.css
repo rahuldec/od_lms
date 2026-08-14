@@ -4,48 +4,53 @@
    backdrop-blur panels (the "glass" half) and solid offset "keycap"
    shadows on the avatar/level badge (the "3D" half) - everything else
    (wells, pills, tracks) stays glass-only for contrast against those two
-   extruded elements. No custom webfont - system stack only. */
+   extruded elements. No custom webfont - system stack only.
+
+   Accent/deep/gold below are sampled directly from the Okie Dokie logo
+   (okiedokie-erp-images.s3.../Okie_Dokie_App_icon), not eyeballed:
+   orange #ED601F, maroon #811A0F, gold #FCDE54. */
 
 .g3d-scope {
-  --g3d-ink: #1c2540;
-  --g3d-soft: #5a6591;
-  --g3d-faint: #8791b8;
-  --g3d-accent: #3f6fe0;
-  --g3d-accent-deep: #2650b0;
-  --g3d-accent-soft: rgba(63, 111, 224, 0.16);
-  --g3d-accent-ink: #24408f;
-  --g3d-panel: rgba(255, 255, 255, 0.45);
+  --g3d-ink: #2c1f16;
+  --g3d-soft: #8a7264;
+  --g3d-faint: #b3a08f;
+  --g3d-accent: #ed601f;
+  --g3d-accent-deep: #811a0f;
+  --g3d-accent-soft: rgba(237, 96, 31, 0.16);
+  --g3d-accent-ink: #8a3315;
+  --g3d-gold: #d9a441;
+  --g3d-panel: rgba(255, 255, 255, 0.5);
   --g3d-border: rgba(255, 255, 255, 0.75);
   --g3d-good-bg: rgba(110, 195, 145, 0.4);
   --g3d-good-ink: #1f5c37;
   --g3d-bad-bg: rgba(255, 140, 120, 0.4);
   --g3d-bad-ink: #8a2a1c;
-  --g3d-batch-bg: rgba(150, 180, 255, 0.4);
-  --g3d-batch-ink: #2c4f9a;
-  --g3d-cs-bg: rgba(130, 200, 255, 0.4);
-  --g3d-cs-ink: #1f5a8a;
-  --g3d-qa-bg: rgba(200, 150, 255, 0.4);
-  --g3d-qa-ink: #5c3986;
+  --g3d-batch-bg: rgba(217, 164, 65, 0.32);
+  --g3d-batch-ink: #8a5a12;
+  --g3d-cs-bg: rgba(237, 96, 31, 0.18);
+  --g3d-cs-ink: #b0431a;
+  --g3d-qa-bg: rgba(129, 26, 15, 0.16);
+  --g3d-qa-ink: #811a0f;
   color: var(--g3d-ink);
 }
 
 .g3d-card {
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.28));
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.65), rgba(255, 250, 244, 0.3));
   backdrop-filter: blur(14px) saturate(160%);
   -webkit-backdrop-filter: blur(14px) saturate(160%);
   border: 1px solid var(--g3d-border);
   border-radius: 20px;
-  box-shadow: 0 16px 34px -18px rgba(40, 60, 130, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 16px 34px -18px rgba(129, 26, 15, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   transition: box-shadow 0.2s ease;
 }
 .g3d-card:hover {
-  box-shadow: 0 20px 40px -16px rgba(40, 60, 130, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 0 20px 40px -16px rgba(129, 26, 15, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .g3d-avatar {
   border-radius: 11px;
-  background: linear-gradient(150deg, #6fa2ff, var(--g3d-accent));
-  box-shadow: 0 4px 0 var(--g3d-accent-deep), 0 7px 10px -3px rgba(63, 111, 224, 0.55);
+  background: linear-gradient(150deg, #f4914f, var(--g3d-accent));
+  box-shadow: 0 4px 0 var(--g3d-accent-deep), 0 7px 10px -3px rgba(237, 96, 31, 0.5);
 }
 
 .g3d-ghost-num {
@@ -70,10 +75,10 @@
   white-space: nowrap;
 }
 .g3d-chip.solid {
-  background: var(--fill, linear-gradient(150deg, #6fa2ff, var(--g3d-accent)));
+  background: var(--fill, linear-gradient(150deg, #f4914f, var(--g3d-accent)));
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 3px 0 var(--g3d-accent-deep), 0 5px 8px -2px rgba(63, 111, 224, 0.5);
+  box-shadow: 0 3px 0 var(--g3d-accent-deep), 0 5px 8px -2px rgba(237, 96, 31, 0.45);
 }
 
 /* frosted sub-panel holding each section (Clients / Projects / Visits / Remarks) */
