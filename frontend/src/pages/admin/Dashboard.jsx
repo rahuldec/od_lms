@@ -377,6 +377,72 @@ function TraineeCard({
 
       <LevelTimeline trainee={t} variant="glass3d" />
 
+      {/* Learning Phase - assignment scores. Collapsed to a one-line summary
+          by default - five full progress bars per card, times every trainee
+          in an expanded level, is the single biggest source of clutter on
+          this page. Moved above Clients/Projects/etc so scoring is the
+          first thing seen after the level bar, not the last. */}
+      <div className="g3d-well relative mb-3 p-2.5">
+        <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-semibold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+          <BarChart3 className="h-3 w-3 flex-shrink-0" />
+          Learning Phase
+        </span>
+        {assignmentsLoading ? (
+          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>Loading assignment scores…</p>
+        ) : assignments.length === 0 ? (
+          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
+        ) : (
+          <div className="mt-1.5">
+            <button
+              onClick={() => setScoresOpen((v) => !v)}
+              className="w-full flex items-center justify-between text-sm hover:opacity-80"
+              style={{ color: "var(--g3d-soft)" }}
+            >
+              <span>
+                {passedCount}/{assignments.length} passed
+                {avgPct != null && (
+                  <span style={{ color: "var(--g3d-faint)" }}> · avg {avgPct}%</span>
+                )}
+              </span>
+              {scoresOpen ? (
+                <ChevronUp className="h-3 w-3" style={{ color: "var(--g3d-faint)" }} />
+              ) : (
+                <ChevronDown className="h-3 w-3" style={{ color: "var(--g3d-faint)" }} />
+              )}
+            </button>
+            {scoresOpen && (
+              <div className="flex flex-col gap-1.5 mt-2">
+                {assignments.map((a) => {
+                  const color = a.passed ? "var(--g3d-good-ink)" : "var(--g3d-bad-ink)";
+                  const fill = a.passed ? "var(--g3d-good-bg)" : "var(--g3d-bad-bg)";
+                  const pct = a.total ? Math.min(100, Math.round((a.score / a.total) * 100)) : 0;
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => onOpenAssignment(a)}
+                      className="text-left hover:opacity-80 transition-opacity"
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-sm" style={{ color: "var(--g3d-soft)" }}>{a.name}</span>
+                        <span className="text-sm font-medium" style={{ color }}>
+                          {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
+                        </span>
+                      </div>
+                      <div className="g3d-track h-1.5">
+                        <div
+                          className="g3d-track-fill h-full"
+                          style={{ width: `${pct}%`, backgroundColor: fill }}
+                        />
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Clients / Projects / Sprints / Visits sit side by side rather than
           stacked - short lists read better across than piled one under
           another, especially now the text inside them is bigger. Cards are
@@ -622,64 +688,6 @@ function TraineeCard({
           {t.notes || "No remarks yet"}
         </p>
       </div>
-
-      {/* Assignment scores. Collapsed to a one-line summary by default - five
-          full progress bars per card, times every trainee in an expanded
-          level, is the single biggest source of clutter on this page. */}
-      {assignmentsLoading ? (
-        <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>Loading assignment scores…</p>
-      ) : assignments.length === 0 ? (
-        <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
-      ) : (
-        <div>
-          <button
-            onClick={() => setScoresOpen((v) => !v)}
-            className="w-full flex items-center justify-between text-sm hover:opacity-80"
-            style={{ color: "var(--g3d-soft)" }}
-          >
-            <span>
-              {passedCount}/{assignments.length} passed
-              {avgPct != null && (
-                <span style={{ color: "var(--g3d-faint)" }}> · avg {avgPct}%</span>
-              )}
-            </span>
-            {scoresOpen ? (
-              <ChevronUp className="h-3 w-3" style={{ color: "var(--g3d-faint)" }} />
-            ) : (
-              <ChevronDown className="h-3 w-3" style={{ color: "var(--g3d-faint)" }} />
-            )}
-          </button>
-          {scoresOpen && (
-            <div className="flex flex-col gap-1.5 mt-2">
-              {assignments.map((a) => {
-                const color = a.passed ? "var(--g3d-good-ink)" : "var(--g3d-bad-ink)";
-                const fill = a.passed ? "var(--g3d-good-bg)" : "var(--g3d-bad-bg)";
-                const pct = a.total ? Math.min(100, Math.round((a.score / a.total) * 100)) : 0;
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() => onOpenAssignment(a)}
-                    className="text-left hover:opacity-80 transition-opacity"
-                  >
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-sm" style={{ color: "var(--g3d-soft)" }}>{a.name}</span>
-                      <span className="text-sm font-medium" style={{ color }}>
-                        {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
-                      </span>
-                    </div>
-                    <div className="g3d-track h-1.5">
-                      <div
-                        className="g3d-track-fill h-full"
-                        style={{ width: `${pct}%`, backgroundColor: fill }}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
