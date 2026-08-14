@@ -89,12 +89,41 @@ const resolveColumn = (row, candidates) => {
   return null;
 };
 
-const fetchAssignmentResult = async (assignment, traineeName) => {
-  try {
-    const res = await fetch(assignment.csvUrl, { cache: "no-store" });
-    if (!res.ok) return null;
+// The sheet itself is the same for every trainee - only the row lookup
+// below differs per trainee - so cache the parsed CSV per assignment
+// rather than per trainee. Without this, opening any trainee's detail
+// page re-fetched all 5 assignment sheets live over the network on every
+// visit, even seconds after the exact same sheets were already fetched
+// (and cached) elsewhere in the app via lib/assignments.js. Same 5-minute
+// TTL + in-flight de-dupe pattern already used there and in lib/sheet.js
+// and lib/clients.js.
+const ASSIGNMENT_CSV_CACHE_TTL_MS = 5 * 60 * 1000;
+const assignmentCsvCache = new Map(); // csvUrl -> { parsed, fetchedAt }
+const assignmentCsvInFlight = new Map(); // csvUrl -> Promise<parsed>
+
+const fetchAssignmentCsv = (csvUrl) => {
+  const cached = assignmentCsvCache.get(csvUrl);
+  if (cached && Date.now() - cached.fetchedAt < ASSIGNMENT_CSV_CACHE_TTL_MS) {
+    return Promise.resolve(cached.parsed);
+  }
+  if (assignmentCsvInFlight.has(csvUrl)) return assignmentCsvInFlight.get(csvUrl);
+
+  const promise = (async () => {
+    const res = await fetch(csvUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to fetch assignment sheet");
     const text = await res.text();
     const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+    assignmentCsvCache.set(csvUrl, { parsed, fetchedAt: Date.now() });
+    return parsed;
+  })().finally(() => assignmentCsvInFlight.delete(csvUrl));
+
+  assignmentCsvInFlight.set(csvUrl, promise);
+  return promise;
+};
+
+const fetchAssignmentResult = async (assignment, traineeName) => {
+  try {
+    const parsed = await fetchAssignmentCsv(assignment.csvUrl);
     const row = parsed.data.find(
       (r) => (r["Name"] || "").trim().toLowerCase() === traineeName.trim().toLowerCase()
     );
