@@ -1,0 +1,112 @@
+/* Glass + 3D treatment for the Dashboard trainee card, replacing the
+   earlier claymorphism pass. Scoped under .g3d-scope so it never bleeds
+   into the rest of the admin UI. Two layered effects: translucent
+   backdrop-blur panels (the "glass" half) and solid offset "keycap"
+   shadows on the avatar/level badge (the "3D" half) - everything else
+   (wells, pills, tracks) stays glass-only for contrast against those two
+   extruded elements. No custom webfont - system stack only. */
+
+.g3d-scope {
+  --g3d-ink: #1c2540;
+  --g3d-soft: #5a6591;
+  --g3d-faint: #8791b8;
+  --g3d-accent: #3f6fe0;
+  --g3d-accent-deep: #2650b0;
+  --g3d-accent-soft: rgba(63, 111, 224, 0.16);
+  --g3d-accent-ink: #24408f;
+  --g3d-panel: rgba(255, 255, 255, 0.45);
+  --g3d-border: rgba(255, 255, 255, 0.75);
+  --g3d-good-bg: rgba(110, 195, 145, 0.4);
+  --g3d-good-ink: #1f5c37;
+  --g3d-bad-bg: rgba(255, 140, 120, 0.4);
+  --g3d-bad-ink: #8a2a1c;
+  --g3d-batch-bg: rgba(150, 180, 255, 0.4);
+  --g3d-batch-ink: #2c4f9a;
+  --g3d-cs-bg: rgba(130, 200, 255, 0.4);
+  --g3d-cs-ink: #1f5a8a;
+  --g3d-qa-bg: rgba(200, 150, 255, 0.4);
+  --g3d-qa-ink: #5c3986;
+  color: var(--g3d-ink);
+}
+
+.g3d-card {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.28));
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid var(--g3d-border);
+  border-radius: 20px;
+  box-shadow: 0 16px 34px -18px rgba(40, 60, 130, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: box-shadow 0.2s ease;
+}
+.g3d-card:hover {
+  box-shadow: 0 20px 40px -16px rgba(40, 60, 130, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.g3d-avatar {
+  border-radius: 11px;
+  background: linear-gradient(150deg, #6fa2ff, var(--g3d-accent));
+  box-shadow: 0 4px 0 var(--g3d-accent-deep), 0 7px 10px -3px rgba(63, 111, 224, 0.55);
+}
+
+.g3d-ghost-num {
+  color: var(--g3d-ink);
+  opacity: 0.05;
+}
+
+/* pill-shaped status/meta chips in the header row */
+.g3d-chip {
+  background: var(--fill, var(--g3d-panel));
+  color: var(--ink2, var(--g3d-soft));
+  border: 1px solid var(--g3d-border);
+  border-radius: 999px;
+  padding: 4px 10px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.g3d-chip.solid {
+  background: var(--fill, linear-gradient(150deg, #6fa2ff, var(--g3d-accent)));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 3px 0 var(--g3d-accent-deep), 0 5px 8px -2px rgba(63, 111, 224, 0.5);
+}
+
+/* frosted sub-panel holding each section (Clients / Projects / Visits / Remarks) */
+.g3d-well {
+  background: rgba(255, 255, 255, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* small frosted pills sitting inside a well */
+.g3d-pill {
+  background: var(--fill, rgba(255, 255, 255, 0.5));
+  color: var(--ink2, var(--g3d-soft));
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+}
+
+/* translucent progress tracks (level bar, score bars) */
+.g3d-track {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.g3d-track-fill {
+  border-radius: inherit;
+}
