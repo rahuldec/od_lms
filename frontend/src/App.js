@@ -131,13 +131,14 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/reports"
+            path="/admin/analytics"
             element={
               <Protected requireRole="admin">
                 <Reports />
               </Protected>
             }
           />
+          <Route path="/admin/reports" element={<Navigate to="/admin/analytics" replace />} />
           <Route
             path="/trainee"
             element={

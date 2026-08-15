@@ -20,11 +20,11 @@ import { daysAtLevel } from "@/lib/levelHistory";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
-  { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees" },
-  { to: "/admin/batches", label: "Batches", testId: "nav-batches" },
-  { to: "/admin/clients", label: "Clients", testId: "nav-clients" },
+  { to: "/admin/trainees", label: "Trainees", testId: "nav-trainees", group: "Roster" },
+  { to: "/admin/batches", label: "Batches", testId: "nav-batches", group: "Roster" },
   { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
-  { to: "/admin/reports", label: "Reports", testId: "nav-reports" },
+  { to: "/admin/analytics", label: "Analytics", testId: "nav-analytics" },
+  { to: "/admin/clients", label: "Clients", testId: "nav-clients", group: "Content" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
   { to: "/admin/webinars", label: "Webinars", testId: "nav-webinars", group: "Content" },
