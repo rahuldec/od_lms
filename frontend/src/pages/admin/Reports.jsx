@@ -103,18 +103,25 @@ export default function Reports() {
   // level history rather than current_level - a trainee now at Level 2 was
   // still promoted to Level 1 on the way there, and that's the milestone
   // this report measures from.
-  const { rows, notYetCount } = useMemo(() => {
+  const { rows, notYetCount, l0Stats } = useMemo(() => {
     const today = todayStr();
     let notYet = 0;
+    const stillAtL0Days = [];
     const built = trainees
       .map((t) => {
         const periods = getLevelPeriods(t, today);
         const l1Period = periods.find((p) => p.level === 1);
         if (!l1Period) {
           notYet += 1;
+          stillAtL0Days.push(daysAtCurrentLevel(t, today));
           return null;
         }
         const l1Date = l1Period.start;
+        // periods[0] is always the Level 0 stint - every trainee starts
+        // there (see backend create_trainee) - and since l1Date is the
+        // *first* time this trainee ever reached Level 1, that stint can't
+        // have been interrupted by an earlier promotion/demotion round trip.
+        const daysAtL0 = periods[0]?.level === 0 ? periods[0].days : daysBetween(periods[0]?.start || l1Date, l1Date);
 
         const clientRows = (clientsByTrainee[t.id] || [])
           .filter((c) => toDateOnly(c.assigned_at) >= l1Date)
@@ -147,6 +154,7 @@ export default function Reports() {
         return {
           trainee: t,
           l1Date,
+          daysAtL0,
           daysSinceL1: daysBetween(l1Date, today),
           clientRows,
           projectRows,
@@ -164,7 +172,25 @@ export default function Reports() {
       })
       .filter(Boolean)
       .sort((a, b) => (b.needsAttention - a.needsAttention) || (b.daysSinceL1 - a.daysSinceL1));
-    return { rows: built, notYetCount: notYet };
+
+    const graduatedDays = built.map((r) => r.daysAtL0);
+    const avgGraduated = graduatedDays.length
+      ? Math.round(graduatedDays.reduce((sum, d) => sum + d, 0) / graduatedDays.length)
+      : null;
+    const avgStillAtL0 = stillAtL0Days.length
+      ? Math.round(stillAtL0Days.reduce((sum, d) => sum + d, 0) / stillAtL0Days.length)
+      : null;
+
+    return {
+      rows: built,
+      notYetCount: notYet,
+      l0Stats: {
+        avgGraduated,
+        graduatedCount: graduatedDays.length,
+        avgStillAtL0,
+        stillAtL0Count: stillAtL0Days.length,
+      },
+    };
   }, [
     trainees,
     clientsByTrainee,
@@ -205,6 +231,35 @@ export default function Reports() {
           Export PDF
         </button>
       </div>
+
+      <Card className="rounded-2xl border-neutral-200/80 p-4 mb-6 no-print flex flex-wrap gap-6">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-neutral-400 font-medium">
+            Avg time at Level 0
+          </p>
+          <p className="text-2xl font-semibold mt-0.5 tabular-nums">
+            {l0Stats.avgGraduated != null ? `${l0Stats.avgGraduated} days` : "—"}
+          </p>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            before promotion to L1 · {l0Stats.graduatedCount} trainee
+            {l0Stats.graduatedCount === 1 ? "" : "s"}
+          </p>
+        </div>
+        {l0Stats.stillAtL0Count > 0 && (
+          <div>
+            <p className="text-xs uppercase tracking-wider text-neutral-400 font-medium">
+              Still at Level 0
+            </p>
+            <p className="text-2xl font-semibold mt-0.5 tabular-nums">
+              {l0Stats.avgStillAtL0} days
+            </p>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              avg so far · {l0Stats.stillAtL0Count} trainee
+              {l0Stats.stillAtL0Count === 1 ? "" : "s"}
+            </p>
+          </div>
+        )}
+      </Card>
 
       <Card className="rounded-2xl border-amber-200 bg-amber-50/60 p-4 mb-6 no-print">
         <div className="flex gap-3">
