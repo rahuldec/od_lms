@@ -13,6 +13,8 @@ import httpx
 import re
 import csv
 import io
+import time
+import asyncio
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -56,7 +58,7 @@ api = APIRouter(prefix="/api")
 # ---------- helpers ----------
 async def supabase_get_user(token: str) -> Dict[str, Any]:
     last_error = None
-    for attempt in range(2):  # one retry to absorb a one-off network/timeout blip
+    for attempt in range(3):  # absorb a couple of one-off network/timeout blips
         try:
             async with httpx.AsyncClient(timeout=15) as cx:
                 r = await cx.get(
@@ -67,6 +69,8 @@ async def supabase_get_user(token: str) -> Dict[str, Any]:
             # Network/timeout talking to Supabase - NOT a token problem.
             # Don't tell the frontend "invalid token" (that triggers sign-out).
             last_error = e
+            if attempt < 2:
+                await asyncio.sleep(0.3 * (attempt + 1))
             continue
 
         if r.status_code == 401:
@@ -78,6 +82,8 @@ async def supabase_get_user(token: str) -> Dict[str, Any]:
             last_error = HTTPException(
                 status_code=503, detail="Auth service temporarily unavailable"
             )
+            if attempt < 2:
+                await asyncio.sleep(0.3 * (attempt + 1))
             continue
         return r.json()
 
@@ -87,22 +93,83 @@ async def supabase_get_user(token: str) -> Dict[str, Any]:
 
 
 async def get_user_role(user_id: str) -> Optional[str]:
-    async with httpx.AsyncClient(timeout=15) as cx:
-        r = await cx.get(
-            f"{REST}/user_roles?user_id=eq.{user_id}&select=role",
-            headers=ADMIN_HEADERS,
+    last_error = None
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=15) as cx:
+                r = await cx.get(
+                    f"{REST}/user_roles?user_id=eq.{user_id}&select=role",
+                    headers=ADMIN_HEADERS,
+                )
+        except (httpx.TimeoutException, httpx.TransportError) as e:
+            last_error = e
+            if attempt < 1:
+                await asyncio.sleep(0.3)
+            continue
+
+        if r.status_code == 200:
+            rows = r.json()
+            return rows[0]["role"] if rows else None
+        # Non-200 here means the lookup itself failed (Supabase hiccup) - this
+        # is NOT the same as "user genuinely has no role". Returning None for
+        # both used to make require_admin() report a misleading 403 "Admin
+        # only" for what was actually a transient backend error, which reads
+        # to an admin exactly like getting logged out.
+        last_error = HTTPException(
+            status_code=503, detail="Auth service temporarily unavailable"
         )
-    rows = r.json() if r.status_code == 200 else []
-    return rows[0]["role"] if rows else None
+        if attempt < 1:
+            await asyncio.sleep(0.3)
+
+    if isinstance(last_error, HTTPException):
+        raise last_error
+    raise HTTPException(status_code=503, detail="Auth service temporarily unavailable")
+
+
+# Per-token cache of verified (user, role), with an in-flight lock so that a
+# burst of parallel requests carrying the same token (e.g. the admin
+# dashboard's ~10 concurrent calls on mount) triggers exactly ONE live
+# Supabase verification instead of one per request. This cuts both the load
+# placed on Supabase's auth API and the odds that a single transient blip
+# there fans out into simultaneous failures across the whole UI. Mirrors the
+# single-flight pattern the frontend already uses for refresh-token calls.
+_AUTH_CACHE_TTL = 45  # seconds - well under the ~1hr access token lifetime
+_auth_cache: Dict[str, Dict[str, Any]] = {}
+_auth_locks: Dict[str, asyncio.Lock] = {}
+
+
+def _auth_cache_get(token: str):
+    entry = _auth_cache.get(token)
+    if entry and entry["expires"] > time.monotonic():
+        return entry
+    return None
 
 
 async def require_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing token")
     token = authorization.split(" ", 1)[1]
-    user = await supabase_get_user(token)
-    role = await get_user_role(user["id"])
-    return {"user": user, "role": role}
+
+    cached = _auth_cache_get(token)
+    if cached:
+        return {"user": cached["user"], "role": cached["role"]}
+
+    lock = _auth_locks.setdefault(token, asyncio.Lock())
+    async with lock:
+        cached = _auth_cache_get(token)  # re-check: another request may have just filled it
+        if cached:
+            return {"user": cached["user"], "role": cached["role"]}
+        try:
+            user = await supabase_get_user(token)
+            role = await get_user_role(user["id"])
+        finally:
+            _auth_locks.pop(token, None)
+        _auth_cache[token] = {
+            "user": user,
+            "role": role,
+            "expires": time.monotonic() + _AUTH_CACHE_TTL,
+        }
+        return {"user": user, "role": role}
 
 
 async def require_admin(ctx=Depends(require_user)):
