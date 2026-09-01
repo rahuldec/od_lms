@@ -11,6 +11,35 @@ import { supabase, usernameToEmail } from "@/lib/supabaseClient";
 const AuthContext = createContext(null);
 const BASE = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Public pages (/webinar, /learn) never need the admin account bootstrapped,
+// and even on pages that do, there's no reason to hit the backend's
+// /setup/init (which lists every Supabase user via the Admin API) more than
+// once in a while per browser - it's only ever useful once, right after the
+// very first deploy. Without this, every single anonymous page load of the
+// ENTIRE app, public pages included, fired that call in the background,
+// adding needless load right when the backend is most likely cold.
+const SETUP_INIT_KEY = "odk-setup-init-last";
+const SETUP_INIT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+const PUBLIC_PATHS = ["/webinar", "/learn"];
+
+const shouldRunSetupInit = () => {
+  if (PUBLIC_PATHS.includes(window.location.pathname)) return false;
+  try {
+    const last = Number(localStorage.getItem(SETUP_INIT_KEY) || 0);
+    return Date.now() - last > SETUP_INIT_TTL_MS;
+  } catch {
+    return true;
+  }
+};
+
+const markSetupInitRan = () => {
+  try {
+    localStorage.setItem(SETUP_INIT_KEY, String(Date.now()));
+  } catch {
+    // ignore storage errors (private browsing, quota, etc.)
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [role, setRole] = useState(null);
@@ -87,9 +116,13 @@ export const AuthProvider = ({ children }) => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
       setSession(data.session);
-      // Bootstrap admin once on initial load (idempotent server-side, but skip if already logged in)
-      if (!data.session) {
-        axios.post(`${BASE}/setup/init`).catch(() => {});
+      // Bootstrap admin once on initial load (idempotent server-side, but skip if
+      // already logged in, on public pages, or if we've already run it recently).
+      if (!data.session && shouldRunSetupInit()) {
+        axios
+          .post(`${BASE}/setup/init`)
+          .then(markSetupInitRan)
+          .catch(() => {});
       }
       await refreshMe(data.session?.access_token);
       setLoading(false);
