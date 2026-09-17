@@ -350,34 +350,36 @@ export default function TraineeHome() {
         </Card>
       )}
 
-      <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
-        <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Assignment scores</p>
-        {assignments.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
-            {assignments.map((a) => {
-              const color = a.passed ? "#16a34a" : "#dc2626";
-              return (
-                <button
-                  key={a.id}
-                  onClick={() => setActiveAssignment(a)}
-                  className="inline-flex items-center gap-2 text-sm border rounded-2xl px-4 py-2.5 cursor-pointer hover:opacity-80 transition-opacity"
-                  style={{ borderColor: color + "40", backgroundColor: color + "10" }}
-                >
-                  <span className="font-medium text-neutral-700">{a.name}</span>
-                  <span className="font-bold tabular-nums" style={{ color: color }}>
-                    {a.score}/{a.total}
-                  </span>
-                  <span className="text-xs font-medium" style={{ color: color }}>
-                    {a.passed ? "Pass" : "Fail"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-sm text-neutral-400">No assignments attempted yet.</p>
-        )}
-      </Card>
+      {trainee?.department !== "Sales" && (
+        <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
+          <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Assignment scores</p>
+          {assignments.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              {assignments.map((a) => {
+                const color = a.passed ? "#16a34a" : "#dc2626";
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => setActiveAssignment(a)}
+                    className="inline-flex items-center gap-2 text-sm border rounded-2xl px-4 py-2.5 cursor-pointer hover:opacity-80 transition-opacity"
+                    style={{ borderColor: color + "40", backgroundColor: color + "10" }}
+                  >
+                    <span className="font-medium text-neutral-700">{a.name}</span>
+                    <span className="font-bold tabular-nums" style={{ color: color }}>
+                      {a.score}/{a.total}
+                    </span>
+                    <span className="text-xs font-medium" style={{ color: color }}>
+                      {a.passed ? "Pass" : "Fail"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-400">No assignments attempted yet.</p>
+          )}
+        </Card>
+      )}
 
       {schedules.filter((s) => new Date(s.visible_from) >= new Date()).length > 0 && (
         <div className="mb-10">
@@ -434,7 +436,7 @@ export default function TraineeHome() {
         </div>
       )}
 
-      {results.length > 0 && (
+      {trainee?.department !== "Sales" && results.length > 0 && (
         <Card className="rounded-2xl border-neutral-200/80 p-7 mb-10">
           <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 mb-4">Results</p>
           <div className="flex flex-col gap-2">
