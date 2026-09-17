@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchSheetModules } from "@/lib/sheet";
+import { fetchSheetModules, fetchSalesSheetModules } from "@/lib/sheet";
 import AppShell from "@/components/AppShell";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,11 @@ export default function TrainingModules() {
   const load = async (opts) => {
     setLoading(true);
     try {
-      const mods = await fetchSheetModules(opts);
-      setModules(mods);
+      const [mods, salesMods] = await Promise.all([
+        fetchSheetModules(opts),
+        fetchSalesSheetModules(opts).catch(() => []),
+      ]);
+      setModules([...mods, ...salesMods]);
     } catch (e) {
       toast.error("Could not load training content from the sheet");
     } finally {
@@ -100,6 +103,11 @@ export default function TrainingModules() {
                   {m.name.charAt(0).toUpperCase()}
                 </div>
                 <h2 className="text-base font-semibold">{m.name}</h2>
+                {m.team && (
+                  <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 ring-1 ring-orange-200">
+                    {m.team}
+                  </span>
+                )}
                 <span className="text-xs text-neutral-400">
                   {m.lessons.length} {m.lessons.length === 1 ? "item" : "items"}
                 </span>

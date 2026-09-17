@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
-import { fetchSheetModules } from "@/lib/sheet";
+import { fetchSheetModules, fetchSalesSheetModules } from "@/lib/sheet";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import AppShell from "@/components/AppShell";
 import LevelTimeline from "@/components/LevelTimeline";
@@ -119,8 +119,10 @@ export default function TraineeHome() {
     if (!trainee) return;
     (async () => {
       try {
-        const [mods, allResults, publishedResults, mySchedules, myClients, myProjects, mySprints, _] = await Promise.all([
+        const isSales = trainee?.department === "Sales";
+        const [mods, salesMods, allResults, publishedResults, mySchedules, myClients, myProjects, mySprints, _] = await Promise.all([
           fetchSheetModules(),
+          isSales ? fetchSalesSheetModules().catch(() => []) : Promise.resolve([]),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listResults().catch(() => []),
           api.listMySchedules().catch(() => []),
@@ -130,7 +132,7 @@ export default function TraineeHome() {
           reloadProgress(),
         ]);
 
-        setModules(mods);
+        setModules(isSales ? [...mods, ...salesMods] : mods);
         const key = (trainee.name || "").trim().toLowerCase();
         setAssignments(allResults[key] || []);
         setResults(Array.isArray(publishedResults) ? publishedResults : []);

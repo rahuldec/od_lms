@@ -49,7 +49,7 @@ import {
 import { daysAtLevel } from "@/lib/levelHistory";
 
 const STATUSES = ["Active", "On Hold", "Exited"];
-const DEPARTMENTS = ["CS", "QA"];
+const DEPARTMENTS = ["CS", "QA", "Sales"];
 
 const statusBadge = (s) => {
   const map = {
@@ -64,6 +64,7 @@ const departmentBadge = (d) => {
   const map = {
     CS: "bg-blue-50 text-blue-700 ring-blue-200",
     QA: "bg-purple-50 text-purple-700 ring-purple-200",
+    Sales: "bg-orange-50 text-orange-700 ring-orange-200",
   };
   return map[d] || "bg-neutral-100 text-neutral-400 ring-neutral-200";
 };
