@@ -120,9 +120,8 @@ export default function TraineeHome() {
     (async () => {
       try {
         const isSales = trainee?.department === "Sales";
-        const [mods, salesMods, allResults, publishedResults, mySchedules, myClients, myProjects, mySprints, _] = await Promise.all([
-          fetchSheetModules(),
-          isSales ? fetchSalesSheetModules().catch(() => []) : Promise.resolve([]),
+        const [mods, allResults, publishedResults, mySchedules, myClients, myProjects, mySprints, _] = await Promise.all([
+          isSales ? fetchSalesSheetModules() : fetchSheetModules(),
           fetchAllAssignmentResults().catch(() => ({})),
           api.listResults().catch(() => []),
           api.listMySchedules().catch(() => []),
@@ -132,7 +131,7 @@ export default function TraineeHome() {
           reloadProgress(),
         ]);
 
-        setModules(isSales ? [...mods, ...salesMods] : mods);
+        setModules(mods);
         const key = (trainee.name || "").trim().toLowerCase();
         setAssignments(allResults[key] || []);
         setResults(Array.isArray(publishedResults) ? publishedResults : []);
