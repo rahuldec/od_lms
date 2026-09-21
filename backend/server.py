@@ -126,6 +126,35 @@ async def get_user_role(user_id: str) -> Optional[str]:
     raise HTTPException(status_code=503, detail="Auth service temporarily unavailable")
 
 
+async def get_trainee_status(user_id: str) -> Optional[str]:
+    last_error = None
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=15) as cx:
+                r = await cx.get(
+                    f"{REST}/trainees?auth_user_id=eq.{user_id}&select=status",
+                    headers=ADMIN_HEADERS,
+                )
+        except (httpx.TimeoutException, httpx.TransportError) as e:
+            last_error = e
+            if attempt < 1:
+                await asyncio.sleep(0.3)
+            continue
+
+        if r.status_code == 200:
+            rows = r.json()
+            return rows[0]["status"] if rows else None
+        last_error = HTTPException(
+            status_code=503, detail="Auth service temporarily unavailable"
+        )
+        if attempt < 1:
+            await asyncio.sleep(0.3)
+
+    if isinstance(last_error, HTTPException):
+        raise last_error
+    raise HTTPException(status_code=503, detail="Auth service temporarily unavailable")
+
+
 # Per-token cache of verified (user, role), with an in-flight lock so that a
 # burst of parallel requests carrying the same token (e.g. the admin
 # dashboard's ~10 concurrent calls on mount) triggers exactly ONE live
@@ -162,6 +191,10 @@ async def require_user(authorization: Optional[str] = Header(None)):
         try:
             user = await supabase_get_user(token)
             role = await get_user_role(user["id"])
+            if role == "trainee":
+                status = await get_trainee_status(user["id"])
+                if status == "Exited":
+                    raise HTTPException(status_code=401, detail="This account is no longer active")
         finally:
             _auth_locks.pop(token, None)
         _auth_cache[token] = {
