@@ -811,9 +811,15 @@ export default function AdminDashboard() {
   const onHold = filteredTrainees.filter((t) => t.status === "On Hold").length;
   const attentionCount = filteredTrainees.filter(needsAttention).length;
 
+  // Sales trainees don't go through the CS/QA Level 0-3 curriculum (they have
+  // their own Sales Training track with no assignments), so they're excluded
+  // from the Level distribution view specifically.
+  const levelEligibleTrainees = filteredTrainees.filter((t) => t.department !== "Sales");
+  const levelTotal = levelEligibleTrainees.length;
+
   const levelGroups = [0, 1, 2, 3].map((lvl) => ({
     level: lvl,
-    trainees: filteredTrainees
+    trainees: levelEligibleTrainees
       .filter((t) => (t.current_level ?? 0) === lvl)
       .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
   }));
@@ -899,7 +905,7 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex items-center gap-3 text-sm text-neutral-400">
-            <span>{total} trainees</span>
+            <span>{levelTotal} trainees</span>
             <span className="text-neutral-200">|</span>
             <Link to="/admin/clients" className="font-semibold" style={{ color: "#E05A2B" }}>
               Manage clients &rarr;
@@ -909,7 +915,7 @@ export default function AdminDashboard() {
 
         <div className="space-y-4">
           {levelGroups.map(({ level, trainees: lvlTrainees }) => {
-            const pct = total ? Math.round((lvlTrainees.length / total) * 100) : 0;
+            const pct = levelTotal ? Math.round((lvlTrainees.length / levelTotal) * 100) : 0;
             const isExpanded = expandedLevel === level;
             const lvlClientCount = lvlTrainees.reduce(
               (acc, t) => acc + (clientsByTrainee[t.id]?.length || 0),
