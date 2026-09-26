@@ -1,5 +1,11 @@
 import { getLevelPeriods } from "@/lib/levelHistory";
 
+const fmtDate = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 export const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
 // Sampled from the Okie Dokie logo: warm neutral for the not-yet-reached
 // base, then orange -> maroon -> gold for L1-L3, echoing the logo's own
@@ -17,13 +23,18 @@ const glass3dLevelColors = ["#c9b8a0", "#ed601f", "#811a0f", "#c99a2e"];
 // styled Dashboard card. It's opt-in so the trainee-facing Home page
 // keeps its plain default look.
 export default function LevelTimeline({ trainee, variant = "default" }) {
-  const daysPerLevel = getLevelPeriods(trainee).reduce((acc, p) => {
-    acc[p.level] = (acc[p.level] || 0) + p.days;
-    return acc;
-  }, {});
+  const periods = getLevelPeriods(trainee);
+  const daysPerLevel = {};
+  const promotedOnPerLevel = {}; // first date each level was reached (handles re-promote cycles)
+  periods.forEach((p) => {
+    daysPerLevel[p.level] = (daysPerLevel[p.level] || 0) + p.days;
+    if (!promotedOnPerLevel[p.level] || p.start < promotedOnPerLevel[p.level]) {
+      promotedOnPerLevel[p.level] = p.start;
+    }
+  });
   const segments = [0, 1, 2, 3]
     .filter((lvl) => daysPerLevel[lvl] > 0)
-    .map((lvl) => ({ level: lvl, days: daysPerLevel[lvl] }));
+    .map((lvl) => ({ level: lvl, days: daysPerLevel[lvl], promotedOn: promotedOnPerLevel[lvl] }));
   const totalDays = segments.reduce((sum, s) => sum + s.days, 0);
   if (totalDays === 0) return null;
 
@@ -41,7 +52,7 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
                 backgroundColor: glass3dLevelColors[s.level],
                 boxShadow: s.level === lastLevel ? `0 0 8px ${glass3dLevelColors[s.level]}` : "none",
               }}
-              title={`Level ${s.level}: ${s.days} day${s.days === 1 ? "" : "s"}`}
+              title={`Level ${s.level}: ${s.days} day${s.days === 1 ? "" : "s"}, promoted ${fmtDate(s.promotedOn)}`}
             >
               L{s.level} · {s.days}d
             </div>
@@ -54,7 +65,7 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
                 className="h-1.5 w-1.5 rounded-full flex-shrink-0"
                 style={{ backgroundColor: glass3dLevelColors[s.level] }}
               />
-              L{s.level} · {s.days}d
+              L{s.level} · {s.days}d · {fmtDate(s.promotedOn)}
             </span>
           ))}
         </div>
@@ -70,7 +81,7 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
             key={s.level}
             className="flex items-center justify-center text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden"
             style={{ width: `${(s.days / totalDays) * 100}%`, backgroundColor: levelColors[s.level] }}
-            title={`Level ${s.level}: ${s.days} day${s.days === 1 ? "" : "s"}`}
+            title={`Level ${s.level}: ${s.days} day${s.days === 1 ? "" : "s"}, promoted ${fmtDate(s.promotedOn)}`}
           >
             L{s.level} · {s.days}d
           </div>
@@ -83,7 +94,7 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
               className="h-1.5 w-1.5 rounded-full flex-shrink-0"
               style={{ backgroundColor: levelColors[s.level] }}
             />
-            L{s.level} · {s.days}d
+            L{s.level} · {s.days}d · {fmtDate(s.promotedOn)}
           </span>
         ))}
       </div>
