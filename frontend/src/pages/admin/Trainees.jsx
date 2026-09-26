@@ -45,11 +45,23 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Award,
 } from "lucide-react";
 import { daysAtLevel } from "@/lib/levelHistory";
 
 const STATUSES = ["Active", "On Hold", "Exited"];
 const DEPARTMENTS = ["CS", "QA", "Sales"];
+// RM designation - independent of the Level 0-3 ladder (no day-tracking, no
+// promotion history log). null means no designation yet.
+const RM_STEPS = [null, "ARM", "RM"];
+const rmBadge = (status) => {
+  const map = {
+    ARM: "bg-cyan-50 text-cyan-700 ring-cyan-200",
+    RM: "bg-yellow-50 text-yellow-800 ring-yellow-300",
+  };
+  return map[status] || "";
+};
+const nextRmStep = (status) => RM_STEPS[RM_STEPS.indexOf(status ?? null) + 1]; // undefined once already RM
 
 const statusBadge = (s) => {
   const map = {
@@ -116,6 +128,8 @@ export default function Trainees() {
   const [demotingId, setDemotingId] = useState(null);
   const [levelDialog, setLevelDialog] = useState(null); // { trainee, action: "promote" | "demote", date }
   const [sortDaysL0, setSortDaysL0] = useState(null); // "asc" | "desc" | null
+  const [rmDialog, setRmDialog] = useState(null); // { trainee, next }
+  const [rmBusyId, setRmBusyId] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -288,6 +302,35 @@ export default function Trainees() {
     }
   };
 
+  const openPromoteRM = (t) => {
+    const next = nextRmStep(t.rm_status);
+    if (next === undefined) { toast.info("Already at RM"); return; }
+    setRmDialog({ trainee: t, next });
+  };
+
+  const openDemoteRM = (t) => {
+    const idx = RM_STEPS.indexOf(t.rm_status ?? null);
+    const next = RM_STEPS[idx - 1];
+    if (next === undefined) { toast.info("No RM designation to remove"); return; }
+    setRmDialog({ trainee: t, next });
+  };
+
+  const confirmRMChange = async () => {
+    if (!rmDialog) return;
+    const { trainee: t, next } = rmDialog;
+    setRmBusyId(t.id);
+    try {
+      await api.updateTrainee(t.id, { rm_status: next || "" });
+      toast.success(`${t.name} is now ${next || "not designated"}`);
+      setRmDialog(null);
+      await load();
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setRmBusyId(null);
+    }
+  };
+
   return (
     <AppShell navItems={navItems} subtitle="Admin">
       <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
@@ -418,6 +461,13 @@ export default function Trainees() {
                           since {t.level_since_date}
                         </div>
                       )}
+                      {t.rm_status && (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ring-1 ml-1.5 ${rmBadge(t.rm_status)}`}
+                        >
+                          {t.rm_status}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-neutral-600 tabular-nums" data-testid={`days-l0-${t.id}`}>
                       {t.daysAtL0}
@@ -447,6 +497,31 @@ export default function Trainees() {
                           <TrendingDown className="h-3.5 w-3.5 mr-1" />
                           Demote
                         </Button>
+                        <Button
+                          data-testid={`promote-rm-${t.id}`}
+                          size="sm"
+                          variant="outline"
+                          disabled={!nextRmStep(t.rm_status) || rmBusyId === t.id}
+                          onClick={() => openPromoteRM(t)}
+                          className="rounded-full"
+                          title={nextRmStep(t.rm_status) ? `Promote to ${nextRmStep(t.rm_status)}` : "Already at RM"}
+                        >
+                          <Award className="h-3.5 w-3.5 mr-1" />
+                          {nextRmStep(t.rm_status) ? `→ ${nextRmStep(t.rm_status)}` : "At RM"}
+                        </Button>
+                        {t.rm_status && (
+                          <Button
+                            data-testid={`demote-rm-${t.id}`}
+                            size="sm"
+                            variant="ghost"
+                            disabled={rmBusyId === t.id}
+                            onClick={() => openDemoteRM(t)}
+                            className="rounded-full text-neutral-500"
+                            title="Remove RM designation"
+                          >
+                            Remove {t.rm_status}
+                          </Button>
+                        )}
                         <Button
                           data-testid={`edit-${t.id}`}
                           size="icon"
@@ -691,6 +766,29 @@ export default function Trainees() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!rmDialog} onOpenChange={(o) => !o && setRmDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {rmDialog?.next ? `Set ${rmDialog.trainee.name} as ${rmDialog.next}?` : `Remove ${rmDialog?.trainee?.name}'s RM designation?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This is independent of their Level - it won't affect Level 0-3 progress or history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-rm-change"
+              onClick={confirmRMChange}
+              disabled={rmBusyId === rmDialog?.trainee?.id}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
