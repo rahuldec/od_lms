@@ -61,7 +61,6 @@ const rmBadge = (status) => {
   };
   return map[status] || "";
 };
-const nextRmStep = (status) => RM_STEPS[RM_STEPS.indexOf(status ?? null) + 1]; // undefined once already RM
 
 const statusBadge = (s) => {
   const map = {
@@ -266,23 +265,52 @@ export default function Trainees() {
     }
   };
 
+  // Promote covers three independent targets an admin can choose between:
+  // the next Level (0-3), ARM, or RM. Which ones are actually pickable
+  // depends on the trainee's current state (see disabled options below).
   const openPromote = (t) => {
-    const next = (t.current_level ?? 0) + 1;
-    if (next > 3) { toast.info("Already at Level 3"); return; }
-    setLevelDialog({ trainee: t, action: "promote", date: todayStr() });
+    const canLevel = (t.current_level ?? 0) < 3;
+    const canARM = (t.rm_status ?? null) === null;
+    const canRM = t.rm_status !== "RM";
+    if (!canLevel && !canARM && !canRM) {
+      toast.info("Already at Level 3 and RM");
+      return;
+    }
+    setLevelDialog({
+      trainee: t,
+      action: "promote",
+      date: todayStr(),
+      target: canLevel ? "level" : canARM ? "ARM" : "RM",
+    });
   };
 
   const openDemote = (t) => {
     const next = (t.current_level ?? 0) - 1;
     if (next < 0) { toast.info("Already at Level 0"); return; }
-    setLevelDialog({ trainee: t, action: "demote", date: todayStr() });
+    setLevelDialog({ trainee: t, action: "demote", date: todayStr(), target: "level" });
   };
 
   const confirmLevelChange = async () => {
     if (!levelDialog) return;
-    const { trainee: t, action, date } = levelDialog;
+    const { trainee: t, action, date, target } = levelDialog;
     if (!date) { toast.error("Pick a date"); return; }
     const isPromote = action === "promote";
+
+    if (isPromote && target !== "level") {
+      setPromotingId(t.id);
+      try {
+        await api.updateTrainee(t.id, { rm_status: target, rm_since_date: date });
+        toast.success(`${t.name} promoted to ${target}, effective ${date}`);
+        setLevelDialog(null);
+        await load();
+      } catch (err) {
+        toast.error(errMsg(err));
+      } finally {
+        setPromotingId(null);
+      }
+      return;
+    }
+
     const next = (t.current_level ?? 0) + (isPromote ? 1 : -1);
     isPromote ? setPromotingId(t.id) : setDemotingId(t.id);
     try {
@@ -302,12 +330,6 @@ export default function Trainees() {
     }
   };
 
-  const openPromoteRM = (t) => {
-    const next = nextRmStep(t.rm_status);
-    if (next === undefined) { toast.info("Already at RM"); return; }
-    setRmDialog({ trainee: t, next });
-  };
-
   const openDemoteRM = (t) => {
     const idx = RM_STEPS.indexOf(t.rm_status ?? null);
     const next = RM_STEPS[idx - 1];
@@ -320,7 +342,10 @@ export default function Trainees() {
     const { trainee: t, next } = rmDialog;
     setRmBusyId(t.id);
     try {
-      await api.updateTrainee(t.id, { rm_status: next || "" });
+      // Fully clearing the designation also clears its effective date;
+      // stepping down from RM to ARM keeps whichever date is already there.
+      const payload = next ? { rm_status: next } : { rm_status: "", rm_since_date: "" };
+      await api.updateTrainee(t.id, payload);
       toast.success(`${t.name} is now ${next || "not designated"}`);
       setRmDialog(null);
       await load();
@@ -462,11 +487,18 @@ export default function Trainees() {
                         </div>
                       )}
                       {t.rm_status && (
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ring-1 ml-1.5 ${rmBadge(t.rm_status)}`}
-                        >
-                          {t.rm_status}
-                        </span>
+                        <>
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ring-1 ml-1.5 ${rmBadge(t.rm_status)}`}
+                          >
+                            {t.rm_status}
+                          </span>
+                          {t.rm_since_date && (
+                            <div className="text-[11px] text-neutral-400 mt-1">
+                              since {t.rm_since_date}
+                            </div>
+                          )}
+                        </>
                       )}
                     </td>
                     <td className="px-5 py-4 text-neutral-600 tabular-nums" data-testid={`days-l0-${t.id}`}>
@@ -479,9 +511,10 @@ export default function Trainees() {
                           data-testid={`promote-${t.id}`}
                           size="sm"
                           variant="outline"
-                          disabled={(t.current_level ?? 0) >= 3 || promotingId === t.id}
+                          disabled={((t.current_level ?? 0) >= 3 && t.rm_status === "RM") || promotingId === t.id}
                           onClick={() => openPromote(t)}
                           className="rounded-full"
+                          title="Promote to the next Level, ARM, or RM"
                         >
                           <TrendingUp className="h-3.5 w-3.5 mr-1" />
                           Promote
@@ -496,18 +529,6 @@ export default function Trainees() {
                         >
                           <TrendingDown className="h-3.5 w-3.5 mr-1" />
                           Demote
-                        </Button>
-                        <Button
-                          data-testid={`promote-rm-${t.id}`}
-                          size="sm"
-                          variant="outline"
-                          disabled={!nextRmStep(t.rm_status) || rmBusyId === t.id}
-                          onClick={() => openPromoteRM(t)}
-                          className="rounded-full"
-                          title={nextRmStep(t.rm_status) ? `Promote to ${nextRmStep(t.rm_status)}` : "Already at RM"}
-                        >
-                          <Award className="h-3.5 w-3.5 mr-1" />
-                          {nextRmStep(t.rm_status) ? `→ ${nextRmStep(t.rm_status)}` : "At RM"}
                         </Button>
                         {t.rm_status && (
                           <Button
@@ -732,14 +753,52 @@ export default function Trainees() {
             </DialogTitle>
             <DialogDescription>
               {levelDialog && (
-                <>
-                  Moving from Level {levelDialog.trainee.current_level ?? 0} to Level{" "}
-                  {(levelDialog.trainee.current_level ?? 0) + (levelDialog.action === "promote" ? 1 : -1)}.
-                  Choose the effective date.
-                </>
+                levelDialog.action === "promote" ? (
+                  levelDialog.target === "level" ? (
+                    <>Moving from Level {levelDialog.trainee.current_level ?? 0} to Level{" "}
+                    {(levelDialog.trainee.current_level ?? 0) + 1}. Choose the effective date.</>
+                  ) : (
+                    <>Setting {levelDialog.trainee.name} as {levelDialog.target}. Choose the effective date.</>
+                  )
+                ) : (
+                  <>Moving from Level {levelDialog.trainee.current_level ?? 0} to Level{" "}
+                  {(levelDialog.trainee.current_level ?? 0) - 1}. Choose the effective date.</>
+                )
               )}
             </DialogDescription>
           </DialogHeader>
+
+          {levelDialog?.action === "promote" && (
+            <div>
+              <Label className="text-xs text-neutral-600">Promote to</Label>
+              <div className="flex gap-2 mt-1">
+                {[
+                  {
+                    key: "level",
+                    label: `Level ${(levelDialog.trainee.current_level ?? 0) + 1}`,
+                    disabled: (levelDialog.trainee.current_level ?? 0) >= 3,
+                  },
+                  { key: "ARM", label: "ARM", disabled: (levelDialog.trainee.rm_status ?? null) !== null },
+                  { key: "RM", label: "RM", disabled: levelDialog.trainee.rm_status === "RM" },
+                ].map((opt) => (
+                  <Button
+                    key={opt.key}
+                    type="button"
+                    size="sm"
+                    variant={levelDialog.target === opt.key ? "default" : "outline"}
+                    disabled={opt.disabled}
+                    onClick={() => setLevelDialog((d) => ({ ...d, target: opt.key }))}
+                    className="rounded-full"
+                    style={levelDialog.target === opt.key ? { backgroundColor: "#E05A2B", color: "white" } : undefined}
+                  >
+                    {opt.key !== "level" && <Award className="h-3.5 w-3.5 mr-1" />}
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <Label className="text-xs text-neutral-600">Effective date</Label>
             <Input

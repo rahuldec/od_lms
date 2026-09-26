@@ -361,9 +361,12 @@ class TraineeUpdate(BaseModel):
     # Admin-entered CSAT score, 0-100. No external source (e.g. a sheet) -
     # set directly, same pattern as notes.
     csat_score: Optional[float] = None
-    # RM designation - independent of the Level 0-3 ladder (not day-tracked,
-    # no promotion history). None/"" clears it, otherwise "ARM" or "RM".
+    # RM designation - independent of the Level 0-3 ladder (no day-tracking,
+    # no promotion-history log). None/"" clears it, otherwise "ARM" or "RM".
     rm_status: Optional[str] = None
+    # Effective date the rm_status change took effect - admin-chosen, same as
+    # date fields elsewhere in this form.
+    rm_since_date: Optional[str] = None
 
 
 class LevelChangeIn(BaseModel):
@@ -651,6 +654,8 @@ async def update_trainee(trainee_id: str, body: TraineeUpdate, _=Depends(require
         patch["rm_status"] = patch["rm_status"] or None  # "" clears it back to none
         if patch["rm_status"] not in (None, "ARM", "RM"):
             raise HTTPException(status_code=400, detail="rm_status must be ARM or RM")
+    if "rm_since_date" in patch and not patch["rm_since_date"]:
+        patch["rm_since_date"] = None
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.patch(
             f"{REST}/trainees?id=eq.{trainee_id}",
