@@ -812,9 +812,12 @@ export default function AdminDashboard() {
   const attentionCount = filteredTrainees.filter(needsAttention).length;
 
   // Sales trainees don't go through the CS/QA Level 0-3 curriculum (they have
-  // their own Sales Training track with no assignments), so they're excluded
-  // from the Level distribution view specifically.
-  const levelEligibleTrainees = filteredTrainees.filter((t) => t.department !== "Sales");
+  // their own Sales Training track with no assignments), and anyone already
+  // promoted to ARM/RM has graduated past the Level ladder entirely - both
+  // are excluded from the Level distribution view specifically.
+  const levelEligibleTrainees = filteredTrainees.filter(
+    (t) => t.department !== "Sales" && !t.rm_status
+  );
   const levelTotal = levelEligibleTrainees.length;
 
   const levelGroups = [0, 1, 2, 3].map((lvl) => ({
