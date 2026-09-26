@@ -305,6 +305,11 @@ function TraineeCard({
             {t.department}
           </span>
         )}
+        {t.join_date && (
+          <span className="g3d-chip" title="Date of joining">
+            Joined {fmtDate(t.join_date)}
+          </span>
+        )}
         {latestPromotion && (
           <span className="inline-flex items-center gap-0.5 text-xs ml-auto" style={{ color: "var(--g3d-faint)" }}>
             <TrendingUp className="h-3 w-3" />
