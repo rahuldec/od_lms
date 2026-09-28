@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { getLevelPeriods } from "@/lib/levelHistory";
 
 const fmtDate = (iso) => {
@@ -5,6 +6,37 @@ const fmtDate = (iso) => {
   const d = new Date(iso);
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
+
+// Connected-node timeline: dot -> line -> dot, with L{n} / days / date
+// stacked under each dot. Dot and label live in the same flex column so
+// they can never drift out of alignment with each other.
+function TimelineRow({ segments, colorOf, faintColor }) {
+  return (
+    <div className="flex items-start mt-2">
+      {segments.map((s, i) => (
+        <Fragment key={s.level}>
+          <div className="flex flex-col items-center flex-shrink-0 px-0.5">
+            <div
+              className="h-2.5 w-2.5 rounded-full ring-2 ring-white flex-shrink-0"
+              style={{ backgroundColor: colorOf(s.level) }}
+            />
+            <div className="text-[11px] font-semibold mt-1 whitespace-nowrap" style={{ color: colorOf(s.level) }}>
+              L{s.level}
+            </div>
+            <div className="text-[10px] whitespace-nowrap" style={{ color: faintColor }}>{s.days}d</div>
+            <div className="text-[10px] whitespace-nowrap" style={{ color: faintColor }}>{fmtDate(s.promotedOn)}</div>
+          </div>
+          {i < segments.length - 1 && (
+            <div
+              className="flex-1 h-0.5 mt-[5px]"
+              style={{ backgroundColor: colorOf(s.level), opacity: 0.35, minWidth: 12 }}
+            />
+          )}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
 
 export const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
 // Sampled from the Okie Dokie logo: warm neutral for the not-yet-reached
@@ -58,17 +90,11 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
             </div>
           ))}
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-          {segments.map((s) => (
-            <span key={s.level} className="inline-flex items-center gap-1 text-[10px] font-medium" style={{ color: "var(--g3d-faint)" }}>
-              <span
-                className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: glass3dLevelColors[s.level] }}
-              />
-              L{s.level} · {s.days}d · {fmtDate(s.promotedOn)}
-            </span>
-          ))}
-        </div>
+        <TimelineRow
+          segments={segments}
+          colorOf={(lvl) => glass3dLevelColors[lvl]}
+          faintColor="var(--g3d-faint)"
+        />
       </div>
     );
   }
@@ -87,17 +113,11 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-        {segments.map((s) => (
-          <span key={s.level} className="inline-flex items-center gap-1 text-[10px] text-neutral-400">
-            <span
-              className="h-1.5 w-1.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: levelColors[s.level] }}
-            />
-            L{s.level} · {s.days}d · {fmtDate(s.promotedOn)}
-          </span>
-        ))}
-      </div>
+      <TimelineRow
+        segments={segments}
+        colorOf={(lvl) => levelColors[lvl]}
+        faintColor="#a3a3a3"
+      />
     </div>
   );
 }
