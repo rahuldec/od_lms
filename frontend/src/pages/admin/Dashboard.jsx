@@ -17,7 +17,7 @@ import RemarksDialog from "@/components/RemarksDialog";
 import CsatDialog from "@/components/CsatDialog";
 import CardSettingsDialog from "@/components/CardSettingsDialog";
 import { Card } from "@/components/ui/card";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 const Stat = ({ icon: Icon, label, value, testId, accent }) => (
@@ -59,7 +59,17 @@ const levelColors = ["#94a3b8", "#f97316", "#8b5cf6", "#16a34a"];
 // Days a trainee is expected to spend at each level before it's worth
 // flagging them as stuck - not a hard rule, just a prompt to go look.
 const LEVEL_DAY_LIMITS = { 0: 30, 1: 60, 2: 60, 3: 60 };
-const needsAttention = (t) => daysAtCurrentLevel(t) > (LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60);
+const levelLimitFor = (t) => LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60;
+const needsAttention = (t) => daysAtCurrentLevel(t) > levelLimitFor(t);
+// "About to cross" - within the last 20% of the expected duration but not
+// over it yet (that's needsAttention's job). A separate, earlier warning so
+// an admin can look before it's actually overdue, not just after.
+const APPROACHING_FRACTION = 0.8;
+const needsAttentionSoon = (t) => {
+  const days = daysAtCurrentLevel(t);
+  const limit = levelLimitFor(t);
+  return days >= limit * APPROACHING_FRACTION && days <= limit;
+};
 
 // Which optional dashboard-card sections apply to a trainee. Null/missing
 // enabled_cards means "everything on" - existing trainees keep every
@@ -832,6 +842,15 @@ export default function AdminDashboard() {
       .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
   }));
 
+  // Level-duration alerts - Sales/ARM/RM trainees are excluded, same as the
+  // Level distribution above, since the day limits don't apply to them.
+  const crossedAlerts = levelEligibleTrainees
+    .filter(needsAttention)
+    .sort((a, b) => (daysAtCurrentLevel(b) - levelLimitFor(b)) - (daysAtCurrentLevel(a) - levelLimitFor(a)));
+  const approachingAlerts = levelEligibleTrainees
+    .filter(needsAttentionSoon)
+    .sort((a, b) => daysAtCurrentLevel(b) / levelLimitFor(b) - daysAtCurrentLevel(a) / levelLimitFor(a));
+
   const now = new Date();
   const promotionsThisMonth = filteredTrainees.reduce((acc, t) => {
     const history = Array.isArray(t.history) ? t.history : [];
@@ -878,6 +897,50 @@ export default function AdminDashboard() {
           accent={attentionCount > 0 ? { bg: "#FEE2E2", color: "#dc2626" } : undefined}
         />
       </div>
+
+      {(crossedAlerts.length > 0 || approachingAlerts.length > 0) && (
+        <Card className="rounded-2xl border-neutral-200/80 p-6 mb-10" data-testid="level-alerts">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            <h2 className="text-base font-semibold">Level duration alerts</h2>
+          </div>
+          <div className="space-y-2">
+            {crossedAlerts.map((t) => {
+              const over = daysAtCurrentLevel(t) - levelLimitFor(t);
+              return (
+                <Link
+                  key={t.id}
+                  to={`/admin/trainees/${t.id}`}
+                  className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-50 transition-colors"
+                >
+                  <span className="text-sm font-medium text-neutral-900">{t.name}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700">
+                    <AlertTriangle className="h-3 w-3" />
+                    L{t.current_level ?? 0} - {over} day{over === 1 ? "" : "s"} over
+                  </span>
+                </Link>
+              );
+            })}
+            {approachingAlerts.map((t) => {
+              const days = daysAtCurrentLevel(t);
+              const limit = levelLimitFor(t);
+              return (
+                <Link
+                  key={t.id}
+                  to={`/admin/trainees/${t.id}`}
+                  className="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-neutral-50 transition-colors"
+                >
+                  <span className="text-sm font-medium text-neutral-900">{t.name}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                    <Clock className="h-3 w-3" />
+                    L{t.current_level ?? 0} - {days}/{limit} days, approaching limit
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <div className="flex items-center justify-end gap-2 mb-4">
         <select
