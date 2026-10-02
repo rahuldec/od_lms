@@ -164,7 +164,9 @@ export default function Trainees() {
 
   const rows = useMemo(() => {
     const withDays = filtered.map((t) => ({ ...t, daysAtL0: daysAtLevel(t, 0) }));
-    if (!sortDaysL0) return withDays;
+    if (!sortDaysL0) {
+      return [...withDays].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    }
     return [...withDays].sort((a, b) =>
       sortDaysL0 === "desc" ? b.daysAtL0 - a.daysAtL0 : a.daysAtL0 - b.daysAtL0
     );
