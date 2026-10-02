@@ -43,7 +43,12 @@ export function getLevelPeriods(trainee, todayStr = new Date().toISOString().sli
       date: toDateOnly(h.effective_date) || toDateOnly(h.at),
       level: h.to,
     }))
-    .filter((c) => c.date && c.date < sinceDate)
+    // A promotion/demotion can't have happened before this trainee joined -
+    // a history entry claiming otherwise is bad data (e.g. a batch-promote
+    // action that stamped its date onto someone who joined that batch
+    // later), not a real event. Dropping it here means a corrupted entry
+    // can produce an impossible period, instead of silently fabricating one.
+    .filter((c) => c.date && c.date >= startDate && c.date < sinceDate)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 
   const marks = [{ date: startDate, level: 0 }, ...changes, { date: sinceDate, level: currentLevel }];
