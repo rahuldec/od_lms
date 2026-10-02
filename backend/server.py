@@ -15,6 +15,8 @@ import csv
 import io
 import time
 import asyncio
+import jwt
+from jwt import PyJWKClient
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -56,7 +58,52 @@ api = APIRouter(prefix="/api")
 
 
 # ---------- helpers ----------
+# Verifying a login token used to mean a network call to Supabase's own
+# /auth/v1/user endpoint on EVERY protected request. Under a burst of
+# parallel requests (e.g. the admin dashboard's ~10 calls on mount),
+# especially across Vercel's serverless instances which don't reliably
+# share the in-memory cache below, that could pile up and occasionally
+# come back as a transient failure.
+#
+# Supabase's own tokens are self-verifying JWTs - signed with a key
+# Supabase publishes at a public JWKS endpoint. Checking the signature
+# locally is instant, needs no network call, and so can't suffer this
+# failure mode at all. PyJWKClient handles fetching + caching that key
+# (including picking up the right one across key rotation via the
+# token's "kid" header) on its own.
+_jwks_client = PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json", lifespan=3600)
+
+
+def _verify_jwt_locally(token: str) -> Optional[Dict[str, Any]]:
+    """Returns the user dict if the token verifies locally, or None if it
+    can't be checked this way (JWKS fetch failed, unrecognized key, unexpected
+    token shape) - signals the caller to fall back to the network check
+    instead of rejecting outright, so a wrong assumption here degrades to the
+    old behavior rather than locking everyone out.
+    """
+    try:
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+    except Exception:
+        return None
+
+    try:
+        payload = jwt.decode(token, signing_key.key, algorithms=["ES256", "RS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    sub = payload.get("sub")
+    if not sub:
+        return None
+    return {"id": sub, "email": payload.get("email")}
+
+
 async def supabase_get_user(token: str) -> Dict[str, Any]:
+    local = _verify_jwt_locally(token)
+    if local is not None:
+        return local
+
     last_error = None
     for attempt in range(3):  # absorb a couple of one-off network/timeout blips
         try:
