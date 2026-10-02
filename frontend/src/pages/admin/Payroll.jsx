@@ -47,6 +47,16 @@ const fmtMonthLabel = (monthStr) => {
 
 const todayMonthStr = () => new Date().toISOString().slice(0, 7);
 
+// getLevelPeriods/daysBetween treat a period's "end" as exclusive (not
+// itself a counted day) - so to make exit_date behave as the trainee's
+// last *paid* day (inclusive), the cutoff passed in has to be the day
+// after it, not the exit date itself.
+const dayAfter = (dateStr) => {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+};
+
 export default function Payroll() {
   const [trainees, setTrainees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,10 +94,12 @@ export default function Payroll() {
         return true;
       })
       .map((t) => {
-        // Caps the open-ended "current level" period at their exit date
-        // instead of letting it run to today, so payroll stops accruing
-        // exactly when they left, not when someone happens to view this page.
-        const asOf = t.status === "Exited" && t.exit_date < today ? t.exit_date : today;
+        // Caps the open-ended "current level" period the day after their
+        // exit date (so the exit date itself is still a paid day) instead
+        // of letting it run to today, so payroll stops accruing exactly
+        // after their last working day, not when someone views this page.
+        const exitCutoff = t.status === "Exited" && t.exit_date ? dayAfter(t.exit_date) : null;
+        const asOf = exitCutoff && exitCutoff < today ? exitCutoff : today;
         const periods = getLevelPeriods(t, asOf);
         const breakdown = [];
         let total = 0;

@@ -669,7 +669,7 @@ export default function Trainees() {
                     onChange={(e) => setForm({ ...form, exit_date: e.target.value })}
                     className="h-10 rounded-xl mt-1"
                   />
-                  <p className="text-xs text-neutral-400 mt-1">Payroll stops accruing after this date.</p>
+                  <p className="text-xs text-neutral-400 mt-1">Their last working day - payroll is paid through this date, inclusive.</p>
                 </div>
               )}
               <div>
