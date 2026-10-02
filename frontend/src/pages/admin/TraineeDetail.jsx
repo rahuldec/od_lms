@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { fetchSheetModules } from "@/lib/sheet";
 import { fetchClients } from "@/lib/clients";
 import AppShell from "@/components/AppShell";
+import LevelTimeline from "@/components/LevelTimeline";
 import ClientAssignDialog from "@/components/ClientAssignDialog";
 import ProjectAssignDialog from "@/components/ProjectAssignDialog";
 import SprintAssignDialog from "@/components/SprintAssignDialog";
@@ -12,11 +13,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft, CheckCircle2, Circle, Clock, XCircle, Briefcase, Layers, Rocket,
-  MessageSquare, Plus, Hourglass, Flag, TrendingUp, TrendingDown, LogIn,
+  MessageSquare, Plus, Flag, TrendingUp, TrendingDown, LogIn,
 } from "lucide-react";
 import { toast } from "sonner";
 import Papa from "papaparse";
-import { daysAtLevel } from "@/lib/levelHistory";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", testId: "nav-dashboard" },
@@ -229,7 +229,6 @@ export default function TraineeDetail() {
 
   const watchedCount = useMemo(() => progress.filter((p) => p.watched).length, [progress]);
   const totalSeconds = useMemo(() => progress.reduce((acc, p) => acc + (p.watch_seconds || 0), 0), [progress]);
-  const daysAtL0 = useMemo(() => daysAtLevel(trainee, 0), [trainee]);
 
   // One entry per calendar day logged in (not one per ping, which would be
   // noisy) merged with the trainee's promotion/demotion/joined log, newest
@@ -328,6 +327,10 @@ export default function TraineeDetail() {
             <p className="text-xs uppercase tracking-wider text-neutral-500">Phone</p>
             <p className="mt-1 font-medium">{trainee.phone || "—"}</p>
           </div>
+        </div>
+        <div className="mt-6">
+          <p className="text-xs uppercase tracking-wider text-neutral-500 mb-2">Level timeline</p>
+          <LevelTimeline trainee={trainee} />
         </div>
         <div className="mt-6">
           <div className="flex items-center justify-between mb-1.5">
@@ -491,20 +494,6 @@ export default function TraineeDetail() {
             )}
           </Card>
           )}
-
-          {/* Days at Level 0 */}
-          <Card className="rounded-2xl border-neutral-200/80 p-7" data-testid="days-at-level0-card">
-            <p className="text-xs uppercase tracking-[0.18em] text-neutral-500 inline-flex items-center gap-1.5">
-              <Hourglass className="h-3 w-3" />
-              Days at Level 0
-            </p>
-            <p className="text-4xl font-semibold mt-2 tabular-nums">{daysAtL0}</p>
-            <p className="text-sm text-neutral-500 mt-1">
-              {(trainee.current_level ?? 0) === 0
-                ? "still at Level 0"
-                : "total across time spent at Level 0"}
-            </p>
-          </Card>
 
           {/* Video Progress */}
           <Card className="rounded-2xl border-neutral-200/80 p-7">
