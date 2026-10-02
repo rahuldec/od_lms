@@ -17,6 +17,7 @@ import Results from "@/pages/admin/Results";
 import Webinars from "@/pages/admin/Webinars";
 import AssignmentSchedule from "@/pages/admin/AssignmentSchedule";
 import Reports from "@/pages/admin/Reports";
+import Payroll from "@/pages/admin/Payroll";
 import TraineeHome from "@/pages/trainee/Home";
 import PublicLearn from "@/pages/Learn";
 import PublicWebinar from "@/pages/Webinar";
@@ -139,6 +140,14 @@ export default function App() {
             }
           />
           <Route path="/admin/reports" element={<Navigate to="/admin/analytics" replace />} />
+          <Route
+            path="/admin/payroll"
+            element={
+              <Protected requireRole="admin">
+                <Payroll />
+              </Protected>
+            }
+          />
           <Route
             path="/trainee"
             element={

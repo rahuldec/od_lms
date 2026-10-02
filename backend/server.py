@@ -440,6 +440,10 @@ class TraineeUpdate(BaseModel):
     # Effective date the rm_status change took effect - admin-chosen, same as
     # date fields elsewhere in this form.
     rm_since_date: Optional[str] = None
+    # Date the trainee actually left - set when status is changed to
+    # "Exited". Used to cap payroll calculation at their last paid day
+    # instead of treating them as still accruing indefinitely.
+    exit_date: Optional[str] = None
 
 
 class LevelChangeIn(BaseModel):
@@ -729,6 +733,8 @@ async def update_trainee(trainee_id: str, body: TraineeUpdate, _=Depends(require
             raise HTTPException(status_code=400, detail="rm_status must be ARM or RM")
     if "rm_since_date" in patch and not patch["rm_since_date"]:
         patch["rm_since_date"] = None
+    if "exit_date" in patch and not patch["exit_date"]:
+        patch["exit_date"] = None
     async with httpx.AsyncClient(timeout=20) as cx:
         r = await cx.patch(
             f"{REST}/trainees?id=eq.{trainee_id}",

@@ -92,6 +92,7 @@ const emptyForm = {
   password: "",
   batch_id: "",
   level_since_date: "",
+  exit_date: "",
 };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -102,6 +103,7 @@ const navItems = [
   { to: "/admin/batches", label: "Batches", testId: "nav-batches", group: "Roster" },
   { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
   { to: "/admin/analytics", label: "Analytics", testId: "nav-analytics" },
+  { to: "/admin/payroll", label: "Payroll", testId: "nav-payroll" },
   { to: "/admin/clients", label: "Clients", testId: "nav-clients", group: "Content" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
@@ -201,6 +203,7 @@ export default function Trainees() {
       password: "",
       batch_id: t.batch_id || "",
       level_since_date: t.level_since_date || "",
+      exit_date: t.exit_date || "",
     });
     setModalOpen(true);
   };
@@ -209,6 +212,10 @@ export default function Trainees() {
     e?.preventDefault?.();
     if (!form.name || !form.username) {
       toast.error("Name and username are required");
+      return;
+    }
+    if (form.status === "Exited" && !form.exit_date) {
+      toast.error("Exit date is required when marking a trainee Exited");
       return;
     }
     setSaving(true);
@@ -224,6 +231,8 @@ export default function Trainees() {
           notes: form.notes,
           batch_id: form.batch_id || null,
           level_since_date: form.level_since_date || null,
+          // Clears itself if the trainee is no longer marked Exited.
+          exit_date: form.status === "Exited" ? form.exit_date : "",
         });
         toast.success("Trainee updated");
       } else {
@@ -634,7 +643,12 @@ export default function Trainees() {
               )}
               <div>
                 <Label className="text-xs text-neutral-600">Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                <Select
+                  value={form.status}
+                  onValueChange={(v) =>
+                    setForm({ ...form, status: v, exit_date: v === "Exited" ? (form.exit_date || todayStr()) : form.exit_date })
+                  }
+                >
                   <SelectTrigger data-testid="form-status" className="h-10 rounded-xl mt-1">
                     <SelectValue />
                   </SelectTrigger>
@@ -645,6 +659,19 @@ export default function Trainees() {
                   </SelectContent>
                 </Select>
               </div>
+              {form.status === "Exited" && (
+                <div>
+                  <Label className="text-xs text-neutral-600">Exit date</Label>
+                  <Input
+                    data-testid="form-exit-date"
+                    type="date"
+                    value={form.exit_date}
+                    onChange={(e) => setForm({ ...form, exit_date: e.target.value })}
+                    className="h-10 rounded-xl mt-1"
+                  />
+                  <p className="text-xs text-neutral-400 mt-1">Payroll stops accruing after this date.</p>
+                </div>
+              )}
               <div>
                 <Label className="text-xs text-neutral-600">Department</Label>
                 <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>

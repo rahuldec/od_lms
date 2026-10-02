@@ -24,6 +24,7 @@ const navItems = [
   { to: "/admin/batches", label: "Batches", testId: "nav-batches", group: "Roster" },
   { to: "/admin/assignment-schedule", label: "Schedule", testId: "nav-assignment-schedule" },
   { to: "/admin/analytics", label: "Analytics", testId: "nav-analytics" },
+  { to: "/admin/payroll", label: "Payroll", testId: "nav-payroll" },
   { to: "/admin/clients", label: "Clients", testId: "nav-clients", group: "Content" },
   { to: "/admin/resources", label: "Resources", testId: "nav-resources", group: "Content" },
   { to: "/admin/training-modules", label: "Training Modules", testId: "nav-training-modules", group: "Content" },
