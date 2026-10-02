@@ -285,10 +285,16 @@ export default function TraineeDetail() {
         Back to trainees
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Trainee Info Card */}
-        <Card className="lg:col-span-2 rounded-2xl border-neutral-200/80 p-7">
-          <div className="flex items-start justify-between">
+      {/* Trainee Info Card - full width, its own row */}
+      <Card className="rounded-2xl border-neutral-200/80 p-7 mb-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-start gap-4">
+            <div
+              className="h-14 w-14 rounded-2xl grid place-items-center text-white text-xl font-bold flex-shrink-0"
+              style={{ backgroundColor: "#E05A2B" }}
+            >
+              {trainee.name?.charAt(0).toUpperCase()}
+            </div>
             <div>
               <p className="text-xs uppercase tracking-[0.18em] text-neutral-500">Trainee</p>
               <h1 className="text-3xl font-semibold mt-1 tracking-tight">{trainee.name}</h1>
@@ -296,58 +302,59 @@ export default function TraineeDetail() {
                 @{trainee.username} · {trainee.phone || "no phone"}
               </p>
             </div>
-            <Badge className="rounded-full" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
-              Level {trainee.current_level ?? 0}
-            </Badge>
           </div>
-          <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-neutral-500">Status</p>
-              <p className="mt-1 font-medium">{trainee.status || "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-neutral-500">Department</p>
-              <p className="mt-1 font-medium">{trainee.department || "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-neutral-500">Manager</p>
-              <p className="mt-1 font-medium">{trainee.manager || "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-neutral-500">Joined</p>
-              <p className="mt-1 font-medium">{trainee.join_date || "—"}</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wider text-neutral-500">Phone</p>
-              <p className="mt-1 font-medium">{trainee.phone || "—"}</p>
-            </div>
+          <Badge className="rounded-full" style={{ backgroundColor: "#FFF0E8", color: "#E05A2B" }}>
+            Level {trainee.current_level ?? 0}
+          </Badge>
+        </div>
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-5 gap-4 text-sm">
+          <div>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">Status</p>
+            <p className="mt-1 font-medium">{trainee.status || "—"}</p>
           </div>
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1.5">
-                <MessageSquare className="h-3 w-3" />
-                Remarks
-              </p>
-              <button
-                onClick={() => setRemarksOpen(true)}
-                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5"
-                style={{ color: "#E05A2B" }}
-              >
-                {trainee.notes ? "Edit" : <><Plus className="h-3 w-3" />Add</>}
-              </button>
-            </div>
-            <div className="p-4 rounded-xl bg-neutral-50 text-sm whitespace-pre-wrap break-words">
-              {trainee.notes ? (
-                <span className="text-neutral-700">{trainee.notes}</span>
-              ) : (
-                <span className="text-neutral-400">No remarks yet</span>
-              )}
-            </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">Department</p>
+            <p className="mt-1 font-medium">{trainee.department || "—"}</p>
           </div>
-        </Card>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">Manager</p>
+            <p className="mt-1 font-medium">{trainee.manager || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">Joined</p>
+            <p className="mt-1 font-medium">{trainee.join_date || "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wider text-neutral-500">Phone</p>
+            <p className="mt-1 font-medium">{trainee.phone || "—"}</p>
+          </div>
+        </div>
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs uppercase tracking-wider text-neutral-500 inline-flex items-center gap-1.5">
+              <MessageSquare className="h-3 w-3" />
+              Remarks
+            </p>
+            <button
+              onClick={() => setRemarksOpen(true)}
+              className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5"
+              style={{ color: "#E05A2B" }}
+            >
+              {trainee.notes ? "Edit" : <><Plus className="h-3 w-3" />Add</>}
+            </button>
+          </div>
+          <div className="p-4 rounded-xl bg-neutral-50 text-sm whitespace-pre-wrap break-words">
+            {trainee.notes ? (
+              <span className="text-neutral-700">{trainee.notes}</span>
+            ) : (
+              <span className="text-neutral-400">No remarks yet</span>
+            )}
+          </div>
+        </div>
+      </Card>
 
-        {/* Right column */}
-        <div className="flex flex-col gap-6">
+      {/* Stat cards - flow into a responsive grid instead of one tall column */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {/* Client book */}
           <Card className="rounded-2xl border-neutral-200/80 p-7">
             <div className="flex items-center justify-between">
@@ -600,7 +607,6 @@ export default function TraineeDetail() {
             );
           })}
         </div>
-      </div>
 
       {/* Lesson Activity */}
       <Card className="rounded-2xl border-neutral-200/80 p-7">
