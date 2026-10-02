@@ -16,7 +16,6 @@ import io
 import time
 import asyncio
 import jwt
-from jwt import PyJWKClient
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -65,16 +64,34 @@ api = APIRouter(prefix="/api")
 # share the in-memory cache below, that could pile up and occasionally
 # come back as a transient failure.
 #
-# Supabase's own tokens are self-verifying JWTs - signed with a key
-# Supabase publishes at a public JWKS endpoint. Checking the signature
-# locally is instant, needs no network call, and so can't suffer this
-# failure mode at all. PyJWKClient handles fetching + caching that key
-# (including picking up the right one across key rotation via the
-# token's "kid" header) on its own.
-_jwks_client = PyJWKClient(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json", lifespan=3600)
+# Supabase's own tokens are self-verifying JWTs - signed with a key Supabase
+# publishes at a public JWKS endpoint. Checking the signature locally is
+# instant, needs no per-request network call, and so can't suffer the above
+# failure mode at all.
+#
+# Fetched with httpx (same library used for every other network call in this
+# file, already proven reliable here) rather than PyJWT's own PyJWKClient,
+# which fetches with a different, more basic networking stack that hung
+# indefinitely in Vercel's runtime with no error at all - worse than a slow
+# failure, since nothing ever times it out on the frontend either.
+_jwks_cache: Dict[str, Any] = {"keys": None, "fetched_at": 0.0}
+_JWKS_CACHE_TTL = 3600  # seconds
 
 
-def _verify_jwt_locally(token: str) -> Optional[Dict[str, Any]]:
+async def _get_jwks_keys(force: bool = False) -> list:
+    now = time.monotonic()
+    if not force and _jwks_cache["keys"] is not None and (now - _jwks_cache["fetched_at"]) < _JWKS_CACHE_TTL:
+        return _jwks_cache["keys"]
+    async with httpx.AsyncClient(timeout=5) as cx:
+        r = await cx.get(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json")
+    r.raise_for_status()
+    keys = r.json().get("keys", [])
+    _jwks_cache["keys"] = keys
+    _jwks_cache["fetched_at"] = now
+    return keys
+
+
+async def _verify_jwt_locally(token: str) -> Optional[Dict[str, Any]]:
     """Returns the user dict if the token verifies locally, or None if it
     can't be checked this way (JWKS fetch failed, unrecognized key, unexpected
     token shape) - signals the caller to fall back to the network check
@@ -82,12 +99,21 @@ def _verify_jwt_locally(token: str) -> Optional[Dict[str, Any]]:
     old behavior rather than locking everyone out.
     """
     try:
-        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        kid = jwt.get_unverified_header(token).get("kid")
+        keys = await _get_jwks_keys()
+        jwk_dict = next((k for k in keys if k.get("kid") == kid), None)
+        if jwk_dict is None:
+            # Might be a just-rotated key we haven't refetched yet - try once more.
+            keys = await _get_jwks_keys(force=True)
+            jwk_dict = next((k for k in keys if k.get("kid") == kid), None)
+        if jwk_dict is None:
+            return None
+        signing_key = jwt.PyJWK(jwk_dict).key
     except Exception:
         return None
 
     try:
-        payload = jwt.decode(token, signing_key.key, algorithms=["ES256", "RS256"])
+        payload = jwt.decode(token, signing_key, algorithms=["ES256", "RS256"], audience="authenticated")
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Invalid token")
     except jwt.InvalidTokenError:
@@ -100,7 +126,7 @@ def _verify_jwt_locally(token: str) -> Optional[Dict[str, Any]]:
 
 
 async def supabase_get_user(token: str) -> Dict[str, Any]:
-    local = _verify_jwt_locally(token)
+    local = await _verify_jwt_locally(token)
     if local is not None:
         return local
 
