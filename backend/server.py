@@ -1,6 +1,6 @@
 """FastAPI backend that wraps Supabase admin operations using service_role key."""
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, File, UploadFile, Form, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Header, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
@@ -2182,41 +2182,6 @@ async def upsert_progress(body: ProgressIn, ctx=Depends(require_user)):
     if r2.status_code not in (200, 201, 204):
         raise HTTPException(status_code=400, detail=r2.text)
     return r2.json()[0] if r2.json() else payload
-
-
-# ---------- Zoho Mail → Asana ticket webhook ----------
-_ASANA_TOKEN = os.environ.get("ASANA_TOKEN", "")
-_ASANA_PROJECT_GID = os.environ.get("ASANA_PROJECT_GID", "1219498756334922")
-_TICKET_SENDER = "wecare@okiedokiepay.com"
-
-
-@app.post("/webhook/zoho-ticket")
-async def zoho_ticket_webhook(request: Request):
-    data = await request.json()
-    from_addr = (data.get("fromAddress") or "").lower().strip()
-    if from_addr != _TICKET_SENDER:
-        return {"status": "ignored", "reason": "sender not whitelisted"}
-
-    subject = data.get("subject") or "(No Subject)"
-    body = data.get("content") or data.get("summary") or ""
-    sender = data.get("fromAddress", "")
-
-    notes = f"From: {sender}\n\n{body}".strip()
-
-    async with httpx.AsyncClient() as cx:
-        resp = await cx.post(
-            "https://app.asana.com/api/1.0/tasks",
-            headers={"Authorization": f"Bearer {_ASANA_TOKEN}"},
-            json={"data": {"name": subject, "notes": notes, "projects": [_ASANA_PROJECT_GID]}},
-            timeout=10,
-        )
-    if resp.status_code != 201:
-        logger.error("Asana task creation failed: %s", resp.text)
-        raise HTTPException(status_code=502, detail=f"Asana error: {resp.text}")
-
-    task_gid = resp.json()["data"]["gid"]
-    logger.info("Created Asana task %s from ticket: %s", task_gid, subject)
-    return {"status": "ok", "task_gid": task_gid}
 
 
 app.include_router(api)
