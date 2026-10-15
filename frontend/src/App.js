@@ -19,7 +19,6 @@ import AssignmentSchedule from "@/pages/admin/AssignmentSchedule";
 import Reports from "@/pages/admin/Reports";
 import Payroll from "@/pages/admin/Payroll";
 import TraineeHome from "@/pages/trainee/Home";
-import PublicLearn from "@/pages/Learn";
 import PublicWebinar from "@/pages/Webinar";
 function RootRedirect() {
   const { session, role, loading } = useAuth();
@@ -41,7 +40,7 @@ export default function App() {
         />
         <Routes>
           <Route path="/" element={<RootRedirect />} />
-          <Route path="/learn" element={<PublicLearn />} />
+          <Route path="/learn" element={<Navigate to="/" replace />} />
           <Route path="/webinar" element={<PublicWebinar />} />
           <Route
             path="/admin/webinars"
