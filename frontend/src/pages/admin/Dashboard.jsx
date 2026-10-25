@@ -236,451 +236,362 @@ function TraineeCard({
   });
   const avgPct = totalSum > 0 ? Math.round((scoreSum / totalSum) * 100) : null;
 
+  // Build visit data for two-col layout
+  const visited = visitRows
+    .filter((v) => v.visit_count > 0)
+    .map((v) => ({ client_name: v.client_name, count: v.visit_count }))
+    .sort((a, b) => b.count - a.count);
+  const totalVisits = visited.reduce((s, v) => s + v.count, 0);
+  const PREVIEW = 5;
+  const visitMap = {};
+  visitRows.forEach((v) => { visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0; });
+
   return (
-    <div className="g3d-scope g3d-card relative p-4 overflow-hidden">
-      <div className="relative flex items-start justify-between mb-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="g3d-avatar h-9 w-9 grid place-items-center text-white text-sm font-bold flex-shrink-0">
-            {t.name?.charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <Link
-              to={`/admin/trainees/${t.id}`}
-              className="text-base font-semibold hover:underline truncate block"
-            >
-              {t.name}
-            </Link>
-            <p className="text-sm truncate" style={{ color: "var(--g3d-faint)" }}>@{t.username}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {days !== null && (
-            <span
-              className="text-base font-extrabold tabular-nums"
-              style={{ color: "var(--g3d-ink)" }}
-              title={`${days} day${days === 1 ? "" : "s"} in training`}
-            >
-              {days}d
-            </span>
-          )}
-          <button
-            onClick={onEditCardSettings}
-            data-testid={`card-settings-${t.id}`}
-            title="Choose which sections show on this card"
-            className="h-7 w-7 rounded-full grid place-items-center hover:opacity-70"
-            style={{ color: "var(--g3d-faint)" }}
-          >
-            <Settings className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
+    <div className="g3d-scope g3d-card overflow-hidden">
 
-      <div className="flex items-center gap-1.5 mb-3 flex-wrap">
-        <span
-          className="g3d-chip"
-          style={
-            t.status === "Active"
-              ? { "--fill": "var(--g3d-good-bg)", "--ink2": "var(--g3d-good-ink)" }
-              : undefined
-          }
+      {/* ── Header ── */}
+      <div className="flex items-start gap-3 px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+        <div
+          className="g3d-avatar flex-shrink-0 grid place-items-center text-white font-semibold"
+          style={{ width: 48, height: 48, borderRadius: 13, fontSize: 18 }}
         >
-          {t.status}
-        </span>
-        <span
-          className="g3d-chip solid"
-          style={flagged ? { "--fill": "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" } : undefined}
-          title={
-            flagged
-              ? `${levelDays} days at Level ${t.current_level ?? 0} - longer than the expected ${LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60}`
-              : `${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`
-          }
-        >
-          {flagged && <AlertTriangle className="h-2.5 w-2.5" />}
-          L{t.current_level ?? 0}
-          <span className="opacity-80 tabular-nums">· {levelDays}d</span>
-        </span>
-        {t.batch_id && batchNameById[t.batch_id] && (
-          <span className="g3d-chip" style={{ "--fill": "var(--g3d-batch-bg)", "--ink2": "var(--g3d-batch-ink)" }}>
-            {batchNameById[t.batch_id]}
-          </span>
-        )}
-        {t.department && (
-          <span
-            className="g3d-chip"
-            style={
-              t.department === "QA"
-                ? { "--fill": "var(--g3d-qa-bg)", "--ink2": "var(--g3d-qa-ink)" }
-                : { "--fill": "var(--g3d-cs-bg)", "--ink2": "var(--g3d-cs-ink)" }
-            }
-          >
-            {t.department}
-          </span>
-        )}
-        {t.join_date && (
-          <span className="g3d-chip" title="Date of joining">
-            Joined {fmtDate(t.join_date)}
-          </span>
-        )}
-        {latestPromotion && (
-          <span className="inline-flex items-center gap-0.5 text-xs ml-auto" style={{ color: "var(--g3d-faint)" }}>
-            <TrendingUp className="h-3 w-3" />
-            {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
-          </span>
-        )}
-      </div>
-
-      <LevelTimeline trainee={t} variant="glass3d" />
-
-      {/* Learning Phase - assignment scores. Collapsed to a one-line summary
-          by default - five full progress bars per card, times every trainee
-          in an expanded level, is the single biggest source of clutter on
-          this page. Moved above Clients/Projects/etc so scoring is the
-          first thing seen after the level bar, not the last. */}
-      <div className="g3d-well relative mb-3 p-2.5">
-        <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-          <BarChart3 className="h-3 w-3 flex-shrink-0" />
-          Learning Phase
-        </span>
-        {assignmentsLoading ? (
-          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>Loading assignment scores…</p>
-        ) : assignments.length === 0 ? (
-          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
-        ) : (
-          <div className="mt-1.5">
-            <button
-              onClick={() => setScoresOpen((v) => !v)}
-              className="w-full flex items-center justify-between text-sm hover:opacity-80"
-              style={{ color: "var(--g3d-soft)" }}
-            >
-              <span>
-                {passedCount}/{assignments.length} passed
-                {avgPct != null && (
-                  <span style={{ color: "var(--g3d-faint)" }}> · avg {avgPct}%</span>
-                )}
-              </span>
-              {scoresOpen ? (
-                <ChevronUp className="h-3 w-3" style={{ color: "var(--g3d-faint)" }} />
-              ) : (
-                <ChevronDown className="h-3 w-3" style={{ color: "var(--g3d-faint)" }} />
+          {t.name?.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <Link
+                to={`/admin/trainees/${t.id}`}
+                className="text-lg font-semibold hover:underline truncate block leading-tight"
+                style={{ color: "var(--g3d-ink)" }}
+              >
+                {t.name}
+              </Link>
+              <p className="text-xs mt-0.5" style={{ color: "var(--g3d-faint)" }}>@{t.username}</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {days !== null && (
+                <div className="text-right">
+                  <div className="text-2xl font-semibold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{days}</div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--g3d-faint)" }}>days in program</div>
+                </div>
               )}
-            </button>
-            {scoresOpen && (
-              <div className="flex flex-col gap-1.5 mt-2">
-                {assignments.map((a) => {
-                  const color = a.passed ? "var(--g3d-good-ink)" : "var(--g3d-bad-ink)";
-                  const fill = a.passed ? "var(--g3d-good-bg)" : "var(--g3d-bad-bg)";
-                  const pct = a.total ? Math.min(100, Math.round((a.score / a.total) * 100)) : 0;
-                  return (
-                    <button
-                      key={a.id}
-                      onClick={() => onOpenAssignment(a)}
-                      className="text-left hover:opacity-80 transition-opacity"
-                    >
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-sm" style={{ color: "var(--g3d-soft)" }}>{a.name}</span>
-                        <span className="text-sm font-medium" style={{ color }}>
-                          {a.score}/{a.total} {a.passed ? "Pass" : "Fail"}
-                        </span>
-                      </div>
-                      <div className="g3d-track h-1.5">
-                        <div
-                          className="g3d-track-fill h-full"
-                          style={{ width: `${pct}%`, backgroundColor: fill }}
-                        />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Clients / Projects / Sprints / Visits / CSAT sit side by side rather
-          than stacked - short lists read better across than piled one under
-          another, especially now the text inside them is bigger. Which of
-          these appear at all is per-trainee (the card's settings icon),
-          so the grid only reserves as many columns as are actually shown -
-          a trainee with just Clients enabled doesn't leave empty slots. */}
-      {visibleCardCount > 0 && (
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3 ${GRID_COLS_LG[Math.min(visibleCardCount, 5)]}`}>
-      {cardsEnabled.clients && (
-      <div className="g3d-well relative min-w-0 p-2.5">
-        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-            <Briefcase className="h-3 w-3 flex-shrink-0" />
-            Clients
-          </span>
-          <button
-            onClick={onAssignClients}
-            data-testid={`assign-clients-${t.id}`}
-            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: "var(--g3d-accent)" }}
-          >
-            {myClients.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
-          </button>
-        </div>
-        {myClients.length > 0 && (
-          <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
-            {myClients.length} assigned
-            {visitRows.reduce((s, v) => s + (v.visit_count || 0), 0) > 0 && (
-              <span>
-                {" · "}
-                {visitRows.reduce((s, v) => s + (v.visit_count || 0), 0)} visits
-              </span>
-            )}
-          </p>
-        )}
-        {myClients.length === 0 ? (
-          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
-        ) : (() => {
-          const visitMap = {};
-          visitRows.forEach((v) => { visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0; });
-          return (
-            <table className="w-full mt-1.5 text-sm border-collapse">
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
-                  <th className="text-left pb-1 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Client</th>
-                  <th className="text-right pb-1 font-semibold w-12" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Visits</th>
-                </tr>
-              </thead>
-              <tbody>
-                {myClients.map((c, i) => {
-                  const vc = visitMap[c.client_name.trim().toLowerCase()] || 0;
-                  return (
-                    <tr key={c.client_name} style={i < myClients.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
-                      <td className="py-1 pr-2 truncate max-w-0" style={{ color: "var(--g3d-soft)", maxWidth: 1 }}>{c.client_name}</td>
-                      <td className="py-1 text-right tabular-nums font-medium w-12" style={{ color: vc > 0 ? "var(--g3d-ink)" : "var(--g3d-border)" }}>{vc > 0 ? vc : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          );
-        })()}
-      </div>
-      )}
-
-      {cardsEnabled.projects && (
-      <div className="g3d-well relative min-w-0 p-2.5">
-        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-            <Layers className="h-3 w-3 flex-shrink-0" />
-            Projects
-          </span>
-          <button
-            onClick={onAssignProjects}
-            data-testid={`assign-projects-${t.id}`}
-            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: "var(--g3d-accent)" }}
-          >
-            {myProjects.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
-          </button>
-        </div>
-        {myProjects.length > 0 && (
-          <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
-            {myProjects.length} assigned
-          </p>
-        )}
-        {myProjects.length === 0 ? (
-          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No projects assigned</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5 min-w-0">
-            {myProjects.map((p) => (
-              <span
-                key={p.project_name}
-                title={p.project_name}
-                className="g3d-pill text-sm"
-              >
-                <span className="min-w-0 break-words">{p.project_name}</span>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      )}
-
-      {cardsEnabled.sprints && (
-      <div className="g3d-well relative min-w-0 p-2.5">
-        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-            <Rocket className="h-3 w-3 flex-shrink-0" />
-            Sprints
-          </span>
-          <button
-            onClick={onAssignSprints}
-            data-testid={`assign-sprints-${t.id}`}
-            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: "var(--g3d-accent)" }}
-          >
-            {mySprints.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Assign</>)}
-          </button>
-        </div>
-        {mySprints.length > 0 && (
-          <div className="flex items-center gap-1 mb-1.5">
-            <p className="text-[11px] tabular-nums" style={{ color: "var(--g3d-faint)" }}>
-              {mySprints.length} assigned
-              <span style={{ color: "var(--g3d-bad-ink)" }}> · avg {avgBugsPercent(mySprints)}% bugs</span>
-            </p>
-            <button
-              onClick={() => setSprintsOpen((v) => !v)}
-              title={sprintsOpen ? "Hide sprint details" : "Show sprint details"}
-              className="flex-shrink-0"
-              style={{ color: "var(--g3d-faint)" }}
-            >
-              <Info className="h-3 w-3" />
-            </button>
-          </div>
-        )}
-        {mySprints.length === 0 ? (
-          <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No sprints assigned</p>
-        ) : !sprintsOpen ? null : (
-          <div className="flex flex-wrap gap-1.5 min-w-0">
-            {mySprints.map((s) => (
-              <span
-                key={s.sprint_name}
-                title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.bugs_percent || 0}% bugs found`}
-                className="g3d-pill text-sm"
-              >
-                <span className="min-w-0 break-words">{s.sprint_name}</span>
-                <span
-                  className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0"
-                  style={{ color: s.sprint_type === "major" ? "var(--g3d-batch-ink)" : "var(--g3d-faint)" }}
-                >
-                  {s.sprint_type}
-                </span>
-                {s.bugs_percent > 0 && (
-                  <span className="text-[10px] font-semibold tabular-nums flex-shrink-0" style={{ color: "var(--g3d-bad-ink)" }}>
-                    {s.bugs_percent}% bugs
-                  </span>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      )}
-
-      {/* Visits. A visit can be logged for any client from the sheet, not
-          only ones formally assigned to this trainee, so this reads from
-          visitRows directly rather than cross-referencing myClients. */}
-      {cardsEnabled.visits && (() => {
-        const visited = visitRows
-          .filter((v) => v.visit_count > 0)
-          .map((v) => ({ client_name: v.client_name, count: v.visit_count }))
-          .sort((a, b) => b.count - a.count);
-        const totalVisits = visited.reduce((s, v) => s + v.count, 0);
-        const PREVIEW = 5;
-        const showingAll = visitsExpanded;
-        const rows = showingAll ? visited : visited.slice(0, PREVIEW);
-        return (
-          <div className="g3d-well relative min-w-0 p-2.5">
-            <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-              <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1.5 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                Visits
-                {totalVisits > 0 && (
-                  <span className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded-full" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                    {totalVisits}
-                  </span>
-                )}
-              </span>
               <button
-                onClick={onLogVisits}
-                data-testid={`log-visits-${t.id}`}
-                className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-                style={{ color: "var(--g3d-accent)" }}
+                onClick={onEditCardSettings}
+                data-testid={`card-settings-${t.id}`}
+                title="Choose which sections show on this card"
+                className="h-7 w-7 rounded-full grid place-items-center hover:opacity-70"
+                style={{ color: "var(--g3d-faint)" }}
               >
-                {visited.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Log</>)}
+                <Settings className="h-3.5 w-3.5" />
               </button>
             </div>
-            {visited.length === 0 ? (
-              <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
-            ) : (
-              <>
-                <table className="w-full mt-1.5 text-sm border-collapse">
+          </div>
+          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+            <span className="g3d-chip"
+              style={t.status === "Active" ? { "--fill": "var(--g3d-good-bg)", "--ink2": "var(--g3d-good-ink)" } : undefined}>
+              {t.status}
+            </span>
+            <span className="g3d-chip solid"
+              style={flagged ? { "--fill": "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" } : undefined}
+              title={flagged
+                ? `${levelDays} days at Level ${t.current_level ?? 0} — over the expected ${LEVEL_DAY_LIMITS[t.current_level ?? 0] ?? 60}`
+                : `${levelDays} day${levelDays === 1 ? "" : "s"} at Level ${t.current_level ?? 0}`}>
+              {flagged && <AlertTriangle className="h-2.5 w-2.5" />}
+              L{t.current_level ?? 0}
+              <span className="opacity-80 tabular-nums">· {levelDays}d</span>
+            </span>
+            {t.batch_id && batchNameById[t.batch_id] && (
+              <span className="g3d-chip" style={{ "--fill": "var(--g3d-batch-bg)", "--ink2": "var(--g3d-batch-ink)" }}>
+                {batchNameById[t.batch_id]}
+              </span>
+            )}
+            {t.department && (
+              <span className="g3d-chip" style={t.department === "QA"
+                ? { "--fill": "var(--g3d-qa-bg)", "--ink2": "var(--g3d-qa-ink)" }
+                : { "--fill": "var(--g3d-cs-bg)", "--ink2": "var(--g3d-cs-ink)" }}>
+                {t.department}
+              </span>
+            )}
+            {t.join_date && (
+              <span className="g3d-chip" title="Date of joining">
+                <Clock className="h-2.5 w-2.5" /> {fmtDate(t.join_date)}
+              </span>
+            )}
+            {latestPromotion && (
+              <span className="inline-flex items-center gap-0.5 text-xs ml-auto" style={{ color: "var(--g3d-faint)" }}>
+                <TrendingUp className="h-3 w-3" />
+                {fmtDate(latestPromotion.effective_date || latestPromotion.at)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Level timeline ── */}
+      <div className="px-5 py-3" style={{ background: "var(--g3d-panel)", borderBottom: "1px solid var(--g3d-border)" }}>
+        <LevelTimeline trainee={t} variant="glass3d" />
+
+      </div>
+
+      {/* ── Clients + Visits two-column ── */}
+      {(cardsEnabled.clients || cardsEnabled.visits) && (
+        <div className="grid grid-cols-2" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+          {cardsEnabled.clients && (
+            <div className="px-5 py-4 min-w-0" style={cardsEnabled.visits ? { borderRight: "1px solid var(--g3d-border)" } : {}}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+                  <Briefcase className="h-3 w-3" /> Clients
+                  {myClients.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                      {myClients.length}
+                    </span>
+                  )}
+                </span>
+                <button onClick={onAssignClients} data-testid={`assign-clients-${t.id}`}
+                  className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
+                  {myClients.length > 0 ? "Manage" : "+ Assign"}
+                </button>
+              </div>
+              {myClients.length === 0 ? (
+                <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
+              ) : (
+                <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
-                      <th className="text-left pb-1 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Client</th>
-                      <th className="text-right pb-1 font-semibold w-12" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Visits</th>
+                      <th className="text-left pb-1.5 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Client</th>
+                      <th className="text-right pb-1.5 font-semibold w-10" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Visits</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((c, i) => (
-                      <tr key={c.client_name} style={i < rows.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
-                        <td className="py-1 pr-2 truncate max-w-0" style={{ color: "var(--g3d-soft)", maxWidth: 1 }}>{c.client_name}</td>
-                        <td className="py-1 text-right tabular-nums font-medium w-12" style={{ color: "var(--g3d-ink)" }}>{c.count}</td>
-                      </tr>
-                    ))}
+                    {myClients.map((c, i) => {
+                      const vc = visitMap[c.client_name.trim().toLowerCase()] || 0;
+                      return (
+                        <tr key={c.client_name} style={i < myClients.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
+                          <td className="py-1.5 pr-2 truncate" style={{ color: "var(--g3d-soft)", maxWidth: 1, width: "100%" }}>{c.client_name}</td>
+                          <td className="py-1.5 text-right w-10">
+                            {vc > 0 ? (
+                              <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
+                                style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                                {vc}
+                              </span>
+                            ) : (
+                              <span style={{ color: "var(--g3d-border)" }}>—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
-                {visited.length > PREVIEW && (
-                  <button
-                    onClick={() => setVisitsExpanded((v) => !v)}
-                    className="mt-2 text-xs font-semibold hover:underline w-full text-center"
-                    style={{ color: "var(--g3d-accent)" }}
-                  >
-                    {showingAll ? "Show less" : `Show all ${visited.length} clients`}
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        );
-      })()}
+              )}
+            </div>
+          )}
 
-      {/* CSAT. Admin-entered, backed by trainees.csat_score - no external
-          source wired up. */}
-      {cardsEnabled.csat && (
-        <div className="g3d-well relative min-w-0 p-2.5">
-          <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-            <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-              <Smile className="h-3 w-3 flex-shrink-0" />
-              CSAT
-            </span>
-            <button
-              onClick={onEditCsat}
-              data-testid={`edit-csat-${t.id}`}
-              className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-              style={{ color: "var(--g3d-accent)" }}
-            >
-              {t.csat_score != null ? "Edit" : (<><Plus className="h-3 w-3" />Add</>)}
-            </button>
-          </div>
-          {t.csat_score != null ? (
-            <p className="text-lg font-semibold mt-1.5 tabular-nums" style={{ color: "var(--g3d-ink)" }}>
-              {t.csat_score}%
-            </p>
-          ) : (
-            <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>Not recorded</p>
+          {cardsEnabled.visits && (
+            <div className="px-5 py-4 min-w-0">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+                  <MapPin className="h-3 w-3" /> Visits
+                  {totalVisits > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                      {totalVisits}
+                    </span>
+                  )}
+                </span>
+                <button onClick={onLogVisits} data-testid={`log-visits-${t.id}`}
+                  className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
+                  {visited.length > 0 ? "Manage" : "+ Log"}
+                </button>
+              </div>
+              {visited.length === 0 ? (
+                <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
+              ) : (
+                <>
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+                        <th className="text-left pb-1.5 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Client</th>
+                        <th className="text-right pb-1.5 font-semibold w-10" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Visits</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(visitsExpanded ? visited : visited.slice(0, PREVIEW)).map((c, i) => {
+                        const displayRows = visitsExpanded ? visited : visited.slice(0, PREVIEW);
+                        return (
+                          <tr key={c.client_name} style={i < displayRows.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
+                            <td className="py-1.5 pr-2 truncate" style={{ color: "var(--g3d-soft)", maxWidth: 1, width: "100%" }}>{c.client_name}</td>
+                            <td className="py-1.5 text-right w-10">
+                              <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold"
+                                style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                                {c.count}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {visited.length > PREVIEW && (
+                    <button onClick={() => setVisitsExpanded((v) => !v)}
+                      className="mt-2 text-xs font-semibold hover:underline w-full text-center"
+                      style={{ color: "var(--g3d-accent)" }}>
+                      {visitsExpanded ? "Show less" : `Show all ${visited.length} clients`}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </div>
       )}
+
+      {/* ── Learning phase ── */}
+      <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+            <BarChart3 className="h-3 w-3" /> Learning phase
+          </span>
+          {assignments.length > 0 && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }}>
+              {passedCount}/{assignments.length} passed{avgPct != null ? ` · avg ${avgPct}%` : ""}
+            </span>
+          )}
+        </div>
+        {assignmentsLoading ? (
+          <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>Loading…</p>
+        ) : assignments.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
+        ) : (
+          <>
+            {(scoresOpen ? assignments : assignments.slice(0, 3)).map((a, i) => {
+              const displayAssignments = scoresOpen ? assignments : assignments.slice(0, 3);
+              return (
+                <button key={a.id} onClick={() => onOpenAssignment(a)}
+                  className="w-full text-left flex items-center justify-between py-1.5 hover:opacity-80 transition-opacity"
+                  style={i < displayAssignments.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
+                  <span className="text-sm truncate flex-1 mr-2" style={{ color: "var(--g3d-soft)" }}>{a.name}</span>
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                    style={a.passed
+                      ? { background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }
+                      : { background: "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" }}>
+                    {a.score != null ? `${a.score}/${a.total} ` : ""}{a.passed ? "Pass" : "Fail"}
+                  </span>
+                </button>
+              );
+            })}
+            {assignments.length > 3 && (
+              <button onClick={() => setScoresOpen((v) => !v)}
+                className="mt-2 text-xs font-semibold hover:underline w-full text-center"
+                style={{ color: "var(--g3d-accent)" }}>
+                {scoresOpen ? "Show less" : `Show all ${assignments.length} assignments`}
+              </button>
+            )}
+          </>
+        )}
       </div>
+
+      {/* ── Projects ── */}
+      {cardsEnabled.projects && (
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+              <Layers className="h-3 w-3" /> Projects
+            </span>
+            <button onClick={onAssignProjects} data-testid={`assign-projects-${t.id}`}
+              className="text-xs font-semibold hover:underline inline-flex items-center gap-1" style={{ color: "var(--g3d-accent)" }}>
+              {myProjects.length > 0 ? "Manage" : <><Plus className="h-3 w-3" /> Assign</>}
+            </button>
+          </div>
+          {myProjects.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No projects assigned</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {myProjects.map((p) => (
+                <span key={p.project_name} className="g3d-pill text-sm">{p.project_name}</span>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Remarks. Backed by trainees.notes - general free-text notes, not
-          tied to any specific client/project/sprint. */}
-      <div className="g3d-well relative mb-3 p-2.5">
-        <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-          <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
-            <MessageSquare className="h-3 w-3 flex-shrink-0" />
-            Remarks
+      {/* ── Sprints ── */}
+      {cardsEnabled.sprints && (
+        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+              <Rocket className="h-3 w-3" /> Sprints
+              {mySprints.length > 0 && (
+                <span className="ml-1 text-[10px] font-semibold" style={{ color: "var(--g3d-bad-ink)" }}>
+                  · avg {avgBugsPercent(mySprints)}% bugs
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-2">
+              {mySprints.length > 0 && (
+                <button onClick={() => setSprintsOpen((v) => !v)} style={{ color: "var(--g3d-faint)" }}>
+                  <Info className="h-3 w-3" />
+                </button>
+              )}
+              <button onClick={onAssignSprints} data-testid={`assign-sprints-${t.id}`}
+                className="text-xs font-semibold hover:underline inline-flex items-center gap-1" style={{ color: "var(--g3d-accent)" }}>
+                {mySprints.length > 0 ? "Manage" : <><Plus className="h-3 w-3" /> Assign</>}
+              </button>
+            </div>
+          </div>
+          {mySprints.length === 0 ? (
+            <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No sprints assigned</p>
+          ) : sprintsOpen ? (
+            <div className="flex flex-wrap gap-1.5">
+              {mySprints.map((s) => (
+                <span key={s.sprint_name} className="g3d-pill text-sm"
+                  title={`${s.sprint_name} · ${s.sprint_type} · ${s.bugs_percent || 0}% bugs`}>
+                  {s.sprint_name}
+                  <span className="text-[10px] font-semibold uppercase ml-1"
+                    style={{ color: s.sprint_type === "major" ? "var(--g3d-batch-ink)" : "var(--g3d-faint)" }}>
+                    {s.sprint_type}
+                  </span>
+                  {s.bugs_percent > 0 && (
+                    <span className="text-[10px] font-semibold ml-1" style={{ color: "var(--g3d-bad-ink)" }}>
+                      {s.bugs_percent}%
+                    </span>
+                  )}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* ── CSAT ── */}
+      {cardsEnabled.csat && (
+        <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+          <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+            <Smile className="h-3 w-3" /> CSAT
+            {t.csat_score != null && (
+              <span className="ml-2 text-base font-semibold tabular-nums" style={{ color: "var(--g3d-accent)" }}>{t.csat_score}%</span>
+            )}
           </span>
-          <button
-            onClick={onEditRemarks}
-            data-testid={`edit-remarks-${t.id}`}
-            className="text-xs font-semibold hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
-            style={{ color: "var(--g3d-accent)" }}
-          >
-            {t.notes ? "Edit" : (<><Plus className="h-3 w-3" />Add</>)}
+          <button onClick={onEditCsat} data-testid={`edit-csat-${t.id}`}
+            className="text-xs font-semibold hover:underline inline-flex items-center gap-1" style={{ color: "var(--g3d-accent)" }}>
+            {t.csat_score != null ? "Edit" : <><Plus className="h-3 w-3" /> Add</>}
           </button>
         </div>
-        <p className="text-sm mt-1.5 whitespace-pre-wrap break-words" style={{ color: t.notes ? "var(--g3d-ink)" : "var(--g3d-faint)" }}>
+      )}
+
+      {/* ── Remarks footer ── */}
+      <div className="px-5 py-3 flex items-center gap-2">
+        <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "var(--g3d-faint)" }} />
+        <p className="text-sm flex-1 min-w-0 truncate" style={{ color: t.notes ? "var(--g3d-soft)" : "var(--g3d-faint)" }}>
           {t.notes || "No remarks yet"}
         </p>
+        <button onClick={onEditRemarks} data-testid={`edit-remarks-${t.id}`}
+          className="text-xs font-semibold hover:underline flex-shrink-0" style={{ color: "var(--g3d-accent)" }}>
+          {t.notes ? "Edit" : "+ Add"}
+        </button>
       </div>
+
     </div>
   );
 }
