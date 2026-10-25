@@ -433,31 +433,31 @@ function TraineeCard({
         )}
         {myClients.length === 0 ? (
           <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5 min-w-0">
-            {(() => {
-              const visitMap = {};
-              visitRows.forEach((v) => {
-                visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0;
-              });
-              return myClients.map((c) => {
-                const vc = visitMap[c.client_name.trim().toLowerCase()] || 0;
-                return (
-                  <span
-                    key={c.client_name}
-                    title={c.client_name}
-                    className="g3d-pill text-sm"
-                  >
-                    <span className="min-w-0 break-words">{c.client_name}</span>
-                    {vc > 0 && (
-                      <span className="tabular-nums flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>· {vc}</span>
-                    )}
-                  </span>
-                );
-              });
-            })()}
-          </div>
-        )}
+        ) : (() => {
+          const visitMap = {};
+          visitRows.forEach((v) => { visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0; });
+          return (
+            <table className="w-full mt-1.5 text-sm border-collapse">
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+                  <th className="text-left pb-1 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Client</th>
+                  <th className="text-right pb-1 font-semibold w-12" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Visits</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myClients.map((c, i) => {
+                  const vc = visitMap[c.client_name.trim().toLowerCase()] || 0;
+                  return (
+                    <tr key={c.client_name} style={i < myClients.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
+                      <td className="py-1 pr-2 truncate max-w-0" style={{ color: "var(--g3d-soft)", maxWidth: 1 }}>{c.client_name}</td>
+                      <td className="py-1 text-right tabular-nums font-medium w-12" style={{ color: vc > 0 ? "var(--g3d-ink)" : "var(--g3d-border)" }}>{vc > 0 ? vc : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          );
+        })()}
       </div>
       )}
 
@@ -584,22 +584,25 @@ function TraineeCard({
                 {visited.length > 0 ? "Manage" : (<><Plus className="h-3 w-3" />Log</>)}
               </button>
             </div>
-            {visited.length > 0 && (
-              <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
-                {visited.reduce((sum, c) => sum + c.count, 0)} total
-              </p>
-            )}
             {visited.length === 0 ? (
               <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
             ) : (
-              <div className="flex flex-wrap gap-1.5 min-w-0">
-                {visited.map((c) => (
-                  <span key={c.client_name} className="g3d-pill text-sm">
-                    <span className="min-w-0 break-words">{c.client_name}</span>
-                    <span className="tabular-nums flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>· {c.count}</span>
-                  </span>
-                ))}
-              </div>
+              <table className="w-full mt-1.5 text-sm border-collapse">
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+                    <th className="text-left pb-1 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Client</th>
+                    <th className="text-right pb-1 font-semibold w-12" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Visits</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visited.map((c, i) => (
+                    <tr key={c.client_name} style={i < visited.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
+                      <td className="py-1 pr-2 truncate max-w-0" style={{ color: "var(--g3d-soft)", maxWidth: 1 }}>{c.client_name}</td>
+                      <td className="py-1 text-right tabular-nums font-medium w-12" style={{ color: "var(--g3d-ink)" }}>{c.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         );
