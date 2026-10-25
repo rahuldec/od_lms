@@ -344,8 +344,7 @@ function TraineeCard({
       }}>
 
         {/* Clients */}
-        {cardsEnabled.clients && (
-          <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+        <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
             {/* Section header */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -401,11 +400,9 @@ function TraineeCard({
               </div>
             )}
           </div>
-        )}
 
         {/* Visits */}
-        {cardsEnabled.visits && (
-          <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+        <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
             {/* Section header */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -457,7 +454,6 @@ function TraineeCard({
               </>
             )}
           </div>
-        )}
 
         {/* Learning phase */}
         <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col">
