@@ -664,6 +664,7 @@ export default function AdminDashboard() {
   const [csatFor, setCsatFor] = useState(null);
   const [cardSettingsFor, setCardSettingsFor] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncingVisits, setSyncingVisits] = useState(false);
 
   const syncClientsFromSheet = useCallback(async () => {
     setSyncing(true);
@@ -690,6 +691,95 @@ export default function AdminDashboard() {
       toast.error(`Sync failed: ${e?.response?.data?.detail || e?.message || "unknown error"}`);
     } finally {
       setSyncing(false);
+    }
+  }, [trainees]);
+
+  const syncVisitsFromOdmom = useCallback(async () => {
+    setSyncingVisits(true);
+    try {
+      const ODMOM_URL = "https://imjrlgzjofzxerqfcnov.supabase.co";
+      const ODMOM_KEY = "sb_publishable_vV0-uDh-g09KJJ-hQVStJw_R7uhQ_yM";
+      const NAME_ALIASES = {
+        "akshat wahi": "akshat",
+        "vansh saini": "vansh",
+        "aadhar mittal": "aadhar",
+        "ashish kumar": "ashish",
+        "lalit garg": "lalit",
+        "tinku singh": "tinku",
+        "bhavey": "bhavey saluja",
+        "tanvi": "tanvi gupta",
+      };
+      const SPLIT_RE = /\s*(?:,|&|\band\b)\s*/gi;
+
+      const normalize = (raw) => {
+        const clean = raw.trim().toLowerCase();
+        return NAME_ALIASES[clean] ?? clean;
+      };
+      const splitEmployees = (raw) =>
+        raw.split(SPLIT_RE).map((p) => normalize(p.trim())).filter(Boolean);
+
+      // Fetch all moms rows
+      let rows = [];
+      let offset = 0;
+      while (true) {
+        const res = await fetch(
+          `${ODMOM_URL}/rest/v1/moms?select=employee_name,client_name`,
+          {
+            headers: {
+              apikey: ODMOM_KEY,
+              Authorization: `Bearer ${ODMOM_KEY}`,
+              "Range-Unit": "items",
+              Range: `${offset}-${offset + 999}`,
+            },
+          }
+        );
+        if (!res.ok) throw new Error(`odmom fetch failed: ${res.status}`);
+        const batch = await res.json();
+        rows = rows.concat(batch);
+        if (batch.length < 1000) break;
+        offset += 1000;
+      }
+
+      // Count visits per (traineeNorm, clientName)
+      const counts = {};
+      for (const row of rows) {
+        const empRaw = (row.employee_name || "").trim();
+        const client = (row.client_name || "").trim();
+        if (!empRaw || !client || empRaw.toLowerCase() === "test") continue;
+        for (const tn of splitEmployees(empRaw)) {
+          if (!counts[tn]) counts[tn] = {};
+          counts[tn][client] = (counts[tn][client] || 0) + 1;
+        }
+      }
+
+      // Build trainee lookup
+      const traineeByName = {};
+      (trainees || []).forEach((t) => {
+        if (t?.name) traineeByName[t.name.trim().toLowerCase()] = t;
+      });
+
+      // Push to backend
+      let pushed = 0;
+      await Promise.all(
+        Object.entries(counts).map(async ([tnNorm, clientMap]) => {
+          const trainee = traineeByName[tnNorm];
+          if (!trainee) return;
+          for (const [clientName, count] of Object.entries(clientMap)) {
+            await api.setClientVisit(trainee.id, clientName, count);
+            pushed++;
+          }
+        })
+      );
+
+      // Refresh visit data
+      const updated = await api.listClientVisits();
+      setClientVisits(Array.isArray(updated) ? updated : []);
+
+      toast.success(`Synced ${pushed} visit record${pushed !== 1 ? "s" : ""} from odmom`);
+    } catch (e) {
+      toast.error(`Visit sync failed: ${e?.message || "unknown error"}`);
+    } finally {
+      setSyncingVisits(false);
     }
   }, [trainees]);
 
@@ -977,6 +1067,17 @@ export default function AdminDashboard() {
             >
               <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
               {syncing ? "Syncing…" : "Sync from sheet"}
+            </button>
+            <span className="text-neutral-200">|</span>
+            <button
+              onClick={syncVisitsFromOdmom}
+              disabled={syncingVisits || loading}
+              className="inline-flex items-center gap-1.5 font-semibold disabled:opacity-50 hover:opacity-80 transition-opacity"
+              style={{ color: "#E05A2B" }}
+              title="Fetch visit counts from odmom portal and update this LMS"
+            >
+              <MapPin className={`h-3.5 w-3.5 ${syncingVisits ? "animate-spin" : ""}`} />
+              {syncingVisits ? "Syncing…" : "Sync visits"}
             </button>
             <span className="text-neutral-200">|</span>
             <Link to="/admin/clients" className="font-semibold" style={{ color: "#E05A2B" }}>
