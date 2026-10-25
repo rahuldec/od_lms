@@ -17,7 +17,7 @@ import RemarksDialog from "@/components/RemarksDialog";
 import CsatDialog from "@/components/CsatDialog";
 import CardSettingsDialog from "@/components/CardSettingsDialog";
 import { Card } from "@/components/ui/card";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const Stat = ({ icon: Icon, label, value, testId, accent }) => (
@@ -623,6 +623,7 @@ export default function AdminDashboard() {
   const [assignmentResults, setAssignmentResults] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedLevel, setExpandedLevel] = useState(null);
+  const [cardIndexByLevel, setCardIndexByLevel] = useState({});
   const [activeAssignment, setActiveAssignment] = useState(null);
   const [clients, setClients] = useState([]);
   const [clientAssignments, setClientAssignments] = useState([]);
@@ -1139,37 +1140,59 @@ export default function AdminDashboard() {
                   )}
                 </button>
 
-                {isExpanded && lvlTrainees.length > 0 && (
-                  <div className="border-t border-neutral-100 p-4">
-                    <div className="flex overflow-x-auto" style={{ scrollSnapType: "x mandatory", scrollBehavior: "smooth" }}>
-                      {lvlTrainees.map((t) => (
-                        <div key={t.id} style={{ minWidth: "100%", flex: "0 0 100%", scrollSnapAlign: "start" }}>
-                        <TraineeCard
-                          key={t.id}
-                          t={t}
-                          assignments={getAssignments(t.name)}
-                          assignmentsLoading={assignmentsLoading}
-                          batchNameById={batchNameById}
-                          myClients={clientsByTrainee[t.id] || []}
-                          sheetClients={sheetClientsByTraineeId[t.id] || []}
-                          sheetClientCount={sheetClientCountByTraineeId[t.id] || 0}
-                          myProjects={projectsByTrainee[t.id] || []}
-                          mySprints={sprintsByTrainee[t.id] || []}
-                          visitRows={visitsByTrainee[t.id] || []}
-                          onAssignClients={() => setAssignFor(t)}
-                          onAssignProjects={() => setProjectAssignFor(t)}
-                          onAssignSprints={() => setSprintAssignFor(t)}
-                          onLogVisits={() => setVisitDialogFor(t)}
-                          onEditRemarks={() => setRemarksFor(t)}
-                          onEditCsat={() => setCsatFor(t)}
-                          onEditCardSettings={() => setCardSettingsFor(t)}
-                          onOpenAssignment={setActiveAssignment}
-                        />
+                {isExpanded && lvlTrainees.length > 0 && (() => {
+                  const idx = cardIndexByLevel[level] || 0;
+                  const t = lvlTrainees[idx];
+                  const goTo = (n) => setCardIndexByLevel((prev) => ({ ...prev, [level]: n }));
+                  return (
+                    <div className="border-t border-neutral-100">
+                      {/* Prev / Next nav bar */}
+                      {lvlTrainees.length > 1 && (
+                        <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: "1px solid var(--g3d-border, #e5e7eb)" }}>
+                          <button
+                            onClick={() => goTo(idx - 1)}
+                            disabled={idx === 0}
+                            className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-30"
+                            style={{ color: "var(--g3d-accent, #EC6724)", background: "var(--g3d-accent-soft, #FDF0E8)" }}
+                          >
+                            <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                          </button>
+                          <span className="text-xs font-medium" style={{ color: "#86868B" }}>
+                            {idx + 1} / {lvlTrainees.length}
+                          </span>
+                          <button
+                            onClick={() => goTo(idx + 1)}
+                            disabled={idx === lvlTrainees.length - 1}
+                            className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-30"
+                            style={{ color: "var(--g3d-accent, #EC6724)", background: "var(--g3d-accent-soft, #FDF0E8)" }}
+                          >
+                            Next <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                      ))}
+                      )}
+                      <TraineeCard
+                        t={t}
+                        assignments={getAssignments(t.name)}
+                        assignmentsLoading={assignmentsLoading}
+                        batchNameById={batchNameById}
+                        myClients={clientsByTrainee[t.id] || []}
+                        sheetClients={sheetClientsByTraineeId[t.id] || []}
+                        sheetClientCount={sheetClientCountByTraineeId[t.id] || 0}
+                        myProjects={projectsByTrainee[t.id] || []}
+                        mySprints={sprintsByTrainee[t.id] || []}
+                        visitRows={visitsByTrainee[t.id] || []}
+                        onAssignClients={() => setAssignFor(t)}
+                        onAssignProjects={() => setProjectAssignFor(t)}
+                        onAssignSprints={() => setSprintAssignFor(t)}
+                        onLogVisits={() => setVisitDialogFor(t)}
+                        onEditRemarks={() => setRemarksFor(t)}
+                        onEditCsat={() => setCsatFor(t)}
+                        onEditCardSettings={() => setCardSettingsFor(t)}
+                        onOpenAssignment={setActiveAssignment}
+                      />
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {isExpanded && lvlTrainees.length === 0 && (
                   <div className="border-t border-neutral-100 px-5 py-4 text-sm text-neutral-400">
