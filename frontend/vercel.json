@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "yarn build",
+  "buildCommand": "npm run build",
   "outputDirectory": "build",
-  "installCommand": "yarn install",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": "create-react-app",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
