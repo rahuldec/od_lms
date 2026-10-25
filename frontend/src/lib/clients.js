@@ -197,6 +197,12 @@ export const CLIENT_FILTER_FIELDS = ["segment", "category", "tier", "owner"];
  * that trainee's name (case-insensitive). Trainees with no matching clients
  * and clients with no matching trainee are silently skipped.
  */
+// Sheet uses full names for some trainees whose LMS accounts use only first names.
+const SHEET_NAME_ALIASES = {
+  "akshat wahi": "akshat",
+  "vansh saini": "vansh",
+};
+
 export const buildSheetSync = (trainees, clients) => {
   const traineeByName = {};
   (trainees || []).forEach((t) => {
@@ -206,7 +212,8 @@ export const buildSheetSync = (trainees, clients) => {
   const byTrainee = {};
   (clients || []).forEach((c) => {
     if (!c?.traineeOwner) return;
-    const key = c.traineeOwner.trim().toLowerCase();
+    const raw = c.traineeOwner.trim().toLowerCase();
+    const key = SHEET_NAME_ALIASES[raw] ?? raw;
     const trainee = traineeByName[key];
     if (!trainee) return;
     if (!byTrainee[trainee.id]) byTrainee[trainee.id] = { traineeId: trainee.id, traineeName: trainee.name, clientNames: [] };
