@@ -1141,8 +1141,9 @@ export default function AdminDashboard() {
 
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 p-4">
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollSnapType: "x mandatory" }}>
                       {lvlTrainees.map((t) => (
+                        <div key={t.id} style={{ minWidth: 480, maxWidth: 560, flex: "0 0 auto", scrollSnapAlign: "start" }}>
                         <TraineeCard
                           key={t.id}
                           t={t}
@@ -1164,6 +1165,7 @@ export default function AdminDashboard() {
                           onEditCardSettings={() => setCardSettingsFor(t)}
                           onOpenAssignment={setActiveAssignment}
                         />
+                        </div>
                       ))}
                     </div>
                   </div>
