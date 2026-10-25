@@ -384,12 +384,6 @@ export default function TraineeDetail() {
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
                   >
                     {c.client_name}
-                    <span
-                      className="text-[9px] uppercase tracking-wide"
-                      style={{ color: c.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
-                    >
-                      {c.handling_mode === "assisted" ? "assisted" : "solo"}
-                    </span>
                   </span>
                 ))}
               </div>
@@ -421,12 +415,6 @@ export default function TraineeDetail() {
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-50 text-neutral-600 ring-1 ring-neutral-200"
                   >
                     {p.project_name}
-                    <span
-                      className="text-[9px] uppercase tracking-wide"
-                      style={{ color: p.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
-                    >
-                      {p.handling_mode === "assisted" ? "assisted" : "solo"}
-                    </span>
                   </span>
                 ))}
               </div>
@@ -477,12 +465,6 @@ export default function TraineeDetail() {
                       style={{ color: s.sprint_type === "major" ? "#2563eb" : "#a3a3a3" }}
                     >
                       {s.sprint_type}
-                    </span>
-                    <span
-                      className="text-[9px] uppercase tracking-wide"
-                      style={{ color: s.handling_mode === "assisted" ? "#E05A2B" : "#a3a3a3" }}
-                    >
-                      {s.handling_mode === "assisted" ? "assisted" : "solo"}
                     </span>
                     {s.bugs_percent > 0 && (
                       <span className="text-[9px] font-semibold tabular-nums" style={{ color: "#dc2626" }}>

@@ -13,11 +13,6 @@ const FILTERS = [
   { key: "owner", label: "All RMs" },
 ];
 
-const MODES = [
-  { key: "solo", label: "Solo" },
-  { key: "assisted", label: "Assisted" },
-];
-
 /**
  * Assign clients to one trainee.
  *
@@ -45,9 +40,6 @@ export default function ClientAssignDialog({
   onClose,
 }) {
   const [selected, setSelected] = useState(() => new Set(assigned.map((a) => a.client_name)));
-  const [modes, setModes] = useState(() =>
-    Object.fromEntries(assigned.map((a) => [a.client_name, a.handling_mode || "solo"]))
-  );
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState({ segment: "", category: "", owner: "" });
   const [onlySelected, setOnlySelected] = useState(false);
@@ -55,7 +47,6 @@ export default function ClientAssignDialog({
 
   useEffect(() => {
     setSelected(new Set(assigned.map((a) => a.client_name)));
-    setModes(Object.fromEntries(assigned.map((a) => [a.client_name, a.handling_mode || "solo"])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trainee?.id]);
 
@@ -80,31 +71,23 @@ export default function ClientAssignDialog({
   const toggle = (name) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) {
-        next.delete(name);
-      } else {
-        next.add(name);
-        setModes((m) => (m[name] ? m : { ...m, [name]: "solo" }));
-      }
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
       return next;
     });
 
-  const setMode = (name, mode) => setModes((m) => ({ ...m, [name]: mode }));
-
   const dirty = useMemo(() => {
-    const before = new Map(assigned.map((a) => [a.client_name, a.handling_mode || "solo"]));
+    const before = new Set(assigned.map((a) => a.client_name));
     if (before.size !== selected.size) return true;
-    for (const n of selected) {
-      if (!before.has(n) || before.get(n) !== (modes[n] || "solo")) return true;
-    }
+    for (const n of selected) if (!before.has(n)) return true;
     return false;
-  }, [assigned, selected, modes]);
+  }, [assigned, selected]);
 
   const save = async () => {
     setSaving(true);
     const assignments = Array.from(selected).map((client_name) => ({
       client_name,
-      handling_mode: modes[client_name] || "solo",
+      handling_mode: "assisted",
     }));
     try {
       await api.setTraineeClients(trainee.id, assignments);
@@ -212,51 +195,32 @@ export default function ClientAssignDialog({
                 const others = (ownersByClient[c.id] || []).filter(
                   (n) => n !== trainee?.name
                 );
-                const mode = modes[c.name] || "solo";
                 return (
                   <li key={c.id}>
-                    <div className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-50 rounded-lg transition-colors">
-                      <button
-                        onClick={() => toggle(c.name)}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    <button
+                      onClick={() => toggle(c.name)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-50 rounded-lg transition-colors text-left"
+                    >
+                      <span
+                        className="h-4 w-4 rounded border grid place-items-center flex-shrink-0"
+                        style={
+                          isOn
+                            ? { backgroundColor: ORANGE, borderColor: ORANGE }
+                            : { borderColor: "#d4d4d4" }
+                        }
                       >
-                        <span
-                          className="h-4 w-4 rounded border grid place-items-center flex-shrink-0"
-                          style={
-                            isOn
-                              ? { backgroundColor: ORANGE, borderColor: ORANGE }
-                              : { borderColor: "#d4d4d4" }
-                          }
-                        >
-                          {isOn && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                        {isOn && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="text-sm font-medium text-neutral-800 block truncate">
+                          {c.name}
                         </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="text-sm font-medium text-neutral-800 block truncate">
-                            {c.name}
-                          </span>
-                          <span className="text-xs text-neutral-400">
-                            {[c.segment, c.category, c.owner && `RM ${c.owner}`]
-                              .filter(Boolean)
-                              .join(" · ") || "—"}
-                          </span>
+                        <span className="text-xs text-neutral-400">
+                          {[c.segment, c.category, c.owner && `RM ${c.owner}`]
+                            .filter(Boolean)
+                            .join(" · ") || "—"}
                         </span>
-                      </button>
-                      {isOn && (
-                        <div className="flex-shrink-0 inline-flex rounded-full border border-neutral-200 p-0.5">
-                          {MODES.map((m) => (
-                            <button
-                              key={m.key}
-                              onClick={() => setMode(c.name, m.key)}
-                              className={`text-[11px] font-medium px-2 py-0.5 rounded-full transition-colors ${
-                                mode === m.key ? "text-white" : "text-neutral-500 hover:text-neutral-700"
-                              }`}
-                              style={mode === m.key ? { backgroundColor: ORANGE } : undefined}
-                            >
-                              {m.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      </span>
                       {others.length > 0 && (
                         <Badge
                           variant="secondary"
@@ -265,7 +229,7 @@ export default function ClientAssignDialog({
                           also {others.join(", ")}
                         </Badge>
                       )}
-                    </div>
+                    </button>
                   </li>
                 );
               })}

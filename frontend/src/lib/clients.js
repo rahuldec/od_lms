@@ -178,6 +178,36 @@ export const groupAssignmentsByClient = (assignments) => {
 
 export const CLIENT_FILTER_FIELDS = ["segment", "category", "tier", "owner"];
 
+/**
+ * Match clients to trainees by the Team/owner column and return a sync plan.
+ *
+ * trainees  – [{id, name}, ...] from api.listTrainees()
+ * clients   – [{name, owner, ...}, ...] from fetchClients()
+ *
+ * Returns [{traineeId, traineeName, clientNames: [...]}] — one entry per
+ * matched trainee, containing all client names whose `owner` field matches
+ * that trainee's name (case-insensitive). Trainees with no matching clients
+ * and clients with no matching trainee are silently skipped.
+ */
+export const buildSheetSync = (trainees, clients) => {
+  const traineeByName = {};
+  (trainees || []).forEach((t) => {
+    if (t?.name) traineeByName[t.name.trim().toLowerCase()] = t;
+  });
+
+  const byTrainee = {};
+  (clients || []).forEach((c) => {
+    if (!c?.owner) return;
+    const key = c.owner.trim().toLowerCase();
+    const trainee = traineeByName[key];
+    if (!trainee) return;
+    if (!byTrainee[trainee.id]) byTrainee[trainee.id] = { traineeId: trainee.id, traineeName: trainee.name, clientNames: [] };
+    byTrainee[trainee.id].clientNames.push(c.name);
+  });
+
+  return Object.values(byTrainee);
+};
+
 /** Distinct non-empty values per filterable field, for the filter dropdowns. */
 export const clientFacets = (clients) => {
   const facets = {};

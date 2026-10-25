@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
-import { fetchClients, groupAssignmentsByTrainee } from "@/lib/clients";
+import { fetchClients, groupAssignmentsByTrainee, buildSheetSync } from "@/lib/clients";
 import { groupProjectAssignmentsByTrainee } from "@/lib/projects";
 import { groupSprintAssignmentsByTrainee } from "@/lib/sprints";
 import { daysAtCurrentLevel } from "@/lib/levelHistory";
@@ -17,7 +17,7 @@ import RemarksDialog from "@/components/RemarksDialog";
 import CsatDialog from "@/components/CsatDialog";
 import CardSettingsDialog from "@/components/CardSettingsDialog";
 import { Card } from "@/components/ui/card";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 const Stat = ({ icon: Icon, label, value, testId, accent }) => (
@@ -167,7 +167,6 @@ function AssignmentModal({ assignment, onClose }) {
   );
 }
 
-const assistedCount = (list) => list.filter((x) => x.handling_mode === "assisted").length;
 
 // Overall bugs% for a trainee: the plain average of bugs_percent across
 // every sprint they've been assigned, rounded to the nearest whole percent.
@@ -424,9 +423,6 @@ function TraineeCard({
         {myClients.length > 0 && (
           <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
             {myClients.length} assigned
-            {assistedCount(myClients) > 0 && (
-              <span style={{ color: "var(--g3d-accent)" }}> · {assistedCount(myClients)} assisted</span>
-            )}
           </p>
         )}
         {myClients.length === 0 ? (
@@ -436,20 +432,10 @@ function TraineeCard({
             {myClients.map((c) => (
               <span
                 key={c.client_name}
-                title={`${c.client_name} · ${c.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                title={c.client_name}
                 className="g3d-pill text-sm"
-                style={
-                  c.handling_mode === "assisted"
-                    ? { "--fill": "var(--g3d-accent-soft)", "--ink2": "var(--g3d-accent-ink)" }
-                    : undefined
-                }
               >
                 <span className="min-w-0 break-words">{c.client_name}</span>
-                {c.handling_mode === "assisted" && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
-                    assisted
-                  </span>
-                )}
               </span>
             ))}
           </div>
@@ -476,9 +462,6 @@ function TraineeCard({
         {myProjects.length > 0 && (
           <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
             {myProjects.length} assigned
-            {assistedCount(myProjects) > 0 && (
-              <span style={{ color: "var(--g3d-accent)" }}> · {assistedCount(myProjects)} assisted</span>
-            )}
           </p>
         )}
         {myProjects.length === 0 ? (
@@ -488,20 +471,10 @@ function TraineeCard({
             {myProjects.map((p) => (
               <span
                 key={p.project_name}
-                title={`${p.project_name} · ${p.handling_mode === "assisted" ? "Assisted" : "Solo"}`}
+                title={p.project_name}
                 className="g3d-pill text-sm"
-                style={
-                  p.handling_mode === "assisted"
-                    ? { "--fill": "var(--g3d-accent-soft)", "--ink2": "var(--g3d-accent-ink)" }
-                    : undefined
-                }
               >
                 <span className="min-w-0 break-words">{p.project_name}</span>
-                {p.handling_mode === "assisted" && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
-                    assisted
-                  </span>
-                )}
               </span>
             ))}
           </div>
@@ -529,9 +502,6 @@ function TraineeCard({
           <div className="flex items-center gap-1 mb-1.5">
             <p className="text-[11px] tabular-nums" style={{ color: "var(--g3d-faint)" }}>
               {mySprints.length} assigned
-              {assistedCount(mySprints) > 0 && (
-                <span style={{ color: "var(--g3d-accent)" }}> · {assistedCount(mySprints)} assisted</span>
-              )}
               <span style={{ color: "var(--g3d-bad-ink)" }}> · avg {avgBugsPercent(mySprints)}% bugs</span>
             </p>
             <button
@@ -551,13 +521,8 @@ function TraineeCard({
             {mySprints.map((s) => (
               <span
                 key={s.sprint_name}
-                title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.handling_mode === "assisted" ? "Assisted" : "Solo"} · ${s.bugs_percent || 0}% bugs found`}
+                title={`${s.sprint_name} · ${s.sprint_type === "major" ? "Major" : "Minor"} · ${s.bugs_percent || 0}% bugs found`}
                 className="g3d-pill text-sm"
-                style={
-                  s.handling_mode === "assisted"
-                    ? { "--fill": "var(--g3d-accent-soft)", "--ink2": "var(--g3d-accent-ink)" }
-                    : undefined
-                }
               >
                 <span className="min-w-0 break-words">{s.sprint_name}</span>
                 <span
@@ -566,11 +531,6 @@ function TraineeCard({
                 >
                   {s.sprint_type}
                 </span>
-                {s.handling_mode === "assisted" && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wide flex-shrink-0">
-                    assisted
-                  </span>
-                )}
                 {s.bugs_percent > 0 && (
                   <span className="text-[10px] font-semibold tabular-nums flex-shrink-0" style={{ color: "var(--g3d-bad-ink)" }}>
                     {s.bugs_percent}% bugs
@@ -703,6 +663,35 @@ export default function AdminDashboard() {
   const [remarksFor, setRemarksFor] = useState(null);
   const [csatFor, setCsatFor] = useState(null);
   const [cardSettingsFor, setCardSettingsFor] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+
+  const syncClientsFromSheet = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const freshClients = await fetchClients({ force: true });
+      const syncs = buildSheetSync(trainees, freshClients);
+      if (syncs.length === 0) {
+        toast.info("No trainees matched sheet owners — check that Team names match trainee names.");
+        return;
+      }
+      await Promise.all(
+        syncs.map(({ traineeId, clientNames }) =>
+          api.setTraineeClients(
+            traineeId,
+            clientNames.map((c) => ({ client_name: c, handling_mode: "assisted" }))
+          )
+        )
+      );
+      const updated = await api.listClientAssignments();
+      setClientAssignments(Array.isArray(updated) ? updated : []);
+      const total = syncs.reduce((s, x) => s + x.clientNames.length, 0);
+      toast.success(`Synced ${total} client${total !== 1 ? "s" : ""} across ${syncs.length} trainee${syncs.length !== 1 ? "s" : ""}`);
+    } catch (e) {
+      toast.error(`Sync failed: ${e?.response?.data?.detail || e?.message || "unknown error"}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [trainees]);
 
   // Assignment scores load lazily - only fetched once the Level distribution
   // section is first expanded, since it's a live Google Sheet round trip.
@@ -978,6 +967,17 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center gap-3 text-sm text-neutral-400">
             <span>{levelTotal} trainees</span>
+            <span className="text-neutral-200">|</span>
+            <button
+              onClick={syncClientsFromSheet}
+              disabled={syncing || loading}
+              className="inline-flex items-center gap-1.5 font-semibold disabled:opacity-50 hover:opacity-80 transition-opacity"
+              style={{ color: "#E05A2B" }}
+              title="Auto-assign clients from the CS Team Plan sheet (matches Team column to trainee names)"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing…" : "Sync from sheet"}
+            </button>
             <span className="text-neutral-200">|</span>
             <Link to="/admin/clients" className="font-semibold" style={{ color: "#E05A2B" }}>
               Manage clients &rarr;
