@@ -361,20 +361,6 @@ function TraineeCard({
                 {sheetClientCount > 0 ? sheetClientCount : myClients.length}
               </span>
             </div>
-            {/* List */}
-            {myClients.length === 0 ? (
-              <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
-            ) : (
-              <div className="flex flex-col gap-0">
-                {myClients.map((c, i) => (
-                  <div key={c.client_name}
-                    className="py-2 text-sm font-medium truncate"
-                    style={{ color: "var(--g3d-ink)", borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
-                    {c.client_name}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
