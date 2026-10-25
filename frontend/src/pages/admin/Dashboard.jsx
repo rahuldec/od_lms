@@ -363,7 +363,7 @@ function TraineeCard({
                 ? `₹${(totalBilling / 100000).toFixed(1)}L`
                 : totalBilling > 0 ? `₹${Math.round(totalBilling / 1000)}K` : null;
               return (
-                <div className="flex items-end gap-4 mb-3">
+                <div className="flex items-end justify-between mb-3">
                   <div>
                     <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
                       {sheetClientCount > 0 ? sheetClientCount : myClients.length}
@@ -371,7 +371,7 @@ function TraineeCard({
                     <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>clients</div>
                   </div>
                   {billingLabel && (
-                    <div>
+                    <div className="text-right">
                       <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>
                         {billingLabel}
                       </div>
