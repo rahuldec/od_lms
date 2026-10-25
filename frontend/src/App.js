@@ -16,7 +16,7 @@ import TrainingModules from "@/pages/admin/TrainingModules";
 import Results from "@/pages/admin/Results";
 import Webinars from "@/pages/admin/Webinars";
 import AssignmentSchedule from "@/pages/admin/AssignmentSchedule";
-import Reports from "@/pages/admin/Reports";
+const Reports = React.lazy(() => import("@/pages/admin/Reports"));
 import Payroll from "@/pages/admin/Payroll";
 import TraineeHome from "@/pages/trainee/Home";
 import PublicWebinar from "@/pages/Webinar";
@@ -134,7 +134,9 @@ export default function App() {
             path="/admin/analytics"
             element={
               <Protected requireRole="admin">
-                <Reports />
+                <React.Suspense fallback={null}>
+                  <Reports />
+                </React.Suspense>
               </Protected>
             }
           />

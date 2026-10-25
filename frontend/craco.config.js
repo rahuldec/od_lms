@@ -38,13 +38,6 @@ let webpackConfig = {
     },
     configure: (webpackConfig) => {
 
-      // Prefer CJS over ESM for node_modules to prevent Radix UI TDZ errors
-      // in webpack 5 (circular live-binding references in their ESM bundles).
-      webpackConfig.resolve = {
-        ...webpackConfig.resolve,
-        mainFields: ['browser', 'main', 'module'],
-      };
-
       // Add ignored patterns to reduce watched directories
         webpackConfig.watchOptions = {
           ...webpackConfig.watchOptions,
