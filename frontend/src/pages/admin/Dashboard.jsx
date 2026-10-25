@@ -356,12 +356,31 @@ function TraineeCard({
                 {myClients.length > 0 ? "Manage" : "+ Assign"}
               </button>
             </div>
-            {/* Big stat — planned count from CS Team Plan sheet */}
-            <div className="flex items-baseline gap-1 mb-3">
-              <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
-                {sheetClientCount > 0 ? sheetClientCount : myClients.length}
-              </span>
-            </div>
+            {/* Big stats — count + total billing */}
+            {(() => {
+              const totalBilling = sheetClients.reduce((s, c) => s + (c.billing || 0), 0);
+              const billingLabel = totalBilling >= 100000
+                ? `₹${(totalBilling / 100000).toFixed(1)}L`
+                : totalBilling > 0 ? `₹${Math.round(totalBilling / 1000)}K` : null;
+              return (
+                <div className="flex items-end gap-4 mb-3">
+                  <div>
+                    <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
+                      {sheetClientCount > 0 ? sheetClientCount : myClients.length}
+                    </div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>clients</div>
+                  </div>
+                  {billingLabel && (
+                    <div>
+                      <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>
+                        {billingLabel}
+                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>total billing</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {/* Sheet client list with billing */}
             {sheetClients.length === 0 ? (
               <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No clients in sheet</p>
