@@ -334,162 +334,143 @@ function TraineeCard({
 
       </div>
 
-      {/* ── Clients + Visits two-column ── */}
-      {(cardsEnabled.clients || cardsEnabled.visits) && (
-        <div className="grid grid-cols-2 mx-3 mt-3 rounded-xl overflow-hidden" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
-          {cardsEnabled.clients && (
-            <div className="px-5 py-4 min-w-0" style={cardsEnabled.visits ? { borderRight: "1px solid var(--g3d-border)" } : {}}>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
-                  <Briefcase className="h-3 w-3" /> Clients
-                  {myClients.length > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                      {myClients.length}
-                    </span>
-                  )}
-                </span>
-                <button onClick={onAssignClients} data-testid={`assign-clients-${t.id}`}
-                  className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
-                  {myClients.length > 0 ? "Manage" : "+ Assign"}
-                </button>
-              </div>
-              {myClients.length === 0 ? (
-                <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
-              ) : (
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
-                      <th className="text-left pb-1.5 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Client</th>
-                      <th className="text-right pb-1.5 font-semibold w-10" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Visits</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {myClients.map((c, i) => {
-                      const vc = visitMap[c.client_name.trim().toLowerCase()] || 0;
-                      return (
-                        <tr key={c.client_name} style={i < myClients.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
-                          <td className="py-1.5 pr-2 truncate" style={{ color: "var(--g3d-soft)", maxWidth: 1, width: "100%" }}>{c.client_name}</td>
-                          <td className="py-1.5 text-right w-10">
-                            {vc > 0 ? (
-                              <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold tabular-nums"
-                                style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                                {vc}
-                              </span>
-                            ) : (
-                              <span style={{ color: "var(--g3d-border)" }}>—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
+      {/* ── Clients | Visits | Learning — 3-col ── */}
+      <div className="grid mx-3 mt-3 rounded-xl overflow-hidden" style={{
+        gridTemplateColumns: "1fr 1fr 1fr",
+        background: "#fff",
+        border: "1px solid var(--g3d-border)",
+      }}>
 
-          {cardsEnabled.visits && (
-            <div className="px-5 py-4 min-w-0">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
-                  <MapPin className="h-3 w-3" /> Visits
-                  {totalVisits > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                      {totalVisits}
-                    </span>
-                  )}
-                </span>
-                <button onClick={onLogVisits} data-testid={`log-visits-${t.id}`}
-                  className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
-                  {visited.length > 0 ? "Manage" : "+ Log"}
-                </button>
-              </div>
-              {visited.length === 0 ? (
-                <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
-              ) : (
-                <>
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
-                        <th className="text-left pb-1.5 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Client</th>
-                        <th className="text-right pb-1.5 font-semibold w-10" style={{ color: "var(--g3d-faint)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.07em" }}>Visits</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(visitsExpanded ? visited : visited.slice(0, PREVIEW)).map((c, i) => {
-                        const displayRows = visitsExpanded ? visited : visited.slice(0, PREVIEW);
-                        return (
-                          <tr key={c.client_name} style={i < displayRows.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
-                            <td className="py-1.5 pr-2 truncate" style={{ color: "var(--g3d-soft)", maxWidth: 1, width: "100%" }}>{c.client_name}</td>
-                            <td className="py-1.5 text-right w-10">
-                              <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold"
-                                style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                                {c.count}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {visited.length > PREVIEW && (
-                    <button onClick={() => setVisitsExpanded((v) => !v)}
-                      className="mt-2 text-xs font-semibold hover:underline w-full text-center"
-                      style={{ color: "var(--g3d-accent)" }}>
-                      {visitsExpanded ? "Show less" : `Show all ${visited.length} clients`}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Learning phase ── */}
-      <div className="px-4 py-4 mx-3 mt-3 rounded-xl" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
-            <BarChart3 className="h-3 w-3" /> Learning phase
-          </span>
-          {assignments.length > 0 && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }}>
-              {passedCount}/{assignments.length} passed{avgPct != null ? ` · avg ${avgPct}%` : ""}
-            </span>
-          )}
-        </div>
-        {assignmentsLoading ? (
-          <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>Loading…</p>
-        ) : assignments.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
-        ) : (
-          <>
-            {(scoresOpen ? assignments : assignments.slice(0, 3)).map((a, i) => {
-              const displayAssignments = scoresOpen ? assignments : assignments.slice(0, 3);
-              return (
-                <button key={a.id} onClick={() => onOpenAssignment(a)}
-                  className="w-full text-left flex items-center justify-between py-1.5 hover:opacity-80 transition-opacity"
-                  style={i < displayAssignments.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
-                  <span className="text-sm truncate flex-1 mr-2" style={{ color: "var(--g3d-soft)" }}>{a.name}</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
-                    style={a.passed
-                      ? { background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }
-                      : { background: "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" }}>
-                    {a.score != null ? `${a.score}/${a.total} ` : ""}{a.passed ? "Pass" : "Fail"}
+        {/* Clients */}
+        {cardsEnabled.clients && (
+          <div className="px-4 py-4 min-w-0" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+                <Briefcase className="h-3 w-3" /> Clients
+                {myClients.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                    {myClients.length}
                   </span>
-                </button>
-              );
-            })}
-            {assignments.length > 3 && (
-              <button onClick={() => setScoresOpen((v) => !v)}
-                className="mt-2 text-xs font-semibold hover:underline w-full text-center"
-                style={{ color: "var(--g3d-accent)" }}>
-                {scoresOpen ? "Show less" : `Show all ${assignments.length} assignments`}
+                )}
+              </span>
+              <button onClick={onAssignClients} data-testid={`assign-clients-${t.id}`}
+                className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
+                {myClients.length > 0 ? "Manage" : "+ Assign"}
               </button>
+            </div>
+            {myClients.length === 0 ? (
+              <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
+            ) : (
+              <div className="flex flex-col gap-0">
+                {myClients.map((c, i) => (
+                  <div key={c.client_name}
+                    className="py-2 text-sm font-medium truncate"
+                    style={{
+                      color: "var(--g3d-ink)",
+                      borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none",
+                    }}>
+                    {c.client_name}
+                  </div>
+                ))}
+              </div>
             )}
-          </>
+          </div>
         )}
+
+        {/* Visits */}
+        {cardsEnabled.visits && (
+          <div className="px-4 py-4 min-w-0" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+                <MapPin className="h-3 w-3" /> Visits
+                {totalVisits > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                    {totalVisits}
+                  </span>
+                )}
+              </span>
+              <button onClick={onLogVisits} data-testid={`log-visits-${t.id}`}
+                className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
+                {visited.length > 0 ? "Manage" : "+ Log"}
+              </button>
+            </div>
+            {visited.length === 0 ? (
+              <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
+            ) : (
+              <>
+                <div className="flex flex-col gap-0">
+                  {(visitsExpanded ? visited : visited.slice(0, PREVIEW)).map((c, i) => {
+                    const displayRows = visitsExpanded ? visited : visited.slice(0, PREVIEW);
+                    return (
+                      <div key={c.client_name}
+                        className="py-2 flex items-center justify-between gap-2"
+                        style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
+                        <span className="text-sm font-medium truncate flex-1" style={{ color: "var(--g3d-ink)" }}>{c.client_name}</span>
+                        <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold flex-shrink-0"
+                          style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                          {c.count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {visited.length > PREVIEW && (
+                  <button onClick={() => setVisitsExpanded((v) => !v)}
+                    className="mt-2 text-xs font-semibold hover:underline w-full text-center"
+                    style={{ color: "var(--g3d-accent)" }}>
+                    {visitsExpanded ? "Show less" : `+${visited.length - PREVIEW} more`}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Learning phase */}
+        <div className="px-4 py-4 min-w-0">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
+              <BarChart3 className="h-3 w-3" /> Learning
+            </span>
+            {assignments.length > 0 && (
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }}>
+                {passedCount}/{assignments.length} · {avgPct != null ? `${avgPct}%` : "—"}
+              </span>
+            )}
+          </div>
+          {assignmentsLoading ? (
+            <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>Loading…</p>
+          ) : assignments.length === 0 ? (
+            <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
+          ) : (
+            <>
+              {(scoresOpen ? assignments : assignments.slice(0, PREVIEW)).map((a, i) => {
+                const displayAssignments = scoresOpen ? assignments : assignments.slice(0, PREVIEW);
+                return (
+                  <button key={a.id} onClick={() => onOpenAssignment(a)}
+                    className="w-full text-left flex items-center justify-between py-2 hover:opacity-80 transition-opacity"
+                    style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
+                    <span className="text-sm font-medium truncate flex-1 mr-2" style={{ color: "var(--g3d-ink)" }}>{a.name}</span>
+                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
+                      style={a.passed
+                        ? { background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }
+                        : { background: "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" }}>
+                      {a.passed ? "Pass" : "Fail"}
+                    </span>
+                  </button>
+                );
+              })}
+              {assignments.length > PREVIEW && (
+                <button onClick={() => setScoresOpen((v) => !v)}
+                  className="mt-2 text-xs font-semibold hover:underline w-full text-center"
+                  style={{ color: "var(--g3d-accent)" }}>
+                  {scoresOpen ? "Show less" : `+${assignments.length - PREVIEW} more`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* ── Projects ── */}
