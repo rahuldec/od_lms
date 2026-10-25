@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { pdf } from "@react-pdf/renderer";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchClients, groupAssignmentsByTrainee, buildSheetSync } from "@/lib/clients";
@@ -16,8 +17,9 @@ import VisitLogDialog from "@/components/VisitLogDialog";
 import RemarksDialog from "@/components/RemarksDialog";
 import CsatDialog from "@/components/CsatDialog";
 import CardSettingsDialog from "@/components/CardSettingsDialog";
+import TraineeSynopsisPDF from "@/components/TraineeSynopsisPDF";
 import { Card } from "@/components/ui/card";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw, FileDown, CheckSquare } from "lucide-react";
 import { toast } from "sonner";
 
 const Stat = ({ icon: Icon, label, value, testId, accent }) => (
@@ -189,6 +191,8 @@ function TraineeCard({
   myProjects,
   mySprints,
   visitRows,
+  selected,
+  onToggleSelect,
   onAssignClients,
   onAssignProjects,
   onAssignSprints,
@@ -237,11 +241,42 @@ function TraineeCard({
   const avgPct = totalSum > 0 ? Math.round((scoreSum / totalSum) * 100) : null;
 
   return (
-    <div className="g3d-scope g3d-card relative p-4 overflow-hidden">
-      <div className="relative flex items-start justify-between mb-2.5">
+    <div
+      className="g3d-scope g3d-card relative p-4 overflow-hidden"
+      style={selected ? { outline: "2px solid var(--g3d-accent)", outlineOffset: 1 } : {}}
+    >
+      {/* select checkbox — top-left corner */}
+      <button
+        onClick={onToggleSelect}
+        title={selected ? "Deselect" : "Select for synopsis"}
+        className="absolute top-2 left-2 z-10 h-5 w-5 rounded-md border flex items-center justify-center transition-colors"
+        style={{
+          background: selected ? "var(--g3d-accent)" : "var(--g3d-panel)",
+          borderColor: selected ? "var(--g3d-accent)" : "var(--g3d-border)",
+        }}
+      >
+        {selected && (
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </button>
+
+      <div className="relative flex items-start justify-between mb-2.5 pl-7">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="g3d-avatar h-9 w-9 grid place-items-center text-white text-sm font-bold flex-shrink-0">
-            {t.name?.charAt(0).toUpperCase()}
+          {/* avatar — photo if available, else initials */}
+          <div className="relative h-9 w-9 flex-shrink-0">
+            {t.photo_url ? (
+              <img
+                src={t.photo_url}
+                alt={t.name}
+                className="h-9 w-9 rounded-xl object-cover"
+              />
+            ) : (
+              <div className="g3d-avatar h-9 w-9 grid place-items-center text-white text-sm font-bold rounded-xl">
+                {t.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
           </div>
           <div className="min-w-0">
             <Link
@@ -708,6 +743,8 @@ export default function AdminDashboard() {
   const [cardSettingsFor, setCardSettingsFor] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncingVisits, setSyncingVisits] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [generatingSynopsis, setGeneratingSynopsis] = useState(false);
 
   const syncClientsFromSheet = useCallback(async () => {
     setSyncing(true);
@@ -825,6 +862,48 @@ export default function AdminDashboard() {
       setSyncingVisits(false);
     }
   }, [trainees]);
+
+  const downloadSynopsis = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setGeneratingSynopsis(true);
+    try {
+      const selected = trainees.filter((t) => selectedIds.has(t.id));
+      const historyByTrainee = {};
+      selected.forEach((t) => {
+        historyByTrainee[t.id] = Array.isArray(t.history) ? t.history : [];
+      });
+      const assignmentsByTrainee = {};
+      selected.forEach((t) => {
+        assignmentsByTrainee[t.id] = assignmentResults[t.name?.trim().toLowerCase()] || [];
+      });
+      const doc = (
+        <TraineeSynopsisPDF
+          trainees={selected}
+          clientsByTrainee={clientsByTrainee}
+          visitsByTrainee={visitsByTrainee}
+          projectsByTrainee={projectsByTrainee}
+          assignmentsByTrainee={assignmentsByTrainee}
+          batchNameById={batchNameById}
+          historyByTrainee={historyByTrainee}
+        />
+      );
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const names = selected.map((t) => t.name).join(", ");
+      a.href = url;
+      a.download = selected.length === 1
+        ? `synopsis-${selected[0].name.toLowerCase().replace(/\s+/g, "-")}.pdf`
+        : `synopsis-${selected.length}-trainees.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Synopsis downloaded for ${selected.length} trainee${selected.length > 1 ? "s" : ""}`);
+    } catch (e) {
+      toast.error(`PDF generation failed: ${e?.message || "unknown error"}`);
+    } finally {
+      setGeneratingSynopsis(false);
+    }
+  }, [selectedIds, trainees, clientsByTrainee, visitsByTrainee, projectsByTrainee, batchNameById, assignmentResults]);
 
   // Assignment scores load lazily - only fetched once the Level distribution
   // section is first expanded, since it's a live Google Sheet round trip.
@@ -1197,6 +1276,14 @@ export default function AdminDashboard() {
                           myProjects={projectsByTrainee[t.id] || []}
                           mySprints={sprintsByTrainee[t.id] || []}
                           visitRows={visitsByTrainee[t.id] || []}
+                          selected={selectedIds.has(t.id)}
+                          onToggleSelect={() =>
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              next.has(t.id) ? next.delete(t.id) : next.add(t.id);
+                              return next;
+                            })
+                          }
                           onAssignClients={() => setAssignFor(t)}
                           onAssignProjects={() => setProjectAssignFor(t)}
                           onAssignSprints={() => setSprintAssignFor(t)}
@@ -1221,6 +1308,34 @@ export default function AdminDashboard() {
           })}
         </div>
       </Card>
+
+      {/* ── Floating synopsis bar ── */}
+      {selectedIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl"
+          style={{ background: "#1D1D1F", color: "#fff", minWidth: 340 }}
+        >
+          <CheckSquare className="h-4 w-4 flex-shrink-0" style={{ color: "#EC6724" }} />
+          <span className="text-sm font-medium flex-1">
+            {selectedIds.size} trainee{selectedIds.size > 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-xs font-medium opacity-60 hover:opacity-100 transition-opacity mr-1"
+          >
+            Clear
+          </button>
+          <button
+            onClick={downloadSynopsis}
+            disabled={generatingSynopsis}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-1.5 rounded-xl disabled:opacity-60 transition-opacity"
+            style={{ background: "#EC6724", color: "#fff" }}
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            {generatingSynopsis ? "Generating…" : "Download Synopsis"}
+          </button>
+        </div>
+      )}
 
       <AssignmentModal assignment={activeAssignment} onClose={() => setActiveAssignment(null)} />
 

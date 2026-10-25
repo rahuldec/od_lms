@@ -444,6 +444,7 @@ class TraineeUpdate(BaseModel):
     # "Exited". Used to cap payroll calculation at their last paid day
     # instead of treating them as still accruing indefinitely.
     exit_date: Optional[str] = None
+    photo_url: Optional[str] = None
 
 
 class LevelChangeIn(BaseModel):
