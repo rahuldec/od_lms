@@ -60,7 +60,9 @@ export default function LevelTimeline({ trainee, variant = "default" }) {
   const promotedOnPerLevel = {}; // first date each level was reached (handles re-promote cycles)
   periods.forEach((p) => {
     daysPerLevel[p.level] = (daysPerLevel[p.level] || 0) + p.days;
-    if (!promotedOnPerLevel[p.level] || p.start < promotedOnPerLevel[p.level]) {
+    // Skip 0-day periods (same-day promote→demote misclicks) when recording
+    // when a level was first meaningfully reached.
+    if (p.days > 0 && (!promotedOnPerLevel[p.level] || p.start < promotedOnPerLevel[p.level])) {
       promotedOnPerLevel[p.level] = p.start;
     }
   });
