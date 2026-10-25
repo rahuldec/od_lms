@@ -252,10 +252,10 @@ function TraineeCard({
     <div className="g3d-scope g3d-card overflow-hidden" style={{ background: "#F5F5F7" }}>
 
       {/* ── Header ── */}
-      <div className="flex items-start gap-3 px-5 pt-5 pb-4" style={{ background: "#fff", borderBottom: "1px solid var(--g3d-border)" }}>
+      <div className="flex items-start gap-3 px-4 pt-3 pb-3" style={{ background: "#fff", borderBottom: "1px solid var(--g3d-border)" }}>
         <div
           className="g3d-avatar flex-shrink-0 grid place-items-center text-white font-semibold"
-          style={{ width: 48, height: 48, borderRadius: 13, fontSize: 18 }}
+          style={{ width: 38, height: 38, borderRadius: 10, fontSize: 15 }}
         >
           {t.name?.charAt(0).toUpperCase()}
         </div>
@@ -331,20 +331,20 @@ function TraineeCard({
       </div>
 
       {/* ── Level timeline ── */}
-      <div className="px-5 py-3" style={{ background: "#fff", borderBottom: "1px solid var(--g3d-border)" }}>
+      <div className="px-4 py-2" style={{ background: "#fff", borderBottom: "1px solid var(--g3d-border)" }}>
         <LevelTimeline trainee={t} variant="glass3d" />
 
       </div>
 
       {/* ── Clients | Visits | Learning — 3-col ── */}
-      <div className="grid mx-3 mt-3 rounded-xl overflow-hidden" style={{
+      <div className="grid mx-2 mt-2 rounded-xl overflow-hidden" style={{
         gridTemplateColumns: "1fr 1fr 1fr",
         background: "#fff",
         border: "1px solid var(--g3d-border)",
       }}>
 
         {/* Clients */}
-        <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+        <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
             {/* Section header */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -364,14 +364,14 @@ function TraineeCard({
               return (
                 <div className="flex items-end justify-between mb-3">
                   <div>
-                    <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
+                    <div className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
                       {sheetClientCount > 0 ? sheetClientCount : myClients.length}
                     </div>
                     <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>clients</div>
                   </div>
                   {billingLabel && (
                     <div className="text-right">
-                      <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>
+                      <div className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>
                         {billingLabel}
                       </div>
                       <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>total billing</div>
@@ -402,7 +402,7 @@ function TraineeCard({
           </div>
 
         {/* Visits */}
-        <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+        <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
             {/* Section header */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -416,12 +416,12 @@ function TraineeCard({
             {/* Big stat */}
             <div className="flex items-end justify-between mb-3">
               <div>
-                <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>{totalVisits}</div>
+                <div className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>{totalVisits}</div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>visits</div>
               </div>
               {visited.length > 0 && (
                 <div className="text-right">
-                  <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{visited.length}</div>
+                  <div className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{visited.length}</div>
                   <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>clients</div>
                 </div>
               )}
@@ -456,7 +456,7 @@ function TraineeCard({
           </div>
 
         {/* Learning phase */}
-        <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col">
+        <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col">
           {/* Section header */}
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -467,14 +467,14 @@ function TraineeCard({
           {assignments.length > 0 && (
             <div className="flex items-end justify-between mb-3">
               <div>
-                <div className="text-3xl font-bold tabular-nums leading-none"
+                <div className="text-2xl font-bold tabular-nums leading-none"
                   style={{ color: avgPct != null && avgPct >= 60 ? "var(--g3d-good-ink)" : avgPct != null ? "var(--g3d-bad-ink)" : "var(--g3d-ink)" }}>
                   {avgPct != null ? `${avgPct}%` : `${passedCount}/${assignments.length}`}
                 </div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>avg score</div>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{passedCount}/{assignments.length}</div>
+                <div className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{passedCount}/{assignments.length}</div>
                 <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>passed</div>
               </div>
             </div>
@@ -1146,30 +1146,23 @@ export default function AdminDashboard() {
                   const goTo = (n) => setCardIndexByLevel((prev) => ({ ...prev, [level]: n }));
                   return (
                     <div className="border-t border-neutral-100">
-                      {/* Prev / Next nav bar */}
-                      {lvlTrainees.length > 1 && (
-                        <div className="flex items-center justify-between px-4 py-2" style={{ borderBottom: "1px solid var(--g3d-border, #e5e7eb)" }}>
-                          <button
-                            onClick={() => goTo(idx - 1)}
-                            disabled={idx === 0}
-                            className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-30"
-                            style={{ color: "var(--g3d-accent, #EC6724)", background: "var(--g3d-accent-soft, #FDF0E8)" }}
-                          >
-                            <ChevronLeft className="h-3.5 w-3.5" /> Prev
-                          </button>
-                          <span className="text-xs font-medium" style={{ color: "#86868B" }}>
-                            {idx + 1} / {lvlTrainees.length}
-                          </span>
-                          <button
-                            onClick={() => goTo(idx + 1)}
-                            disabled={idx === lvlTrainees.length - 1}
-                            className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity disabled:opacity-30"
-                            style={{ color: "var(--g3d-accent, #EC6724)", background: "var(--g3d-accent-soft, #FDF0E8)" }}
-                          >
-                            Next <ChevronRight className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2 px-3 py-3">
+                        {/* Prev arrow */}
+                        <button
+                          onClick={() => goTo(idx - 1)}
+                          disabled={!lvlTrainees.length || idx === 0}
+                          className="flex-shrink-0 h-8 w-8 rounded-full grid place-items-center transition-opacity disabled:opacity-20"
+                          style={{ background: "var(--g3d-accent-soft, #FDF0E8)", color: "var(--g3d-accent, #EC6724)" }}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        {/* Card + counter */}
+                        <div className="flex-1 min-w-0">
+                          {lvlTrainees.length > 1 && (
+                            <div className="text-center mb-2">
+                              <span className="text-[11px] font-medium" style={{ color: "#86868B" }}>{idx + 1} / {lvlTrainees.length}</span>
+                            </div>
+                          )}
                       <TraineeCard
                         t={t}
                         assignments={getAssignments(t.name)}
@@ -1190,6 +1183,17 @@ export default function AdminDashboard() {
                         onEditCardSettings={() => setCardSettingsFor(t)}
                         onOpenAssignment={setActiveAssignment}
                       />
+                        </div>
+                        {/* Next arrow */}
+                        <button
+                          onClick={() => goTo(idx + 1)}
+                          disabled={!lvlTrainees.length || idx === lvlTrainees.length - 1}
+                          className="flex-shrink-0 h-8 w-8 rounded-full grid place-items-center transition-opacity disabled:opacity-20"
+                          style={{ background: "var(--g3d-accent-soft, #FDF0E8)", color: "var(--g3d-accent, #EC6724)" }}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })()}
