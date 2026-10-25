@@ -200,6 +200,7 @@ function TraineeCard({
 }) {
   const [scoresOpen, setScoresOpen] = useState(false);
   const [sprintsOpen, setSprintsOpen] = useState(false);
+  const [visitsExpanded, setVisitsExpanded] = useState(false);
 
   const history = Array.isArray(t.history) ? t.history : [];
   const promotions = history.filter((h) => h.type === "promotion");
@@ -567,13 +568,23 @@ function TraineeCard({
       {cardsEnabled.visits && (() => {
         const visited = visitRows
           .filter((v) => v.visit_count > 0)
-          .map((v) => ({ client_name: v.client_name, count: v.visit_count }));
+          .map((v) => ({ client_name: v.client_name, count: v.visit_count }))
+          .sort((a, b) => b.count - a.count);
+        const totalVisits = visited.reduce((s, v) => s + v.count, 0);
+        const PREVIEW = 5;
+        const showingAll = visitsExpanded;
+        const rows = showingAll ? visited : visited.slice(0, PREVIEW);
         return (
           <div className="g3d-well relative min-w-0 p-2.5">
             <div className="flex items-center justify-between gap-2 mb-0.5 flex-wrap">
-              <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
+              <span className="text-xs uppercase tracking-wider inline-flex items-center gap-1.5 font-bold flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>
                 <MapPin className="h-3 w-3 flex-shrink-0" />
                 Visits
+                {totalVisits > 0 && (
+                  <span className="text-xs font-bold tabular-nums px-1.5 py-0.5 rounded-full" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                    {totalVisits}
+                  </span>
+                )}
               </span>
               <button
                 onClick={onLogVisits}
@@ -587,22 +598,33 @@ function TraineeCard({
             {visited.length === 0 ? (
               <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
             ) : (
-              <table className="w-full mt-1.5 text-sm border-collapse">
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
-                    <th className="text-left pb-1 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Client</th>
-                    <th className="text-right pb-1 font-semibold w-12" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Visits</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visited.map((c, i) => (
-                    <tr key={c.client_name} style={i < visited.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
-                      <td className="py-1 pr-2 truncate max-w-0" style={{ color: "var(--g3d-soft)", maxWidth: 1 }}>{c.client_name}</td>
-                      <td className="py-1 text-right tabular-nums font-medium w-12" style={{ color: "var(--g3d-ink)" }}>{c.count}</td>
+              <>
+                <table className="w-full mt-1.5 text-sm border-collapse">
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+                      <th className="text-left pb-1 font-semibold" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Client</th>
+                      <th className="text-right pb-1 font-semibold w-12" style={{ color: "var(--g3d-faint)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Visits</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {rows.map((c, i) => (
+                      <tr key={c.client_name} style={i < rows.length - 1 ? { borderBottom: "1px solid var(--g3d-border)" } : {}}>
+                        <td className="py-1 pr-2 truncate max-w-0" style={{ color: "var(--g3d-soft)", maxWidth: 1 }}>{c.client_name}</td>
+                        <td className="py-1 text-right tabular-nums font-medium w-12" style={{ color: "var(--g3d-ink)" }}>{c.count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {visited.length > PREVIEW && (
+                  <button
+                    onClick={() => setVisitsExpanded((v) => !v)}
+                    className="mt-2 text-xs font-semibold hover:underline w-full text-center"
+                    style={{ color: "var(--g3d-accent)" }}
+                  >
+                    {showingAll ? "Show less" : `Show all ${visited.length} clients`}
+                  </button>
+                )}
+              </>
             )}
           </div>
         );
