@@ -423,21 +423,39 @@ function TraineeCard({
         {myClients.length > 0 && (
           <p className="text-[11px] mb-1.5 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
             {myClients.length} assigned
+            {visitRows.reduce((s, v) => s + (v.visit_count || 0), 0) > 0 && (
+              <span>
+                {" · "}
+                {visitRows.reduce((s, v) => s + (v.visit_count || 0), 0)} visits
+              </span>
+            )}
           </p>
         )}
         {myClients.length === 0 ? (
           <p className="text-sm mt-1.5" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
         ) : (
           <div className="flex flex-wrap gap-1.5 min-w-0">
-            {myClients.map((c) => (
-              <span
-                key={c.client_name}
-                title={c.client_name}
-                className="g3d-pill text-sm"
-              >
-                <span className="min-w-0 break-words">{c.client_name}</span>
-              </span>
-            ))}
+            {(() => {
+              const visitMap = {};
+              visitRows.forEach((v) => {
+                visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0;
+              });
+              return myClients.map((c) => {
+                const vc = visitMap[c.client_name.trim().toLowerCase()] || 0;
+                return (
+                  <span
+                    key={c.client_name}
+                    title={c.client_name}
+                    className="g3d-pill text-sm"
+                  >
+                    <span className="min-w-0 break-words">{c.client_name}</span>
+                    {vc > 0 && (
+                      <span className="tabular-nums flex-shrink-0" style={{ color: "var(--g3d-faint)" }}>· {vc}</span>
+                    )}
+                  </span>
+                );
+              });
+            })()}
           </div>
         )}
       </div>
