@@ -865,34 +865,21 @@ export default function AdminDashboard() {
     if (selectedIds.size === 0) return;
     setGeneratingSynopsis(true);
     try {
-      const [{ pdf }, { default: TraineeSynopsisPDF }] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("@/components/TraineeSynopsisPDF"),
-      ]);
+      const { generateSynopsisPDF } = await import("@/components/TraineeSynopsisPDF");
       const selected = trainees.filter((t) => selectedIds.has(t.id));
-      const historyByTrainee = {};
-      selected.forEach((t) => {
-        historyByTrainee[t.id] = Array.isArray(t.history) ? t.history : [];
-      });
       const assignmentsByTrainee = {};
       selected.forEach((t) => {
         assignmentsByTrainee[t.id] = assignmentResults[t.name?.trim().toLowerCase()] || [];
       });
-      const doc = (
-        <TraineeSynopsisPDF
-          trainees={selected}
-          clientsByTrainee={clientsByTrainee}
-          visitsByTrainee={visitsByTrainee}
-          projectsByTrainee={projectsByTrainee}
-          assignmentsByTrainee={assignmentsByTrainee}
-          batchNameById={batchNameById}
-          historyByTrainee={historyByTrainee}
-        />
-      );
-      const blob = await pdf(doc).toBlob();
+      const blob = await generateSynopsisPDF(selected, {
+        clientsByTrainee,
+        visitsByTrainee,
+        projectsByTrainee,
+        assignmentsByTrainee,
+        batchNameById,
+      });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const names = selected.map((t) => t.name).join(", ");
       a.href = url;
       a.download = selected.length === 1
         ? `synopsis-${selected[0].name.toLowerCase().replace(/\s+/g, "-")}.pdf`
