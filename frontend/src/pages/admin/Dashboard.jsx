@@ -870,12 +870,13 @@ export default function AdminDashboard() {
       if (!byName[key]) byName[key] = [];
       byName[key].push(c);
     });
-    const ALIASES = { "akshat wahi": "akshat", "vansh saini": "vansh" };
+    // Maps trainee LMS name → sheet RM column value (full name used in sheet)
+    const ALIASES = { "akshat": "akshat wahi", "vansh": "vansh saini" };
     const result = {};
     (trainees || []).forEach((t) => {
       const raw = t.name.trim().toLowerCase();
-      const resolved = ALIASES[raw] ?? raw;
-      result[t.id] = byName[resolved] || byName[raw] || [];
+      const sheetKey = ALIASES[raw] ?? raw;
+      result[t.id] = byName[sheetKey] || byName[raw] || [];
     });
     return result;
   }, [clients, trainees]);
