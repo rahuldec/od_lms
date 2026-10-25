@@ -355,16 +355,11 @@ function TraineeCard({
                 {myClients.length > 0 ? "Manage" : "+ Assign"}
               </button>
             </div>
-            {/* Big stat */}
+            {/* Big stat — planned count from CS Team Plan sheet */}
             <div className="flex items-baseline gap-1 mb-3">
               <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
-                {myClients.length}
+                {sheetClientCount > 0 ? sheetClientCount : myClients.length}
               </span>
-              {sheetClientCount > 0 && (
-                <span className="text-base font-semibold tabular-nums" style={{ color: "var(--g3d-faint)" }}>
-                  / {sheetClientCount}
-                </span>
-              )}
             </div>
             {/* List */}
             {myClients.length === 0 ? (
