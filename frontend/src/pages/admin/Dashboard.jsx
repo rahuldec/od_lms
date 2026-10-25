@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { pdf } from "@react-pdf/renderer";
 import { api } from "@/lib/api";
 import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchClients, groupAssignmentsByTrainee, buildSheetSync } from "@/lib/clients";
@@ -17,7 +16,6 @@ import VisitLogDialog from "@/components/VisitLogDialog";
 import RemarksDialog from "@/components/RemarksDialog";
 import CsatDialog from "@/components/CsatDialog";
 import CardSettingsDialog from "@/components/CardSettingsDialog";
-import TraineeSynopsisPDF from "@/components/TraineeSynopsisPDF";
 import { Card } from "@/components/ui/card";
 import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw, FileDown, CheckSquare } from "lucide-react";
 import { toast } from "sonner";
@@ -867,6 +865,10 @@ export default function AdminDashboard() {
     if (selectedIds.size === 0) return;
     setGeneratingSynopsis(true);
     try {
+      const [{ pdf }, { default: TraineeSynopsisPDF }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/components/TraineeSynopsisPDF"),
+      ]);
       const selected = trainees.filter((t) => selectedIds.has(t.id));
       const historyByTrainee = {};
       selected.forEach((t) => {
