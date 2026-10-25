@@ -337,14 +337,17 @@ function TraineeCard({
       </div>
 
       {/* ── Clients | Visits | Learning — 3-col ── */}
+      {(() => {
+        const cols = [cardsEnabled.clients, cardsEnabled.visits, true].filter(Boolean).length;
+        return (
       <div className="grid mx-2 mt-2 rounded-xl overflow-hidden" style={{
-        gridTemplateColumns: "1fr 1fr 1fr",
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
         background: "#fff",
         border: "1px solid var(--g3d-border)",
       }}>
 
         {/* Clients */}
-        <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+        {cardsEnabled.clients && <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
             {/* Section header */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -399,10 +402,10 @@ function TraineeCard({
                 ))}
               </div>
             )}
-          </div>
+          </div>}
 
         {/* Visits */}
-        <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+        {cardsEnabled.visits && <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
             {/* Section header */}
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
@@ -453,7 +456,7 @@ function TraineeCard({
                 )}
               </>
             )}
-          </div>
+          </div>}
 
         {/* Learning phase */}
         <div className="px-3 pt-2 pb-3 min-w-0 flex flex-col">
@@ -510,6 +513,8 @@ function TraineeCard({
           )}
         </div>
       </div>
+        );
+      })()}
 
       {/* ── Projects ── */}
       {cardsEnabled.projects && (
