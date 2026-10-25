@@ -100,9 +100,9 @@ export const AuthProvider = ({ children }) => {
       setRole(null);
       setTrainee(null);
       try {
-        await supabase.auth.signOut({ scope: "global" });
-      } catch (signOutErr) {
         await supabase.auth.signOut();
+      } catch (signOutErr) {
+        // ignore
       }
       try {
         localStorage.removeItem("odk-training-auth");
@@ -157,6 +157,23 @@ export const AuthProvider = ({ children }) => {
       document.removeEventListener("visibilitychange", handleVisibility);
   }, [refreshMe]);
 
+  // Keepalive: browsers throttle background timers and can let the
+  // 1-hour JWT expire before Supabase's own auto-refresh fires. Poll
+  // every 4 minutes; if the token will expire within 10 minutes, force
+  // a refresh so the user is never unexpectedly signed out mid-session.
+  useEffect(() => {
+    const keepalive = setInterval(async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return;
+      const expiresAtMs = (data.session.expires_at || 0) * 1000;
+      if (expiresAtMs - Date.now() < 10 * 60 * 1000) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (refreshed?.session) setSession(refreshed.session);
+      }
+    }, 4 * 60 * 1000);
+    return () => clearInterval(keepalive);
+  }, []);
+
   const signInAs = async ({ username, password, roleHint }) => {
     const email = usernameToEmail(username, roleHint);
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -169,9 +186,9 @@ export const AuthProvider = ({ children }) => {
 
   const signOut = async () => {
     try {
-      await supabase.auth.signOut({ scope: "global" });
-    } catch (e) {
       await supabase.auth.signOut();
+    } catch (e) {
+      // ignore
     }
     try {
       localStorage.removeItem("odk-training-auth");
