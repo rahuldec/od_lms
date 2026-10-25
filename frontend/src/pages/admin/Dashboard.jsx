@@ -186,6 +186,7 @@ function TraineeCard({
   assignmentsLoading,
   batchNameById,
   myClients,
+  sheetClientCount = 0,
   myProjects,
   mySprints,
   visitRows,
@@ -343,21 +344,29 @@ function TraineeCard({
 
         {/* Clients */}
         {cardsEnabled.clients && (
-          <div className="px-4 py-4 min-w-0" style={{ borderRight: "1px solid var(--g3d-border)" }}>
-            <div className="flex items-center justify-between mb-3">
+          <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+            {/* Section header */}
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
                 <Briefcase className="h-3 w-3" /> Clients
-                {myClients.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                    {myClients.length}
-                  </span>
-                )}
               </span>
               <button onClick={onAssignClients} data-testid={`assign-clients-${t.id}`}
                 className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
                 {myClients.length > 0 ? "Manage" : "+ Assign"}
               </button>
             </div>
+            {/* Big stat */}
+            <div className="flex items-baseline gap-1 mb-3">
+              <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
+                {myClients.length}
+              </span>
+              {sheetClientCount > 0 && (
+                <span className="text-base font-semibold tabular-nums" style={{ color: "var(--g3d-faint)" }}>
+                  / {sheetClientCount}
+                </span>
+              )}
+            </div>
+            {/* List */}
             {myClients.length === 0 ? (
               <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No clients assigned</p>
             ) : (
@@ -365,10 +374,7 @@ function TraineeCard({
                 {myClients.map((c, i) => (
                   <div key={c.client_name}
                     className="py-2 text-sm font-medium truncate"
-                    style={{
-                      color: "var(--g3d-ink)",
-                      borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none",
-                    }}>
+                    style={{ color: "var(--g3d-ink)", borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
                     {c.client_name}
                   </div>
                 ))}
@@ -379,40 +385,40 @@ function TraineeCard({
 
         {/* Visits */}
         {cardsEnabled.visits && (
-          <div className="px-4 py-4 min-w-0" style={{ borderRight: "1px solid var(--g3d-border)" }}>
-            <div className="flex items-center justify-between mb-3">
+          <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col" style={{ borderRight: "1px solid var(--g3d-border)" }}>
+            {/* Section header */}
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
                 <MapPin className="h-3 w-3" /> Visits
-                {totalVisits > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                    {totalVisits}
-                  </span>
-                )}
               </span>
               <button onClick={onLogVisits} data-testid={`log-visits-${t.id}`}
                 className="text-xs font-semibold hover:underline" style={{ color: "var(--g3d-accent)" }}>
                 {visited.length > 0 ? "Manage" : "+ Log"}
               </button>
             </div>
+            {/* Big stat */}
+            <div className="mb-3">
+              <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
+                {totalVisits}
+              </span>
+            </div>
+            {/* List */}
             {visited.length === 0 ? (
               <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No visits logged</p>
             ) : (
               <>
                 <div className="flex flex-col gap-0">
-                  {(visitsExpanded ? visited : visited.slice(0, PREVIEW)).map((c, i) => {
-                    const displayRows = visitsExpanded ? visited : visited.slice(0, PREVIEW);
-                    return (
-                      <div key={c.client_name}
-                        className="py-2 flex items-center justify-between gap-2"
-                        style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
-                        <span className="text-sm font-medium truncate flex-1" style={{ color: "var(--g3d-ink)" }}>{c.client_name}</span>
-                        <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold flex-shrink-0"
-                          style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
-                          {c.count}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {(visitsExpanded ? visited : visited.slice(0, PREVIEW)).map((c, i) => (
+                    <div key={c.client_name}
+                      className="py-2 flex items-center justify-between gap-2"
+                      style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
+                      <span className="text-sm font-medium truncate flex-1" style={{ color: "var(--g3d-ink)" }}>{c.client_name}</span>
+                      <span className="inline-flex items-center justify-center rounded-md text-[11px] font-semibold flex-shrink-0"
+                        style={{ minWidth: 22, height: 20, padding: "0 5px", background: "var(--g3d-accent-soft)", color: "var(--g3d-accent)" }}>
+                        {c.count}
+                      </span>
+                    </div>
+                  ))}
                 </div>
                 {visited.length > PREVIEW && (
                   <button onClick={() => setVisitsExpanded((v) => !v)}
@@ -427,40 +433,47 @@ function TraineeCard({
         )}
 
         {/* Learning phase */}
-        <div className="px-4 py-4 min-w-0">
-          <div className="flex items-center justify-between mb-3">
+        <div className="px-4 pt-3 pb-4 min-w-0 flex flex-col">
+          {/* Section header */}
+          <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
               <BarChart3 className="h-3 w-3" /> Learning
             </span>
-            {assignments.length > 0 && (
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                style={{ background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }}>
-                {passedCount}/{assignments.length} · {avgPct != null ? `${avgPct}%` : "—"}
-              </span>
-            )}
           </div>
+          {/* Big overall score */}
+          {assignments.length > 0 && (
+            <div className="flex items-baseline gap-1.5 mb-3">
+              <span className="text-3xl font-bold tabular-nums leading-none"
+                style={{ color: avgPct != null && avgPct >= 60 ? "var(--g3d-good-ink)" : avgPct != null ? "var(--g3d-bad-ink)" : "var(--g3d-ink)" }}>
+                {avgPct != null ? `${avgPct}%` : `${passedCount}/${assignments.length}`}
+              </span>
+              {avgPct != null && (
+                <span className="text-xs font-medium" style={{ color: "var(--g3d-faint)" }}>
+                  avg · {passedCount}/{assignments.length} passed
+                </span>
+              )}
+            </div>
+          )}
+          {/* Assignment list */}
           {assignmentsLoading ? (
             <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>Loading…</p>
           ) : assignments.length === 0 ? (
             <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No assignments yet</p>
           ) : (
             <>
-              {(scoresOpen ? assignments : assignments.slice(0, PREVIEW)).map((a, i) => {
-                const displayAssignments = scoresOpen ? assignments : assignments.slice(0, PREVIEW);
-                return (
-                  <button key={a.id} onClick={() => onOpenAssignment(a)}
-                    className="w-full text-left flex items-center justify-between py-2 hover:opacity-80 transition-opacity"
-                    style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
-                    <span className="text-sm font-medium truncate flex-1 mr-2" style={{ color: "var(--g3d-ink)" }}>{a.name}</span>
-                    <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0"
-                      style={a.passed
-                        ? { background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }
-                        : { background: "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" }}>
-                      {a.passed ? "Pass" : "Fail"}
-                    </span>
-                  </button>
-                );
-              })}
+              {(scoresOpen ? assignments : assignments.slice(0, PREVIEW)).map((a, i) => (
+                <button key={a.id} onClick={() => onOpenAssignment(a)}
+                  className="w-full text-left flex items-center justify-between py-2 hover:opacity-80 transition-opacity"
+                  style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
+                  <span className="text-sm font-medium truncate flex-1 mr-2" style={{ color: "var(--g3d-ink)" }}>{a.name}</span>
+                  <span className="text-[11px] font-bold tabular-nums flex-shrink-0 px-1.5 py-0.5 rounded"
+                    style={a.passed
+                      ? { background: "var(--g3d-good-bg)", color: "var(--g3d-good-ink)" }
+                      : { background: "var(--g3d-bad-bg)", color: "var(--g3d-bad-ink)" }}>
+                    {a.score != null && a.total != null ? `${a.score}/${a.total}` : a.passed ? "Pass" : "Fail"}
+                  </span>
+                </button>
+              ))}
               {assignments.length > PREVIEW && (
                 <button onClick={() => setScoresOpen((v) => !v)}
                   className="mt-2 text-xs font-semibold hover:underline w-full text-center"
@@ -828,6 +841,24 @@ export default function AdminDashboard() {
     return map;
   }, [clientVisits]);
 
+  // Count of clients planned per trainee in the CS Team Plan sheet (traineeOwner column).
+  const sheetClientCountByTraineeId = useMemo(() => {
+    const byName = {};
+    (clients || []).forEach((c) => {
+      if (!c.traineeOwner) return;
+      const key = c.traineeOwner.trim().toLowerCase();
+      byName[key] = (byName[key] || 0) + 1;
+    });
+    const ALIASES = { "akshat wahi": "akshat", "vansh saini": "vansh" };
+    const result = {};
+    (trainees || []).forEach((t) => {
+      const raw = t.name.trim().toLowerCase();
+      const resolved = ALIASES[raw] ?? raw;
+      result[t.id] = byName[resolved] || byName[raw] || 0;
+    });
+    return result;
+  }, [clients, trainees]);
+
   const filteredTrainees = useMemo(() => {
     let list = trainees.filter((t) => t.status !== "Exited");
     if (selectedBatch === "none") list = list.filter((t) => !t.batch_id);
@@ -1086,6 +1117,7 @@ export default function AdminDashboard() {
                           assignmentsLoading={assignmentsLoading}
                           batchNameById={batchNameById}
                           myClients={clientsByTrainee[t.id] || []}
+                          sheetClientCount={sheetClientCountByTraineeId[t.id] || 0}
                           myProjects={projectsByTrainee[t.id] || []}
                           mySprints={sprintsByTrainee[t.id] || []}
                           visitRows={visitsByTrainee[t.id] || []}
