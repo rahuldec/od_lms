@@ -186,6 +186,7 @@ function TraineeCard({
   assignmentsLoading,
   batchNameById,
   myClients,
+  sheetClients = [],
   sheetClientCount = 0,
   myProjects,
   mySprints,
@@ -361,6 +362,25 @@ function TraineeCard({
                 {sheetClientCount > 0 ? sheetClientCount : myClients.length}
               </span>
             </div>
+            {/* Sheet client list with billing */}
+            {sheetClients.length === 0 ? (
+              <p className="text-sm font-medium" style={{ color: "var(--g3d-faint)" }}>No clients in sheet</p>
+            ) : (
+              <div className="flex flex-col gap-0">
+                {sheetClients.map((c, i) => (
+                  <div key={c.name}
+                    className="py-2 flex items-center justify-between gap-2"
+                    style={{ borderTop: i > 0 ? "1px solid var(--g3d-border)" : "none" }}>
+                    <span className="text-sm font-medium truncate flex-1" style={{ color: "var(--g3d-ink)" }}>{c.name}</span>
+                    {c.billing != null && c.billing > 0 && (
+                      <span className="text-xs font-semibold flex-shrink-0 tabular-nums" style={{ color: "var(--g3d-faint)" }}>
+                        ₹{c.billing >= 100000 ? `${(c.billing / 100000).toFixed(1)}L` : `${Math.round(c.billing / 1000)}K`}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -822,23 +842,30 @@ export default function AdminDashboard() {
     return map;
   }, [clientVisits]);
 
-  // Count of clients planned per trainee in the CS Team Plan sheet (traineeOwner column).
-  const sheetClientCountByTraineeId = useMemo(() => {
+  // Clients from the CS Team Plan sheet grouped by trainee id.
+  const sheetClientsByTraineeId = useMemo(() => {
     const byName = {};
     (clients || []).forEach((c) => {
       if (!c.traineeOwner) return;
       const key = c.traineeOwner.trim().toLowerCase();
-      byName[key] = (byName[key] || 0) + 1;
+      if (!byName[key]) byName[key] = [];
+      byName[key].push(c);
     });
     const ALIASES = { "akshat wahi": "akshat", "vansh saini": "vansh" };
     const result = {};
     (trainees || []).forEach((t) => {
       const raw = t.name.trim().toLowerCase();
       const resolved = ALIASES[raw] ?? raw;
-      result[t.id] = byName[resolved] || byName[raw] || 0;
+      result[t.id] = byName[resolved] || byName[raw] || [];
     });
     return result;
   }, [clients, trainees]);
+
+  const sheetClientCountByTraineeId = useMemo(() => {
+    const result = {};
+    Object.entries(sheetClientsByTraineeId).forEach(([id, list]) => { result[id] = list.length; });
+    return result;
+  }, [sheetClientsByTraineeId]);
 
   const filteredTrainees = useMemo(() => {
     let list = trainees.filter((t) => t.status !== "Exited");
@@ -1098,6 +1125,7 @@ export default function AdminDashboard() {
                           assignmentsLoading={assignmentsLoading}
                           batchNameById={batchNameById}
                           myClients={clientsByTrainee[t.id] || []}
+                          sheetClients={sheetClientsByTraineeId[t.id] || []}
                           sheetClientCount={sheetClientCountByTraineeId[t.id] || 0}
                           myProjects={projectsByTrainee[t.id] || []}
                           mySprints={sprintsByTrainee[t.id] || []}
