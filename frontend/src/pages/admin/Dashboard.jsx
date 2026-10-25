@@ -1141,9 +1141,9 @@ export default function AdminDashboard() {
 
                 {isExpanded && lvlTrainees.length > 0 && (
                   <div className="border-t border-neutral-100 p-4">
-                    <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollSnapType: "x mandatory" }}>
+                    <div className="flex overflow-x-auto" style={{ scrollSnapType: "x mandatory", scrollBehavior: "smooth" }}>
                       {lvlTrainees.map((t) => (
-                        <div key={t.id} style={{ minWidth: 480, maxWidth: 560, flex: "0 0 auto", scrollSnapAlign: "start" }}>
+                        <div key={t.id} style={{ minWidth: "100%", flex: "0 0 100%", scrollSnapAlign: "start" }}>
                         <TraineeCard
                           key={t.id}
                           t={t}
