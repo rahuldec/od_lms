@@ -33,7 +33,7 @@ const clientsCsvUrl = () =>
 const COLUMNS = {
   srNo: ["Sr No.", "Sr No", "S.No", "Sno"],
   name: ["Client Name", "Client", "Name"],
-  owner: ["Team", "Client Ownership", "RM", "Owner"],
+  owner: ["Team", "Client Ownership", "Owner"],
   segment: ["TYPE1", "Type1", "Segment"],
   category: ["Category", "Size"],
   tier: ["Type", "Tier"],
@@ -74,6 +74,13 @@ const parseClientsCsv = (text) => {
       resolveColumn(first, candidates),
     ])
   );
+
+  // The sheet has TWO "RM" columns: the first is a specialty tag (Exam/blank),
+  // the second (with surrounding spaces: " RM ") is the trainee assigned to
+  // that client. We need the last one for syncing assignments.
+  const rmKeys = Object.keys(first).filter((k) => k.trim().toLowerCase() === "rm");
+  cols.traineeOwner = rmKeys.length > 1 ? rmKeys[rmKeys.length - 1] : null;
+
   if (!cols.name) {
     // Almost always a wrong gid - the published link points at another tab.
     // Echo the headers back so the mismatch is diagnosable from the UI banner
@@ -105,6 +112,7 @@ const parseClientsCsv = (text) => {
       id: key,
       name,
       owner: cell(row, cols.owner) === "-" ? "" : cell(row, cols.owner),
+      traineeOwner: cell(row, cols.traineeOwner),
       segment: cell(row, cols.segment),
       category: cell(row, cols.category),
       tier: cell(row, cols.tier),
@@ -197,8 +205,8 @@ export const buildSheetSync = (trainees, clients) => {
 
   const byTrainee = {};
   (clients || []).forEach((c) => {
-    if (!c?.owner) return;
-    const key = c.owner.trim().toLowerCase();
+    if (!c?.traineeOwner) return;
+    const key = c.traineeOwner.trim().toLowerCase();
     const trainee = traineeByName[key];
     if (!trainee) return;
     if (!byTrainee[trainee.id]) byTrainee[trainee.id] = { traineeId: trainee.id, traineeName: trainee.name, clientNames: [] };
