@@ -247,10 +247,10 @@ function TraineeCard({
   visitRows.forEach((v) => { visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0; });
 
   return (
-    <div className="g3d-scope g3d-card overflow-hidden">
+    <div className="g3d-scope g3d-card overflow-hidden" style={{ background: "#F5F5F7" }}>
 
       {/* ── Header ── */}
-      <div className="flex items-start gap-3 px-5 pt-5 pb-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+      <div className="flex items-start gap-3 px-5 pt-5 pb-4" style={{ background: "#fff", borderBottom: "1px solid var(--g3d-border)" }}>
         <div
           className="g3d-avatar flex-shrink-0 grid place-items-center text-white font-semibold"
           style={{ width: 48, height: 48, borderRadius: 13, fontSize: 18 }}
@@ -329,14 +329,14 @@ function TraineeCard({
       </div>
 
       {/* ── Level timeline ── */}
-      <div className="px-5 py-3" style={{ background: "var(--g3d-panel)", borderBottom: "1px solid var(--g3d-border)" }}>
+      <div className="px-5 py-3" style={{ background: "#fff", borderBottom: "1px solid var(--g3d-border)" }}>
         <LevelTimeline trainee={t} variant="glass3d" />
 
       </div>
 
       {/* ── Clients + Visits two-column ── */}
       {(cardsEnabled.clients || cardsEnabled.visits) && (
-        <div className="grid grid-cols-2" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+        <div className="grid grid-cols-2 mx-3 mt-3 rounded-xl overflow-hidden" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
           {cardsEnabled.clients && (
             <div className="px-5 py-4 min-w-0" style={cardsEnabled.visits ? { borderRight: "1px solid var(--g3d-border)" } : {}}>
               <div className="flex items-center justify-between mb-3">
@@ -447,7 +447,7 @@ function TraineeCard({
       )}
 
       {/* ── Learning phase ── */}
-      <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+      <div className="px-4 py-4 mx-3 mt-3 rounded-xl" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
             <BarChart3 className="h-3 w-3" /> Learning phase
@@ -494,7 +494,7 @@ function TraineeCard({
 
       {/* ── Projects ── */}
       {cardsEnabled.projects && (
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+        <div className="px-4 py-4 mx-3 mt-3 rounded-xl" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
               <Layers className="h-3 w-3" /> Projects
@@ -518,7 +518,7 @@ function TraineeCard({
 
       {/* ── Sprints ── */}
       {cardsEnabled.sprints && (
-        <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+        <div className="px-4 py-4 mx-3 mt-3 rounded-xl" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
               <Rocket className="h-3 w-3" /> Sprints
@@ -566,7 +566,7 @@ function TraineeCard({
 
       {/* ── CSAT ── */}
       {cardsEnabled.csat && (
-        <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: "1px solid var(--g3d-border)" }}>
+        <div className="px-4 py-3 mx-3 mt-3 rounded-xl flex items-center justify-between" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
           <span className="text-[10px] font-semibold uppercase tracking-widest inline-flex items-center gap-1" style={{ color: "var(--g3d-faint)" }}>
             <Smile className="h-3 w-3" /> CSAT
             {t.csat_score != null && (
@@ -581,7 +581,7 @@ function TraineeCard({
       )}
 
       {/* ── Remarks footer ── */}
-      <div className="px-5 py-3 flex items-center gap-2">
+      <div className="px-4 py-3 mx-3 mt-3 mb-3 rounded-xl flex items-center gap-2" style={{ background: "#fff", border: "1px solid var(--g3d-border)" }}>
         <MessageSquare className="h-3.5 w-3.5 flex-shrink-0" style={{ color: "var(--g3d-faint)" }} />
         <p className="text-sm flex-1 min-w-0 truncate" style={{ color: t.notes ? "var(--g3d-soft)" : "var(--g3d-faint)" }}>
           {t.notes || "No remarks yet"}
