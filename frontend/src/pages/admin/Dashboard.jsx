@@ -417,10 +417,17 @@ function TraineeCard({
               </button>
             </div>
             {/* Big stat */}
-            <div className="mb-3">
-              <span className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>
-                {totalVisits}
-              </span>
+            <div className="flex items-end justify-between mb-3">
+              <div>
+                <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-accent)" }}>{totalVisits}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>visits</div>
+              </div>
+              {visited.length > 0 && (
+                <div className="text-right">
+                  <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{visited.length}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>clients</div>
+                </div>
+              )}
             </div>
             {/* List */}
             {visited.length === 0 ? (
@@ -462,16 +469,18 @@ function TraineeCard({
           </div>
           {/* Big overall score */}
           {assignments.length > 0 && (
-            <div className="flex items-baseline gap-1.5 mb-3">
-              <span className="text-3xl font-bold tabular-nums leading-none"
-                style={{ color: avgPct != null && avgPct >= 60 ? "var(--g3d-good-ink)" : avgPct != null ? "var(--g3d-bad-ink)" : "var(--g3d-ink)" }}>
-                {avgPct != null ? `${avgPct}%` : `${passedCount}/${assignments.length}`}
-              </span>
-              {avgPct != null && (
-                <span className="text-xs font-medium" style={{ color: "var(--g3d-faint)" }}>
-                  avg · {passedCount}/{assignments.length} passed
-                </span>
-              )}
+            <div className="flex items-end justify-between mb-3">
+              <div>
+                <div className="text-3xl font-bold tabular-nums leading-none"
+                  style={{ color: avgPct != null && avgPct >= 60 ? "var(--g3d-good-ink)" : avgPct != null ? "var(--g3d-bad-ink)" : "var(--g3d-ink)" }}>
+                  {avgPct != null ? `${avgPct}%` : `${passedCount}/${assignments.length}`}
+                </div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>avg score</div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold tabular-nums leading-none" style={{ color: "var(--g3d-ink)" }}>{passedCount}/{assignments.length}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: "var(--g3d-faint)" }}>passed</div>
+              </div>
             </div>
           )}
           {/* Assignment list */}
