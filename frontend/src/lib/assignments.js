@@ -112,6 +112,34 @@ export const ASSIGNMENTS = [
     ],
   },
   {
+    id: "coe",
+    name: "COE Module",
+    csvUrl:
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vQBe5MDIMNzbup0q0Up6rIjaETmKXxRpiSCoO6ipmZHXgvxxCwzO0er8ZRTbJPLP7Adz-DvAzxfm-zJ/pub?output=csv",
+    scoreCol: "Overall Score",
+    linkCol: "Link",
+    nameCol: "Name",
+    totalMarks: 15,
+    passThreshold: 9,
+    questions: [
+      "What is the purpose of the Manage Bundles feature?",
+      "What is the purpose of Masking Number Management?",
+      "How can we create a Date Sheet and complete the declaration process?",
+      "How can we check pending student registrations?",
+      "What is Admin Marks Entry, and how is it used?",
+      "How can we configure average grace marks?",
+      "What is the purpose of the Daily Exam Dashboard?",
+      "How can we generate result sheets for Regular and Re-Appear examinations together?",
+      "How can an HOD register a student for an examination?",
+      "Is it possible to detain a student in a single subject? If yes, how can this be done?",
+      "If a particular student is not appearing on the marks entry page, what could be the possible reasons?",
+      "If a student is required to pass only the external examination and not the internal examination for a particular course, how can this be configured?",
+      "If a particular subject is not appearing while creating an Exam Master, how can this issue be resolved?",
+      "If a particular student is not appearing in a bundle, what could be the possible reasons?",
+      "Is it possible to generate a student-wise attendance sheet? If yes, how?",
+    ],
+  },
+  {
     id: "admission",
     name: "Admission Module",
     csvUrl:
@@ -148,7 +176,7 @@ export const ASSIGNMENTS = [
 // promotion; if a sheet doesn't have any of these columns, submittedAt is
 // just null and that assignment is left out of "since" filtering rather
 // than guessed at.
-const DATE_COL_CANDIDATES = ["Timestamp", "Date", "Submitted At", "Submission Date"];
+const DATE_COL_CANDIDATES = ["Timestamp", "Added Time", "Date", "Submitted At", "Submission Date"];
 
 // Case-insensitive lookup of the first candidate column name that actually
 // exists in a parsed CSV row. Falls back to null if none match.
