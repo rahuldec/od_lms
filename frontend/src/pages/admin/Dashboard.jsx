@@ -251,183 +251,253 @@ function TraineeCard({
   const printPerformanceCard = () => {
     const periods = getLevelPeriods(t);
     const batchName = batchNameById[t.batch_id] || "";
-    const totalBilling = sheetClients.reduce((s, c) => s + (c.billing || 0), 0);
-    const fmtAmt = (n) => !n ? "—" : n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${Math.round(n / 1000)}K`;
     const glass3dColors = ["#c9b8a0", "#ed601f", "#811a0f", "#c99a2e"];
     const totalPeriodDays = periods.reduce((s, p) => s + p.days, 0);
 
-    const levelBarHtml = periods.map((p) =>
-      `<div style="width:${totalPeriodDays ? (p.days / totalPeriodDays) * 100 : 0}%;background:${glass3dColors[p.level] || "#94a3b8"};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;min-width:${p.days > 0 ? 32 : 0}px;overflow:hidden;white-space:nowrap;padding:0 4px;">L${p.level}·${p.days}d</div>`
-    ).join("");
-
-    // Build unique level milestone dots (deduplicate by level, prefer first non-zero period)
+    // Unique milestones (skip 0-day periods from same-day misclicks)
     const milestones = [];
-    const seen = new Set();
+    const seenLevels = new Set();
     periods.forEach((p) => {
-      if (!seen.has(p.level) && p.days > 0) {
-        seen.add(p.level);
+      if (!seenLevels.has(p.level) && p.days > 0) {
+        seenLevels.add(p.level);
         milestones.push(p);
       }
     });
-    const dotsHtml = milestones.map((p, i) => `
-      <div style="display:flex;align-items:flex-start;flex:${i < milestones.length - 1 ? '1' : '0'};min-width:0;">
-        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
-          <div style="width:10px;height:10px;border-radius:50%;background:${glass3dColors[p.level]};border:2px solid #fff;"></div>
-          <div style="font-size:11px;font-weight:700;color:${glass3dColors[p.level]};margin-top:2px;">L${p.level}</div>
-          <div style="font-size:10px;color:#86868B;">${p.days}d</div>
-          <div style="font-size:10px;color:#86868B;">${fmtDate(p.start)}</div>
-        </div>
-        ${i < milestones.length - 1 ? `<div style="flex:1;height:2px;background:${glass3dColors[p.level]};opacity:0.35;margin-top:4px;min-width:12px;"></div>` : ""}
-      </div>
-    `).join("");
 
-    const clientsHtml = sheetClients.length
-      ? sheetClients.map((c) => `<tr><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;">${c.name}</td><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;text-align:right;color:#86868B;">${fmtAmt(c.billing)}</td></tr>`).join("")
-      : `<tr><td colspan="2" style="padding:7px 10px;font-size:13px;color:#86868B;">No clients in sheet</td></tr>`;
+    // Level progression bar segments
+    const levelBarHtml = milestones.map((p) => {
+      const pct = totalPeriodDays ? (p.days / totalPeriodDays) * 100 : 0;
+      return `<div style="width:${pct}%;background:${glass3dColors[p.level]};border-radius:100px;min-width:${p.days > 0 ? "20px" : "0"};height:100%;"></div>`;
+    }).join("");
 
-    const visitsHtml = visited.length
-      ? visited.map((v) => `<tr><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;">${v.client_name}</td><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;text-align:right;"><span style="background:#FDF0E8;color:#EC6724;font-weight:700;padding:2px 10px;border-radius:20px;font-size:12px;">${v.count}</span></td></tr>`).join("")
-      : `<tr><td colspan="2" style="padding:7px 10px;font-size:13px;color:#86868B;">No visits logged</td></tr>`;
+    // Timeline dots grid
+    const colWidth = milestones.length > 0 ? 100 / milestones.length : 100;
+    const lineLeft = `calc(${colWidth / 2}% + 6px)`;
+    const lineRight = `calc(${colWidth / 2}% + 6px)`;
+    const timelineHtml = `
+      <div style="display:grid;grid-template-columns:repeat(${milestones.length},1fr);position:relative;padding-top:4px;">
+        <div style="position:absolute;top:5px;left:${lineLeft};right:${lineRight};height:2px;background:#e6e2db;"></div>
+        ${milestones.map((p) => `
+          <div style="display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;">
+            <div style="width:12px;height:12px;border-radius:50%;background:${glass3dColors[p.level]};border:2px solid #fff;box-shadow:0 0 0 1.5px #e6e2db;flex-shrink:0;"></div>
+            <div style="margin-top:8px;text-align:center;">
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:${glass3dColors[p.level]};">L${p.level}</div>
+              <div style="font-size:11px;color:#9b9490;margin-top:1px;font-variant-numeric:tabular-nums;">${p.days} days</div>
+              <div style="font-size:10px;color:#9b9490;margin-top:1px;">${fmtDate(p.start)}</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>`;
 
-    const learningHtml = assignments.length
-      ? assignments.map((a) => {
+    // Learning: sorted best score first, with progress bars
+    const sortedAssignments = [...assignments].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const learningRowsHtml = sortedAssignments.length
+      ? sortedAssignments.map((a) => {
           const pct = a.total ? Math.round((a.score / a.total) * 100) : 0;
-          const badge = a.passed
-            ? `<span style="background:#d1fae5;color:#065f46;font-weight:700;padding:2px 10px;border-radius:20px;font-size:12px;">${a.score}/${a.total}</span>`
-            : `<span style="background:#fee2e2;color:#991b1b;font-weight:700;padding:2px 10px;border-radius:20px;font-size:12px;">${a.score}/${a.total}</span>`;
-          return `<tr><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;">${a.name}</td><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;text-align:right;">${badge}</td></tr>`;
+          const color = a.passed ? "#16a34a" : "#dc2626";
+          const pillBg = a.passed ? "rgba(22,163,74,0.08)" : "rgba(220,38,38,0.07)";
+          const pillBorder = a.passed ? "rgba(22,163,74,0.25)" : "rgba(220,38,38,0.22)";
+          return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:11px;">
+            <div style="width:155px;flex-shrink:0;font-size:13px;color:#1a1714;">${a.name}</div>
+            <div style="flex:1;min-width:0;height:7px;background:#e6e2db;border-radius:100px;overflow:hidden;">
+              <div style="width:${pct}%;height:100%;background:${color};border-radius:100px;"></div>
+            </div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:600;width:38px;text-align:right;color:${color};font-variant-numeric:tabular-nums;">${a.score}/${a.total}</div>
+            <div style="font-size:10.5px;font-weight:600;padding:2px 9px;border-radius:100px;width:56px;text-align:center;background:${pillBg};color:${color};border:1px solid ${pillBorder};">${a.passed ? "Pass" : "Pending"}</div>
+          </div>`;
         }).join("")
-      : `<tr><td colspan="2" style="padding:7px 10px;font-size:13px;color:#86868B;">No assignments yet</td></tr>`;
+      : `<div style="font-size:13px;color:#9b9490;">No assignments yet</div>`;
 
-    const projectsHtml = myProjects.length
-      ? myProjects.map((p) => `<span style="display:inline-block;background:#f3f4f6;color:#374151;border-radius:20px;padding:3px 10px;font-size:12px;margin:2px;">${p.project_name || p}</span>`).join("")
-      : `<span style="font-size:13px;color:#86868B;">No projects assigned</span>`;
+    // Top 10 visits in 2 columns
+    const topVisits = visited.slice(0, 10);
+    const halfLen = Math.ceil(topVisits.length / 2);
+    const visitColHtml = (items) => items.map((v) =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #e6e2db;">
+        <span style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">${v.client_name}</span>
+        <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:#e8571a;flex-shrink:0;font-variant-numeric:tabular-nums;">${v.count}</span>
+      </div>`
+    ).join("");
+    const visitsHtml = topVisits.length
+      ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 28px;">
+          <div>${visitColHtml(topVisits.slice(0, halfLen))}</div>
+          <div>${visitColHtml(topVisits.slice(halfLen))}</div>
+        </div>
+        <div style="font-size:11px;color:#9b9490;margin-top:11px;">Top ${topVisits.length} of ${visited.length} clients &middot; ${totalVisits} total visits logged</div>`
+      : `<div style="font-size:13px;color:#9b9490;">No visits logged yet</div>`;
+
+    // Key highlights
+    const highlights = [];
+    if (t.notes) {
+      const nl = t.notes.toLowerCase();
+      if (nl.includes("deploy") || nl.includes("site")) {
+        highlights.push({ color: "#c99a2e", title: "Client Site Deployment", text: "Independently deployed at a client site, demonstrating readiness for unsupervised engagements." });
+      }
+      if (nl.includes("train")) {
+        highlights.push({ color: "#811a0f", title: "Solo Staff Training", text: "Conducted an independent staff training session, showing strong product knowledge and presentation capability." });
+      }
+    }
+    if (totalVisits > 0) {
+      const avg = days ? (totalVisits / days * 7).toFixed(1) : 0;
+      highlights.push({ color: "#ed601f", title: "Field Coverage", text: `${totalVisits} visits across ${visited.length} institutions — ${avg > 1 ? `~${avg} visits/week` : "consistent field presence"} throughout the program.` });
+    }
+    if (milestones.length > 1) {
+      highlights.push({ color: "#c9b8a0", title: "Consistent Progression", text: `Advanced through ${milestones.length} levels without stagnation across ${days ?? "?"} days in program.` });
+    }
+    const highlightsHtml = highlights.length
+      ? `<div style="display:grid;grid-template-columns:${highlights.length === 1 ? "1fr" : "1fr 1fr"};gap:11px;">
+          ${highlights.map((h) => `
+            <div style="background:#f5f3f0;border:1px solid #e6e2db;border-radius:10px;padding:15px 16px;display:flex;gap:12px;align-items:flex-start;">
+              <div style="width:6px;height:6px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${h.color};"></div>
+              <div>
+                <div style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;margin-bottom:4px;">${h.title}</div>
+                <div style="font-size:12px;color:#625e59;line-height:1.55;">${h.text}</div>
+              </div>
+            </div>`).join("")}
+        </div>`
+      : "";
+
+    // Focus areas
+    const focusItems = [];
+    const failedModules = assignments.filter((a) => !a.passed);
+    if (failedModules.length > 0) {
+      focusItems.push(`<strong>Learning modules:</strong> ${failedModules.map((a) => `${a.name} (${a.score}/${a.total})`).join(", ")} — close to the passing threshold (9/15). Targeted revision should resolve quickly.`);
+    }
+    const totalBilling = sheetClients.reduce((s, c) => s + (c.billing || 0), 0);
+    if (totalBilling === 0 && (t.current_level ?? 0) >= 2) {
+      focusItems.push(`<strong>Billing tracking:</strong> No billing data recorded. As an L${t.current_level} trainee, client billing should be tracked from each engagement.`);
+    }
+    if (t.csat_score == null) {
+      focusItems.push(`<strong>CSAT score:</strong> Not recorded. Should be collected after client deployments going forward.`);
+    }
+    const focusHtml = focusItems.length
+      ? `<div style="background:rgba(232,87,26,0.09);border:1px solid rgba(232,87,26,0.2);border-radius:10px;padding:18px 20px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${focusItems.map((item) => `
+              <div style="display:flex;align-items:flex-start;gap:10px;font-size:13px;color:#625e59;">
+                <div style="width:5px;height:5px;border-radius:50%;background:#e8571a;margin-top:7px;flex-shrink:0;"></div>
+                <span>${item}</span>
+              </div>`).join("")}
+          </div>
+        </div>`
+      : "";
+
+    const remarksHtml = t.notes
+      ? t.notes.split(/\d+\.\s+/).filter(Boolean).map((r) => `<div style="margin-bottom:4px;">&bull; ${r.trim()}</div>`).join("")
+      : "";
+
+    const daysToLevel = (t.current_level ?? 0) > 0 && days != null ? days - levelDays : null;
+    const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
     const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>${t.name} — Performance Report</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${t.name || "Trainee"} — Performance Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1d1d1f;background:#fff;padding:32px;max-width:860px;margin:0 auto}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #EC6724;padding-bottom:14px;margin-bottom:22px}
-  .brand{font-size:14px;font-weight:800;color:#EC6724;letter-spacing:0.06em;text-transform:uppercase}
-  .report-title{font-size:11px;color:#86868B;margin-top:3px}
-  .gen-date{font-size:11px;color:#86868B;text-align:right}
-  .trainee-row{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px}
-  .avatar{width:52px;height:52px;background:#EC6724;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;flex-shrink:0}
-  .trainee-name{font-size:22px;font-weight:700;color:#1d1d1f;line-height:1.1}
-  .trainee-username{font-size:13px;color:#86868B;margin-top:3px}
-  .badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
-  .badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
-  .meta-right{margin-left:auto;text-align:right;flex-shrink:0}
-  .days-num{font-size:36px;font-weight:700;color:#1d1d1f;line-height:1}
-  .days-label{font-size:11px;color:#86868B}
-  .section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#86868B;margin-bottom:7px;display:flex;align-items:center;gap:5px}
-  .level-bar{display:flex;border-radius:8px;overflow:hidden;height:28px;margin-bottom:9px}
-  .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
-  .stat-card{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
-  .stat-val{font-size:26px;font-weight:700;line-height:1}
-  .stat-sub{font-size:11px;color:#86868B;margin-top:2px}
-  .data-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
-  .data-col{border:1px solid #e5e5e5;border-radius:12px;overflow:hidden}
-  .data-col-head{padding:9px 12px;background:#fafafa;border-bottom:1px solid #f0f0f0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#86868B}
-  table{width:100%;border-collapse:collapse}
-  .info-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
-  .info-box{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
-  .info-box-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#86868B;margin-bottom:6px}
-  .footer{margin-top:28px;border-top:1px solid #e5e5e5;padding-top:10px;display:flex;justify-content:space-between;font-size:11px;color:#86868B}
-  @media print{body{padding:16px}@page{margin:12mm;size:A4}}
+  body{background:#f5f3f0;color:#1a1714;font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.6;padding:32px 16px}
+  .report{max-width:820px;margin:0 auto;background:#fff;border:1px solid #e6e2db;border-radius:14px;overflow:hidden}
+  .section{padding:24px 36px;border-bottom:1px solid #e6e2db}
+  .section:last-child{border-bottom:none}
+  .slabel{font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#9b9490;margin-bottom:16px}
+  @media print{body{background:#fff;padding:0}@page{margin:10mm;size:A4}.report{border:none;border-radius:0;max-width:100%}}
 </style>
 </head>
 <body>
-<div class="header">
+<div class="report">
+
+<div style="background:#1a1714;padding:24px 36px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;">
   <div>
-    <div class="brand">Okie Dokie</div>
-    <div class="report-title">Trainee Performance Report</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;color:#e8571a;letter-spacing:0.1em;text-transform:uppercase;">Okie Dokie</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.35);letter-spacing:0.06em;text-transform:uppercase;margin-top:2px;">Trainee Performance Report</div>
   </div>
-  <div class="gen-date">Generated: ${fmtDate(new Date().toISOString())}</div>
+  <div style="text-align:right;">
+    <div style="font-size:10.5px;color:rgba(255,255,255,0.3);letter-spacing:0.04em;">Confidential &middot; Internal Use</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:2px;">Generated ${today}</div>
+  </div>
 </div>
 
-<div class="trainee-row">
-  <div class="avatar">${(t.name || "?").charAt(0).toUpperCase()}</div>
-  <div style="flex:1;min-width:0;">
-    <div class="trainee-name">${t.name || "—"}</div>
-    <div class="trainee-username">@${t.username || "—"}</div>
-    <div class="badges">
-      <span class="badge" style="background:#d1fae5;color:#065f46;">${t.status || "Active"}</span>
-      <span class="badge" style="background:#FDF0E8;color:#EC6724;">L${t.current_level ?? 0} · ${levelDays}d</span>
-      ${batchName ? `<span class="badge" style="background:#fef9c3;color:#854d0e;">${batchName}</span>` : ""}
-      ${t.department ? `<span class="badge" style="background:#FDF0E8;color:#EC6724;">${t.department}</span>` : ""}
-      ${t.join_date ? `<span class="badge" style="background:#f3f4f6;color:#6b7280;">Joined ${fmtDate(t.join_date)}</span>` : ""}
-      ${latestPromotion ? `<span class="badge" style="background:#f3f4f6;color:#6b7280;">↑ Promoted ${fmtDate(latestPromotion.effective_date || latestPromotion.at)}</span>` : ""}
+<div style="padding:28px 36px 24px;border-bottom:1px solid #e6e2db;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;">
+  <div style="width:52px;height:52px;border-radius:50%;background:rgba(232,87,26,0.09);border:2px solid #e8571a;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:20px;color:#e8571a;flex-shrink:0;">${(t.name || "?").charAt(0).toUpperCase()}</div>
+  <div style="flex:1;min-width:200px;">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;line-height:1.2;">${t.name || "—"}</div>
+    <div style="color:#9b9490;font-size:12.5px;margin-top:2px;">@${t.username || "—"}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;">
+      <span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:600;background:rgba(232,87,26,0.09);border:1px solid rgba(232,87,26,0.3);color:#e8571a;">Active</span>
+      <span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:600;background:rgba(201,154,46,0.1);border:1px solid rgba(201,154,46,0.35);color:#9d7510;">L${t.current_level ?? 0} &middot; ${levelDays}d</span>
+      ${batchName ? `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:500;background:#f5f3f0;border:1px solid #e6e2db;color:#625e59;">${batchName}</span>` : ""}
+      ${t.department ? `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:500;background:#f5f3f0;border:1px solid #e6e2db;color:#625e59;">${t.department}</span>` : ""}
+      ${t.join_date ? `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:500;background:#f5f3f0;border:1px solid #e6e2db;color:#625e59;">Joined ${fmtDate(t.join_date)}</span>` : ""}
+      ${latestPromotion ? `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;font-size:11.5px;font-weight:500;background:#f5f3f0;border:1px solid #e6e2db;color:#625e59;">Promoted ${fmtDate(latestPromotion.effective_date || latestPromotion.at)}</span>` : ""}
     </div>
   </div>
-  <div class="meta-right">
-    <div class="days-num">${days ?? "—"}</div>
-    <div class="days-label">days in program</div>
+  <div style="flex-shrink:0;text-align:right;">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;">${days ?? "—"}</div>
+    <div style="font-size:10.5px;color:#9b9490;letter-spacing:0.05em;text-transform:uppercase;margin-top:3px;">Days in Program</div>
   </div>
 </div>
 
-<div style="margin-bottom:18px;">
-  <div class="section-label">Level Progression</div>
-  <div class="level-bar">${levelBarHtml}</div>
-  <div style="display:flex;align-items:flex-start;margin-top:6px;">${dotsHtml}</div>
-</div>
-
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="section-label" style="margin-bottom:6px;">Clients</div>
-    <div class="stat-val" style="color:#EC6724;">${sheetClientCount || sheetClients.length || 0}</div>
-    <div class="stat-sub">${totalBilling > 0 ? fmtAmt(totalBilling) + " total billing" : "No billing data"}</div>
-  </div>
-  <div class="stat-card">
-    <div class="section-label" style="margin-bottom:6px;">Visits</div>
-    <div class="stat-val" style="color:#EC6724;">${totalVisits}</div>
-    <div class="stat-sub">${visited.length} client${visited.length !== 1 ? "s" : ""} visited</div>
-  </div>
-  <div class="stat-card">
-    <div class="section-label" style="margin-bottom:6px;">Learning</div>
-    <div class="stat-val" style="color:${avgPct != null && avgPct >= 60 ? "#16a34a" : "#dc2626"};">${avgPct != null ? avgPct + "%" : "—"}</div>
-    <div class="stat-sub">${passedCount}/${assignments.length} modules passed</div>
+<div class="section">
+  <div class="slabel">Performance at a Glance</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+    <div style="background:#f5f3f0;border:1px solid #e6e2db;border-radius:10px;padding:16px 18px;">
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#9b9490;margin-bottom:6px;">Field Visits</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;">${totalVisits}</div>
+      <div style="font-size:12px;color:#625e59;margin-top:5px;">${visited.length} client institutions covered</div>
+    </div>
+    <div style="background:#f5f3f0;border:1px solid #e6e2db;border-radius:10px;padding:16px 18px;">
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#9b9490;margin-bottom:6px;">Learning Progress</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1;color:${avgPct != null && avgPct >= 60 ? "#16a34a" : "#dc2626"};font-variant-numeric:tabular-nums;">${avgPct != null ? avgPct + "%" : "—"}</div>
+      <div style="font-size:12px;color:#625e59;margin-top:5px;">${passedCount} of ${assignments.length} modules cleared</div>
+    </div>
+    <div style="background:#f5f3f0;border:1px solid #e6e2db;border-radius:10px;padding:16px 18px;">
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#9b9490;margin-bottom:6px;">Current Level</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;line-height:1;color:${glass3dColors[t.current_level ?? 0]};font-variant-numeric:tabular-nums;">L${t.current_level ?? 0}</div>
+      <div style="font-size:12px;color:#625e59;margin-top:5px;">${daysToLevel != null ? `Reached in ${daysToLevel} days` : `In program ${days ?? "—"} days`}</div>
+    </div>
   </div>
 </div>
 
-<div class="data-grid">
-  <div class="data-col">
-    <div class="data-col-head">Clients</div>
-    <table>${clientsHtml}</table>
-  </div>
-  <div class="data-col">
-    <div class="data-col-head">Visits</div>
-    <table>${visitsHtml}</table>
-  </div>
-  <div class="data-col">
-    <div class="data-col-head">Learning</div>
-    <table>${learningHtml}</table>
-  </div>
+<div class="section">
+  <div class="slabel">Level Progression</div>
+  <div style="display:flex;height:10px;border-radius:100px;overflow:hidden;gap:2px;margin-bottom:20px;">${levelBarHtml}</div>
+  ${timelineHtml}
 </div>
 
-<div class="info-row">
-  <div class="info-box">
-    <div class="info-box-label">Projects</div>
-    <div>${projectsHtml}</div>
-  </div>
-  <div class="info-box">
-    <div class="info-box-label">CSAT Score</div>
-    <div style="font-size:${t.csat_score != null ? "28px" : "13px"};font-weight:700;color:${t.csat_score != null ? "#EC6724" : "#86868B"};">${t.csat_score != null ? t.csat_score + "%" : "Not recorded"}</div>
-  </div>
+<div class="section">
+  <div class="slabel">Learning Assessment</div>
+  ${learningRowsHtml}
+  <div style="font-size:11px;color:#9b9490;margin-top:12px;">Pass threshold: 9/15 (60%) &middot; Average score: ${avgPct != null ? avgPct : "—"}%</div>
 </div>
 
-<div style="border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
-  <div class="info-box-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#86868B;margin-bottom:6px;">Remarks</div>
-  <div style="font-size:13px;color:${t.notes ? "#1d1d1f" : "#86868B"};">${t.notes || "No remarks added."}</div>
+${totalVisits > 0 ? `<div class="section">
+  <div class="slabel">Field Visits — Top Clients</div>
+  ${visitsHtml}
+</div>` : ""}
+
+${highlights.length > 0 ? `<div class="section">
+  <div class="slabel">Key Highlights</div>
+  ${highlightsHtml}
+</div>` : ""}
+
+${remarksHtml ? `<div class="section">
+  <div class="slabel">Remarks</div>
+  <div style="font-size:13.5px;color:#1a1714;line-height:1.65;">${remarksHtml}</div>
+</div>` : ""}
+
+${focusItems.length > 0 ? `<div class="section">
+  <div class="slabel">Focus Areas for Management</div>
+  ${focusHtml}
+</div>` : ""}
+
+<div style="padding:14px 36px;border-top:1px solid #e6e2db;background:#f5f3f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;">
+  <div style="font-size:11px;color:#9b9490;">Okie Dokie &middot; Training &amp; Performance Tracker</div>
+  <div style="font-size:11px;color:#9b9490;">${t.name || "Trainee"} &middot; ${today} &middot; Confidential</div>
 </div>
 
-<div class="footer">
-  <span>Okie Dokie Admin · Training Tracker</span>
-  <span>${t.name} · ${fmtDate(new Date().toISOString())}</span>
 </div>
 </body>
 </html>`;
@@ -436,7 +506,7 @@ function TraineeCard({
     if (!win) return;
     win.document.write(html);
     win.document.close();
-    setTimeout(() => win.print(), 400);
+    setTimeout(() => win.print(), 600);
   };
 
   return (
