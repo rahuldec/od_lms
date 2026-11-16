@@ -5,7 +5,7 @@ import { fetchAllAssignmentResults } from "@/lib/assignments";
 import { fetchClients, groupAssignmentsByTrainee, buildSheetSync } from "@/lib/clients";
 import { groupProjectAssignmentsByTrainee } from "@/lib/projects";
 import { groupSprintAssignmentsByTrainee } from "@/lib/sprints";
-import { daysAtCurrentLevel } from "@/lib/levelHistory";
+import { daysAtCurrentLevel, getLevelPeriods } from "@/lib/levelHistory";
 import "@/styles/glass3d.css";
 import AppShell from "@/components/AppShell";
 import LevelTimeline from "@/components/LevelTimeline";
@@ -17,7 +17,7 @@ import RemarksDialog from "@/components/RemarksDialog";
 import CsatDialog from "@/components/CsatDialog";
 import CardSettingsDialog from "@/components/CardSettingsDialog";
 import { Card } from "@/components/ui/card";
-import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw } from "lucide-react";
+import { Users, TrendingUp, CheckCircle2, PauseCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, BarChart3, Layers, Briefcase, MapPin, Rocket, MessageSquare, Info, AlertTriangle, Plus, Settings, Smile, Clock, RefreshCw, Printer } from "lucide-react";
 import { toast } from "sonner";
 
 const Stat = ({ icon: Icon, label, value, testId, accent }) => (
@@ -248,6 +248,197 @@ function TraineeCard({
   const visitMap = {};
   visitRows.forEach((v) => { visitMap[v.client_name.trim().toLowerCase()] = v.visit_count || 0; });
 
+  const printPerformanceCard = () => {
+    const periods = getLevelPeriods(t);
+    const batchName = batchNameById[t.batch_id] || "";
+    const totalBilling = sheetClients.reduce((s, c) => s + (c.billing || 0), 0);
+    const fmtAmt = (n) => !n ? "—" : n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${Math.round(n / 1000)}K`;
+    const glass3dColors = ["#c9b8a0", "#ed601f", "#811a0f", "#c99a2e"];
+    const totalPeriodDays = periods.reduce((s, p) => s + p.days, 0);
+
+    const levelBarHtml = periods.map((p) =>
+      `<div style="width:${totalPeriodDays ? (p.days / totalPeriodDays) * 100 : 0}%;background:${glass3dColors[p.level] || "#94a3b8"};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;min-width:${p.days > 0 ? 32 : 0}px;overflow:hidden;white-space:nowrap;padding:0 4px;">L${p.level}·${p.days}d</div>`
+    ).join("");
+
+    // Build unique level milestone dots (deduplicate by level, prefer first non-zero period)
+    const milestones = [];
+    const seen = new Set();
+    periods.forEach((p) => {
+      if (!seen.has(p.level) && p.days > 0) {
+        seen.add(p.level);
+        milestones.push(p);
+      }
+    });
+    const dotsHtml = milestones.map((p, i) => `
+      <div style="display:flex;align-items:flex-start;flex:${i < milestones.length - 1 ? '1' : '0'};min-width:0;">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${glass3dColors[p.level]};border:2px solid #fff;"></div>
+          <div style="font-size:11px;font-weight:700;color:${glass3dColors[p.level]};margin-top:2px;">L${p.level}</div>
+          <div style="font-size:10px;color:#86868B;">${p.days}d</div>
+          <div style="font-size:10px;color:#86868B;">${fmtDate(p.start)}</div>
+        </div>
+        ${i < milestones.length - 1 ? `<div style="flex:1;height:2px;background:${glass3dColors[p.level]};opacity:0.35;margin-top:4px;min-width:12px;"></div>` : ""}
+      </div>
+    `).join("");
+
+    const clientsHtml = sheetClients.length
+      ? sheetClients.map((c) => `<tr><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;">${c.name}</td><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;text-align:right;color:#86868B;">${fmtAmt(c.billing)}</td></tr>`).join("")
+      : `<tr><td colspan="2" style="padding:7px 10px;font-size:13px;color:#86868B;">No clients in sheet</td></tr>`;
+
+    const visitsHtml = visited.length
+      ? visited.map((v) => `<tr><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;">${v.client_name}</td><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;text-align:right;"><span style="background:#FDF0E8;color:#EC6724;font-weight:700;padding:2px 10px;border-radius:20px;font-size:12px;">${v.count}</span></td></tr>`).join("")
+      : `<tr><td colspan="2" style="padding:7px 10px;font-size:13px;color:#86868B;">No visits logged</td></tr>`;
+
+    const learningHtml = assignments.length
+      ? assignments.map((a) => {
+          const pct = a.total ? Math.round((a.score / a.total) * 100) : 0;
+          const badge = a.passed
+            ? `<span style="background:#d1fae5;color:#065f46;font-weight:700;padding:2px 10px;border-radius:20px;font-size:12px;">${a.score}/${a.total}</span>`
+            : `<span style="background:#fee2e2;color:#991b1b;font-weight:700;padding:2px 10px;border-radius:20px;font-size:12px;">${a.score}/${a.total}</span>`;
+          return `<tr><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;">${a.name}</td><td style="padding:7px 10px;font-size:13px;border-bottom:1px solid #f5f5f5;text-align:right;">${badge}</td></tr>`;
+        }).join("")
+      : `<tr><td colspan="2" style="padding:7px 10px;font-size:13px;color:#86868B;">No assignments yet</td></tr>`;
+
+    const projectsHtml = myProjects.length
+      ? myProjects.map((p) => `<span style="display:inline-block;background:#f3f4f6;color:#374151;border-radius:20px;padding:3px 10px;font-size:12px;margin:2px;">${p.project_name || p}</span>`).join("")
+      : `<span style="font-size:13px;color:#86868B;">No projects assigned</span>`;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${t.name} — Performance Report</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1d1d1f;background:#fff;padding:32px;max-width:860px;margin:0 auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #EC6724;padding-bottom:14px;margin-bottom:22px}
+  .brand{font-size:14px;font-weight:800;color:#EC6724;letter-spacing:0.06em;text-transform:uppercase}
+  .report-title{font-size:11px;color:#86868B;margin-top:3px}
+  .gen-date{font-size:11px;color:#86868B;text-align:right}
+  .trainee-row{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px}
+  .avatar{width:52px;height:52px;background:#EC6724;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;flex-shrink:0}
+  .trainee-name{font-size:22px;font-weight:700;color:#1d1d1f;line-height:1.1}
+  .trainee-username{font-size:13px;color:#86868B;margin-top:3px}
+  .badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+  .meta-right{margin-left:auto;text-align:right;flex-shrink:0}
+  .days-num{font-size:36px;font-weight:700;color:#1d1d1f;line-height:1}
+  .days-label{font-size:11px;color:#86868B}
+  .section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#86868B;margin-bottom:7px;display:flex;align-items:center;gap:5px}
+  .level-bar{display:flex;border-radius:8px;overflow:hidden;height:28px;margin-bottom:9px}
+  .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+  .stat-card{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
+  .stat-val{font-size:26px;font-weight:700;line-height:1}
+  .stat-sub{font-size:11px;color:#86868B;margin-top:2px}
+  .data-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+  .data-col{border:1px solid #e5e5e5;border-radius:12px;overflow:hidden}
+  .data-col-head{padding:9px 12px;background:#fafafa;border-bottom:1px solid #f0f0f0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#86868B}
+  table{width:100%;border-collapse:collapse}
+  .info-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .info-box{border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px}
+  .info-box-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#86868B;margin-bottom:6px}
+  .footer{margin-top:28px;border-top:1px solid #e5e5e5;padding-top:10px;display:flex;justify-content:space-between;font-size:11px;color:#86868B}
+  @media print{body{padding:16px}@page{margin:12mm;size:A4}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="brand">Okie Dokie</div>
+    <div class="report-title">Trainee Performance Report</div>
+  </div>
+  <div class="gen-date">Generated: ${fmtDate(new Date().toISOString())}</div>
+</div>
+
+<div class="trainee-row">
+  <div class="avatar">${(t.name || "?").charAt(0).toUpperCase()}</div>
+  <div style="flex:1;min-width:0;">
+    <div class="trainee-name">${t.name || "—"}</div>
+    <div class="trainee-username">@${t.username || "—"}</div>
+    <div class="badges">
+      <span class="badge" style="background:#d1fae5;color:#065f46;">${t.status || "Active"}</span>
+      <span class="badge" style="background:#FDF0E8;color:#EC6724;">L${t.current_level ?? 0} · ${levelDays}d</span>
+      ${batchName ? `<span class="badge" style="background:#fef9c3;color:#854d0e;">${batchName}</span>` : ""}
+      ${t.department ? `<span class="badge" style="background:#FDF0E8;color:#EC6724;">${t.department}</span>` : ""}
+      ${t.join_date ? `<span class="badge" style="background:#f3f4f6;color:#6b7280;">Joined ${fmtDate(t.join_date)}</span>` : ""}
+      ${latestPromotion ? `<span class="badge" style="background:#f3f4f6;color:#6b7280;">↑ Promoted ${fmtDate(latestPromotion.effective_date || latestPromotion.at)}</span>` : ""}
+    </div>
+  </div>
+  <div class="meta-right">
+    <div class="days-num">${days ?? "—"}</div>
+    <div class="days-label">days in program</div>
+  </div>
+</div>
+
+<div style="margin-bottom:18px;">
+  <div class="section-label">Level Progression</div>
+  <div class="level-bar">${levelBarHtml}</div>
+  <div style="display:flex;align-items:flex-start;margin-top:6px;">${dotsHtml}</div>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="section-label" style="margin-bottom:6px;">Clients</div>
+    <div class="stat-val" style="color:#EC6724;">${sheetClientCount || sheetClients.length || 0}</div>
+    <div class="stat-sub">${totalBilling > 0 ? fmtAmt(totalBilling) + " total billing" : "No billing data"}</div>
+  </div>
+  <div class="stat-card">
+    <div class="section-label" style="margin-bottom:6px;">Visits</div>
+    <div class="stat-val" style="color:#EC6724;">${totalVisits}</div>
+    <div class="stat-sub">${visited.length} client${visited.length !== 1 ? "s" : ""} visited</div>
+  </div>
+  <div class="stat-card">
+    <div class="section-label" style="margin-bottom:6px;">Learning</div>
+    <div class="stat-val" style="color:${avgPct != null && avgPct >= 60 ? "#16a34a" : "#dc2626"};">${avgPct != null ? avgPct + "%" : "—"}</div>
+    <div class="stat-sub">${passedCount}/${assignments.length} modules passed</div>
+  </div>
+</div>
+
+<div class="data-grid">
+  <div class="data-col">
+    <div class="data-col-head">Clients</div>
+    <table>${clientsHtml}</table>
+  </div>
+  <div class="data-col">
+    <div class="data-col-head">Visits</div>
+    <table>${visitsHtml}</table>
+  </div>
+  <div class="data-col">
+    <div class="data-col-head">Learning</div>
+    <table>${learningHtml}</table>
+  </div>
+</div>
+
+<div class="info-row">
+  <div class="info-box">
+    <div class="info-box-label">Projects</div>
+    <div>${projectsHtml}</div>
+  </div>
+  <div class="info-box">
+    <div class="info-box-label">CSAT Score</div>
+    <div style="font-size:${t.csat_score != null ? "28px" : "13px"};font-weight:700;color:${t.csat_score != null ? "#EC6724" : "#86868B"};">${t.csat_score != null ? t.csat_score + "%" : "Not recorded"}</div>
+  </div>
+</div>
+
+<div style="border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px;margin-bottom:18px;">
+  <div class="info-box-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#86868B;margin-bottom:6px;">Remarks</div>
+  <div style="font-size:13px;color:${t.notes ? "#1d1d1f" : "#86868B"};">${t.notes || "No remarks added."}</div>
+</div>
+
+<div class="footer">
+  <span>Okie Dokie Admin · Training Tracker</span>
+  <span>${t.name} · ${fmtDate(new Date().toISOString())}</span>
+</div>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 400);
+  };
+
   return (
     <div className="g3d-scope g3d-card overflow-hidden" style={{ background: "#F5F5F7" }}>
 
@@ -278,6 +469,14 @@ function TraineeCard({
                   <div className="text-[10px] mt-0.5" style={{ color: "var(--g3d-faint)" }}>days in program</div>
                 </div>
               )}
+              <button
+                onClick={printPerformanceCard}
+                title="Download performance card"
+                className="h-7 w-7 rounded-full grid place-items-center hover:opacity-70"
+                style={{ color: "var(--g3d-faint)" }}
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </button>
               <button
                 onClick={onEditCardSettings}
                 data-testid={`card-settings-${t.id}`}
